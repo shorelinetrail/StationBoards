@@ -158,6 +158,7 @@ void displaySplashScreen();
 void displayProgress(const char* step, int currentStep, int totalSteps, int progress);
 void displayWelcomeScreen();
 void displayAPScreen();
+void displayReadyScreen(const IPAddress& ip);
 void displayMessage(const char* line1, const char* line2 = "");
 void displayStatus(const char* status);
 String extractTagValue(String xml, String tag, String ns = "");
@@ -1772,10 +1773,14 @@ void setup() {
   
   // Setup OTA
   setupOTA();
-  
+
   displayProgress("System ready!", 5, 5, 100);
-  delay(1000);
-  
+  delay(500);
+
+  IPAddress localIp = WiFi.localIP();
+  displayReadyScreen(localIp);
+  delay(4000);
+
   Serial.println("\n✅ Setup complete!");
   Serial.println("📍 IP: " + WiFi.localIP().toString());
   Serial.println("🌐 WebSocket ready on port 81");
