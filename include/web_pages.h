@@ -812,13 +812,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <div class="form-group">
             <label for="y2">Second Line Vertical Position</label>
             <input type="number" id="y2" name="y2" value="{Y2}" min="0" max="64" required>
-            <span class="help-text">Default 40. Keep lower than the bottom line for spacing.</span>
+            <span class="help-text">Default 38. Keep lower than the bottom line for spacing.</span>
           </div>
 
           <div class="form-group">
             <label for="y3">Bottom Line Vertical Position</label>
             <input type="number" id="y3" name="y3" value="{Y3}" min="0" max="64" required>
-            <span class="help-text">Default 54. Controls the alternating services baseline.</span>
+            <span class="help-text">Default 50. Controls the alternating services baseline.</span>
           </div>
         </div>
       </div>
