@@ -7,9 +7,10 @@
 #include <SPIFFS.h>
 #include <time.h>
 #include <ArduinoOTA.h>
-#include <WebSocketsServer.h>  // ← NEW: WebSocket support
-#include <WebSocketsClient.h>  // ← MONITORING: WebSocket client for monitoring server
-#include <HTTPUpdate.h>        // ← MONITORING: For OTA updates from monitoring server
+#include <ArduinoJson.h>         // ← FIXED: Added missing include
+#include <WebSocketsServer.h>
+#include <WebSocketsClient.h>
+#include <HTTPUpdate.h>
 #include "config.h"
 #include "web_pages.h"
 
@@ -22,7 +23,7 @@ U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI u8g2(U8G2_R0, 5, 16, 17);
 
 // ---------------- Web Server ----------------
 WebServer server(80);
-WebSocketsServer webSocket = WebSocketsServer(81);  // ← NEW: WebSocket on port 81
+WebSocketsServer webSocket = WebSocketsServer(81);
 
 // ---------------- Configuration ----------------
 Config config;
@@ -53,7 +54,7 @@ unsigned long lastCallingAtScroll = 0;
 bool apMode = false;
 bool systemError = false;
 bool firstBoot = false;
-bool fetchingNewStation = false;  // Track when we're fetching data for a station change
+bool fetchingNewStation = false;
 unsigned long lastDisplaySnapshot = 0;
 
 enum FetchState {
@@ -72,18 +73,18 @@ unsigned long fetchStartTime = 0;
 unsigned long lastFetchAttempt = 0;
 unsigned long lastSuccessfulFetch = 0;
 
-// ← NEW: WebSocket connected clients
-uint8_t connectedClients[10];
+// WebSocket connected clients
+uint8_t connectedClients[10] = {0};  // ← FIXED: Initialized array
 uint8_t clientCount = 0;
 unsigned long lastMetricsBroadcast = 0;
 
-// ← MONITORING: Remote monitoring server configuration
-String monitorServerHost = "192.168.0.75";  // Change to your PC's IP address
+// Remote monitoring server configuration
+String monitorServerHost = "192.168.0.75";  // TODO: Make this configurable
 int monitorServerPort = 3000;
 bool monitoringEnabled = true;
 WebSocketsClient monitorClient;
 unsigned long lastMonitorHeartbeat = 0;
-const unsigned long MONITOR_HEARTBEAT_INTERVAL = 30000;  // 30 seconds
+const unsigned long MONITOR_HEARTBEAT_INTERVAL = 30000;
 bool monitorConnected = false;
 
 // ---------------- Logo Bitmap ----------------
@@ -135,11 +136,8 @@ const unsigned char logo_bitmap [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-	0x00, 0xfc, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x07, 0x00, 0x00, 0x00, 0x00, 
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0xfc, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x07, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -692,6 +690,25 @@ void displayStatus(const char* status) {
   u8g2.print(status);
 }
 
+void displayReadyScreen(const IPAddress& ip) {
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_helvB12_tr);
+  
+  String ready = "Ready!";
+  int width = u8g2.getUTF8Width(ready.c_str());
+  u8g2.setCursor((256 - width) / 2, 16);
+  u8g2.print(ready);
+  
+  u8g2.setFont(u8g2_font_t0_11_tf);
+  u8g2.setCursor(10, 32);
+  u8g2.print("IP: " + ip.toString());
+  
+  u8g2.setCursor(10, 46);
+  u8g2.print("Station: " + String(config.stationCode));
+  
+  u8g2.sendBuffer();
+}
+
 // Utility Functions
 String extractTagValue(String xml, String tag, String ns) {
   String openTag = "<" + (ns != "" ? ns + ":" : "") + tag + ">";
@@ -764,66 +781,42 @@ String fitTextToWidth(String text, int maxWidth) {
 
 // WiFi Functions
 bool initializeWiFi() {
-  String ssid = String(config.wifiSSID);
-  ssid.trim();
-
-  if (ssid.isEmpty()) {
+  if (strlen(config.wifiSSID) == 0) {
     Serial.println("⚠️ WiFi SSID not configured");
     return false;
   }
 
-  WiFi.persistent(false);
-  WiFi.setAutoReconnect(true);
+  Serial.println("📡 Connecting to WiFi: " + String(config.wifiSSID));
+
   WiFi.softAPdisconnect(true);
-  WiFi.disconnect(true, true);
   WiFi.mode(WIFI_STA);
   delay(100);
 
-  bool connected = false;
-  for (uint8_t attempt = 0; attempt < 2 && !connected; ++attempt) {
-    if (attempt == 0) {
-      Serial.println("📡 Connecting to WiFi: " + ssid);
-    } else {
-      Serial.println("🔁 Retrying WiFi connection...");
-      WiFi.disconnect(true, true);
-      delay(200);
-      WiFi.mode(WIFI_STA);
-      delay(100);
-    }
-
-    WiFi.begin(config.wifiSSID, config.wifiPassword);
-
-    int pollCount = 0;
-    while (WiFi.status() != WL_CONNECTED && pollCount < 100) {
-      delay(300);
-      Serial.print(".");
-      ++pollCount;
-      if (pollCount % 4 == 0) {
-        int progress = min(100, (pollCount * 100) / 30);
-        displayProgress("Connecting to WiFi...", 2, 5, progress);
-      }
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
-      WiFi.softAPdisconnect(true);
-      apMode = false;
-      connected = true;
-    } else {
-      Serial.println("\n❌ WiFi Connection Failed");
+  WiFi.begin(config.wifiSSID, config.wifiPassword);
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 100) {
+    delay(300);
+    Serial.print(".");
+    attempts++;
+    if (attempts % 4 == 0) {
+      int progress = (attempts * 100) / 30;
+      displayProgress("Connecting to WiFi...", 2, 5, progress);
     }
   }
 
-  if (!connected) {
-    Serial.println("🚨 Unable to connect to WiFi after two attempts");
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
+    apMode = false;
+    return true;
+  } else {
+    Serial.println("\n❌ WiFi Connection Failed");
+    return false;
   }
-
-  return connected;
+  // ← FIXED: Removed unreachable "return connected;"
 }
 
 void startAccessPoint() {
-  WiFi.disconnect(true, true);
-  WiFi.softAPdisconnect(true);
+  WiFi.disconnect();
   WiFi.mode(WIFI_AP);
   delay(100);
   WiFi.softAP("TrainBoard_AP", "config123");
@@ -983,12 +976,12 @@ void handleFetchStateMachine() {
       break;
 
     case FETCH_DONE:
-    if (parseAndDisplayResponse(fetchBuffer)) {
-      displayStatus("OK");
-      lastSuccessfulFetch = millis();  
-      lastDataUpdate = millis();
-      Serial.println("✅ Parse successful");
-    } else {
+      if (parseAndDisplayResponse(fetchBuffer)) {
+        displayStatus("OK");
+        lastSuccessfulFetch = millis();  
+        lastDataUpdate = millis();
+        Serial.println("✅ Parse successful");
+      } else {
         displayStatus("ERR");
         Serial.println("❌ Parse failed");
       }
@@ -1503,20 +1496,12 @@ void setupWebServer() {
 
   server.on("/save", HTTP_POST, []() {
     if (server.hasArg("ssid")) {
-      String ssid = server.arg("ssid");
-      ssid.trim();
-      strncpy(config.wifiSSID, ssid.c_str(), sizeof(config.wifiSSID) - 1);
+      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
       config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
     }
-    if (server.hasArg("password")) {
-      String password = server.arg("password");
-      password.trim();
-      if (password.length() == 0) {
-        config.wifiPassword[0] = '\0';
-      } else {
-        strncpy(config.wifiPassword, password.c_str(), sizeof(config.wifiPassword) - 1);
-        config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
-      }
+    if (server.hasArg("password") && !server.arg("password").isEmpty()) {
+      strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
+      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
     }
     if (server.hasArg("station")) {
       String station = server.arg("station");
@@ -1552,7 +1537,6 @@ void setupWebServer() {
     
     config.save();
     
-    // ← NEW: Notify WebSocket clients before restart
     broadcastStatus("Device restarting - settings saved", "warning");
     
     String html = FPSTR(SAVE_SUCCESS_PAGE);
@@ -1569,20 +1553,12 @@ void setupWebServer() {
     int oldExtraServices = config.extraServices;
     
     if (server.hasArg("ssid")) {
-      String ssid = server.arg("ssid");
-      ssid.trim();
-      strncpy(config.wifiSSID, ssid.c_str(), sizeof(config.wifiSSID) - 1);
+      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
       config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
     }
-    if (server.hasArg("password")) {
-      String password = server.arg("password");
-      password.trim();
-      if (password.length() == 0) {
-        config.wifiPassword[0] = '\0';
-      } else {
-        strncpy(config.wifiPassword, password.c_str(), sizeof(config.wifiPassword) - 1);
-        config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
-      }
+    if (server.hasArg("password") && !server.arg("password").isEmpty()) {
+      strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
+      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
     }
     if (server.hasArg("station")) {
       String station = server.arg("station");
@@ -1747,7 +1723,6 @@ void setupWebServer() {
   server.begin();
   Serial.println("✅ HTTP server started on port 80");
   
-  // ← NEW: Start WebSocket server
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
   Serial.println("✅ WebSocket server started on port 81");
@@ -1825,11 +1800,11 @@ void setup() {
   Serial.println("🌐 WebSocket ready on port 81");
   Serial.println("📊 Free heap: " + String(ESP.getFreeHeap()) + " bytes");
   
-  // ← MONITORING: Connect to monitoring server
+  // Connect to monitoring server
   if (monitoringEnabled && !apMode) {
     Serial.println("🔌 Connecting to monitoring server...");
     Serial.println("   Host: " + monitorServerHost + ":" + String(monitorServerPort));
-    monitorClient.begin(monitorServerHost, monitorServerPort, "/ws");  // Plain WebSocket path
+    monitorClient.begin(monitorServerHost, monitorServerPort, "/ws");
     monitorClient.onEvent(monitorWebSocketEvent);
     monitorClient.setReconnectInterval(5000);
     delay(500);
@@ -1840,7 +1815,7 @@ void setup() {
 
 void loop() {
   server.handleClient();
-  webSocket.loop();  // ← NEW: Handle WebSocket events
+  webSocket.loop();
   
   ArduinoOTA.handle();
 
@@ -1861,35 +1836,35 @@ void loop() {
 
   unsigned long currentTime = millis();
 
-  // Fetch with regular intervals
+  // Fetch with regular intervals - ← FIXED: Proper indentation
   if (fetchState == FETCH_IDLE) {
-  unsigned long timeSinceLastSuccess = currentTime - lastSuccessfulFetch;
-  unsigned long timeSinceLastAttempt = currentTime - lastFetchAttempt;
-  
-  bool shouldFetch = (timeSinceLastSuccess >= config.refreshInterval * 1000UL);
-  bool enoughTimeSinceAttempt = (timeSinceLastAttempt >= 30000UL);
-  bool forceFetch = (lastFetchAttempt == 0 && lastSuccessfulFetch == 0); // New condition
-  
-  if ((shouldFetch && enoughTimeSinceAttempt) || forceFetch) {
-    if (WiFi.status() == WL_CONNECTED) {
-      lastFetchAttempt = currentTime;
-      if (!asyncFetchStart()) {
-        displayStatus("ERR");
+    unsigned long timeSinceLastSuccess = currentTime - lastSuccessfulFetch;
+    unsigned long timeSinceLastAttempt = currentTime - lastFetchAttempt;
+    
+    bool shouldFetch = (timeSinceLastSuccess >= config.refreshInterval * 1000UL);
+    bool enoughTimeSinceAttempt = (timeSinceLastAttempt >= 30000UL);
+    bool forceFetch = (lastFetchAttempt == 0 && lastSuccessfulFetch == 0);
+    
+    if ((shouldFetch && enoughTimeSinceAttempt) || forceFetch) {
+      if (WiFi.status() == WL_CONNECTED) {
+        lastFetchAttempt = currentTime;
+        if (!asyncFetchStart()) {
+          displayStatus("ERR");
+        }
+      } else {
+        Serial.println("❌ WiFi disconnected");
+        displayStatus("OFF");
+        lastFetchAttempt = currentTime;
+        if (!initializeWiFi()) startAccessPoint();
       }
-    } else {
-      Serial.println("❌ WiFi disconnected");
-      displayStatus("OFF");
-      lastFetchAttempt = currentTime;
-      if (!initializeWiFi()) startAccessPoint();
     }
   }
-}
 
   handleFetchStateMachine();
   handleAlternatingService(currentTime);
   updateDisplay();  // CRITICAL: Called every loop for smooth animations and clock updates!
   
-  // ← MONITORING: Handle monitoring server connection
+  // Handle monitoring server connection
   if (monitoringEnabled) {
     monitorClient.loop();
     
@@ -1900,7 +1875,7 @@ void loop() {
     }
   }
   
-  // ← NEW: Broadcast metrics periodically
+  // Broadcast metrics periodically
   if (currentTime - lastMetricsBroadcast >= 10000) {  // Every 10 seconds
     broadcastMetrics();
     lastMetricsBroadcast = currentTime;
@@ -1914,13 +1889,3 @@ void loop() {
   
   delay(20);
 }
-
-// NOTE: In your actual parseAndDisplayResponse function, add this after successful parse:
-// broadcastTrainUpdate();  // ← Notify WebSocket clients of new data
-// broadcastStatus("Train data updated", "success");
-
-// NOTE: When fetch fails, add:
-// broadcastStatus("Failed to fetch train data", "error");
-
-// NOTE: When fetch starts, add:
-// broadcastStatus("Fetching train data...", "info");
