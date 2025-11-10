@@ -158,6 +158,7 @@ void displaySplashScreen();
 void displayProgress(const char* step, int currentStep, int totalSteps, int progress);
 void displayWelcomeScreen();
 void displayAPScreen();
+void displayReadyScreen(const IPAddress& ip);
 void displayMessage(const char* line1, const char* line2 = "");
 void displayStatus(const char* status);
 String extractTagValue(String xml, String tag, String ns = "");
@@ -614,25 +615,59 @@ void displayWelcomeScreen() {
 
 void displayAPScreen() {
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_t0_11b_tf);
-  
-  u8g2.setCursor(5, 10);
-  u8g2.print("SETUP MODE");
-  
-  u8g2.setFont(u8g2_font_helvB10_tr);
-  u8g2.drawFrame(5, 18, 246, 26);
-  u8g2.setCursor(10, 30);
-  u8g2.print("SSID: TrainBoard_AP");
-  u8g2.setCursor(10, 42);
-  u8g2.print("Pass: config123");
-  
+  // Header bar
+  u8g2.setDrawColor(1);
+  u8g2.drawBox(0, 0, 256, 20);
+  u8g2.setDrawColor(0);
+  u8g2.setFont(u8g2_font_helvB12_tr);
+  const char *title = "SETUP MODE";
+  int titleWidth = u8g2.getUTF8Width(title);
+  u8g2.setCursor((256 - titleWidth) / 2, 15);
+  u8g2.print(title);
+
+  // Accent Wi-Fi icon in the header
+  u8g2.drawDisc(18, 10, 2, U8G2_DRAW_ALL);
+  u8g2.drawCircle(18, 10, 5, U8G2_DRAW_ALL);
+  u8g2.drawCircle(18, 10, 8, U8G2_DRAW_ALL);
+
+  u8g2.setDrawColor(1);
+
+  // Instructional copy
   u8g2.setFont(u8g2_font_t0_11_tf);
-  u8g2.setCursor(5, 56);
-  u8g2.print("Visit: ");
+  u8g2.setCursor(12, 34);
+  u8g2.print("1. Connect to the Wi-Fi network:");
+
+  // Highlighted credentials card
+  int cardX = 10;
+  int cardY = 38;
+  int cardW = 236;
+  int cardH = 24;
+  u8g2.drawRFrame(cardX, cardY, cardW, cardH, 4);
+  u8g2.setFont(u8g2_font_t0_11b_tf);
+  u8g2.setCursor(cardX + 8, cardY + 13);
+  u8g2.print("SSID");
+  u8g2.setFont(u8g2_font_t0_11_tf);
+  u8g2.setCursor(cardX + 48, cardY + 13);
+  u8g2.print(": TrainBoard_AP");
+  u8g2.setFont(u8g2_font_t0_11b_tf);
+  u8g2.setCursor(cardX + 8, cardY + 22);
+  u8g2.print("Password");
+  u8g2.setFont(u8g2_font_t0_11_tf);
+  u8g2.setCursor(cardX + 78, cardY + 22);
+  u8g2.print(": config123");
+
+  // Step two + URL
+  u8g2.setCursor(12, 64);
+  u8g2.print("2. Visit ");
   u8g2.setFont(u8g2_font_t0_11b_tf);
   IPAddress ip = WiFi.softAPIP();
   u8g2.print(ip.toString().c_str());
-  
+  u8g2.setFont(u8g2_font_t0_11_tf);
+  u8g2.print(" to configure.");
+
+  // Decorative underline
+  u8g2.drawHLine(10, 52, 236);
+
   u8g2.sendBuffer();
 }
 
@@ -729,66 +764,43 @@ String fitTextToWidth(String text, int maxWidth) {
 
 // WiFi Functions
 bool initializeWiFi() {
-  String ssid = String(config.wifiSSID);
-  ssid.trim();
-
-  if (ssid.isEmpty()) {
+  if (strlen(config.wifiSSID) == 0) {
     Serial.println("⚠️ WiFi SSID not configured");
     return false;
   }
 
-  WiFi.persistent(false);
-  WiFi.setAutoReconnect(true);
+  Serial.println("📡 Connecting to WiFi: " + String(config.wifiSSID));
+
   WiFi.softAPdisconnect(true);
-  WiFi.disconnect(true, true);
   WiFi.mode(WIFI_STA);
   delay(100);
 
-  bool wifiConnected = false;
-  for (uint8_t attempt = 0; attempt < 2 && !wifiConnected; ++attempt) {
-    if (attempt == 0) {
-      Serial.println("📡 Connecting to WiFi: " + ssid);
-    } else {
-      Serial.println("🔁 Retrying WiFi connection...");
-      WiFi.disconnect(true, true);
-      delay(200);
-      WiFi.mode(WIFI_STA);
-      delay(100);
-    }
-
-    WiFi.begin(config.wifiSSID, config.wifiPassword);
-
-    int pollCount = 0;
-    while (WiFi.status() != WL_CONNECTED && pollCount < 100) {
-      delay(300);
-      Serial.print(".");
-      ++pollCount;
-      if (pollCount % 4 == 0) {
-        int progress = min(100, (pollCount * 100) / 30);
-        displayProgress("Connecting to WiFi...", 2, 5, progress);
-      }
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
-      WiFi.softAPdisconnect(true);
-      apMode = false;
-      wifiConnected = true;
-    } else {
-      Serial.println("\n❌ WiFi Connection Failed");
+  WiFi.begin(config.wifiSSID, config.wifiPassword);
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 100) {
+    delay(300);
+    Serial.print(".");
+    attempts++;
+    if (attempts % 4 == 0) {
+      int progress = (attempts * 100) / 30;
+      displayProgress("Connecting to WiFi...", 2, 5, progress);
     }
   }
 
-  if (!wifiConnected) {
-    Serial.println("🚨 Unable to connect to WiFi after two attempts");
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
+    apMode = false;
+    return true;
+  } else {
+    Serial.println("\n❌ WiFi Connection Failed");
+    return false;
   }
 
-  return wifiConnected;
+  return connected;
 }
 
 void startAccessPoint() {
-  WiFi.disconnect(true, true);
-  WiFi.softAPdisconnect(true);
+  WiFi.disconnect();
   WiFi.mode(WIFI_AP);
   delay(100);
   WiFi.softAP("TrainBoard_AP", "config123");
@@ -1468,20 +1480,12 @@ void setupWebServer() {
 
   server.on("/save", HTTP_POST, []() {
     if (server.hasArg("ssid")) {
-      String ssid = server.arg("ssid");
-      ssid.trim();
-      strncpy(config.wifiSSID, ssid.c_str(), sizeof(config.wifiSSID) - 1);
+      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
       config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
     }
-    if (server.hasArg("password")) {
-      String password = server.arg("password");
-      password.trim();
-      if (password.length() == 0) {
-        config.wifiPassword[0] = '\0';
-      } else {
-        strncpy(config.wifiPassword, password.c_str(), sizeof(config.wifiPassword) - 1);
-        config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
-      }
+    if (server.hasArg("password") && !server.arg("password").isEmpty()) {
+      strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
+      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
     }
     if (server.hasArg("station")) {
       String station = server.arg("station");
@@ -1534,20 +1538,12 @@ void setupWebServer() {
     int oldExtraServices = config.extraServices;
     
     if (server.hasArg("ssid")) {
-      String ssid = server.arg("ssid");
-      ssid.trim();
-      strncpy(config.wifiSSID, ssid.c_str(), sizeof(config.wifiSSID) - 1);
+      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
       config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
     }
-    if (server.hasArg("password")) {
-      String password = server.arg("password");
-      password.trim();
-      if (password.length() == 0) {
-        config.wifiPassword[0] = '\0';
-      } else {
-        strncpy(config.wifiPassword, password.c_str(), sizeof(config.wifiPassword) - 1);
-        config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
-      }
+    if (server.hasArg("password") && !server.arg("password").isEmpty()) {
+      strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
+      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
     }
     if (server.hasArg("station")) {
       String station = server.arg("station");
@@ -1777,10 +1773,14 @@ void setup() {
   
   // Setup OTA
   setupOTA();
-  
+
   displayProgress("System ready!", 5, 5, 100);
-  delay(1000);
-  
+  delay(500);
+
+  IPAddress localIp = WiFi.localIP();
+  displayReadyScreen(localIp);
+  delay(4000);
+
   Serial.println("\n✅ Setup complete!");
   Serial.println("📍 IP: " + WiFi.localIP().toString());
   Serial.println("🌐 WebSocket ready on port 81");

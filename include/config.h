@@ -58,30 +58,17 @@ public:
     
     // Load WiFi
     if (doc.containsKey("wifiSSID")) {
-      String ssid = doc["wifiSSID"].as<String>();
-      ssid.trim();
-      strncpy(wifiSSID, ssid.c_str(), sizeof(wifiSSID) - 1);
+      strncpy(wifiSSID, doc["wifiSSID"], sizeof(wifiSSID) - 1);
       wifiSSID[sizeof(wifiSSID) - 1] = '\0';
-    } else {
-      wifiSSID[0] = '\0';
     }
     if (doc.containsKey("wifiPassword")) {
-      String password = doc["wifiPassword"].as<String>();
-      password.trim();
-      strncpy(wifiPassword, password.c_str(), sizeof(wifiPassword) - 1);
+      strncpy(wifiPassword, doc["wifiPassword"], sizeof(wifiPassword) - 1);
       wifiPassword[sizeof(wifiPassword) - 1] = '\0';
-    } else {
-      wifiPassword[0] = '\0';
     }
 
     // Load Station
     if (doc.containsKey("stationCode")) {
-      String station = doc["stationCode"].as<String>();
-      station.trim();
-      strncpy(stationCode, station.c_str(), sizeof(stationCode) - 1);
-      stationCode[sizeof(stationCode) - 1] = '\0';
-    } else {
-      strncpy(stationCode, "PAD", sizeof(stationCode) - 1);
+      strncpy(stationCode, doc["stationCode"], sizeof(stationCode) - 1);
       stationCode[sizeof(stationCode) - 1] = '\0';
     }
     
