@@ -24,8 +24,8 @@ public:
   
   // Display Positions
   int yPos1st = 26;
-  int yPos2nd = 40;
-  int yPosAlt = 54;
+  int yPos2nd = 38;
+  int yPosAlt = 50;
   
   // Vertical Spacing
   int lineSpacing = 14;  // Default spacing between lines
@@ -79,8 +79,8 @@ public:
     
     // Load Positions
     yPos1st = doc["yPos1st"] | 26;
-    yPos2nd = doc["yPos2nd"] | 40;
-    yPosAlt = doc["yPosAlt"] | 54;
+    yPos2nd = doc["yPos2nd"] | 38;
+    yPosAlt = doc["yPosAlt"] | 50;
     
     // Load Vertical Spacing
     lineSpacing = doc["lineSpacing"] | 14;
