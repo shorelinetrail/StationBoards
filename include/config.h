@@ -59,14 +59,17 @@ public:
     // Load WiFi
     if (doc.containsKey("wifiSSID")) {
       strncpy(wifiSSID, doc["wifiSSID"], sizeof(wifiSSID) - 1);
+      wifiSSID[sizeof(wifiSSID) - 1] = '\0';
     }
     if (doc.containsKey("wifiPassword")) {
       strncpy(wifiPassword, doc["wifiPassword"], sizeof(wifiPassword) - 1);
+      wifiPassword[sizeof(wifiPassword) - 1] = '\0';
     }
     
     // Load Station
     if (doc.containsKey("stationCode")) {
       strncpy(stationCode, doc["stationCode"], sizeof(stationCode) - 1);
+      stationCode[sizeof(stationCode) - 1] = '\0';
     }
     
     // Load Display Settings
