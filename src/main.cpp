@@ -760,6 +760,8 @@ bool initializeWiFi() {
     Serial.println("\n❌ WiFi Connection Failed");
     return false;
   }
+
+  return connected;
 }
 
 void startAccessPoint() {
