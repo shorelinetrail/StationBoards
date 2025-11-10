@@ -729,7 +729,17 @@ String fitTextToWidth(String text, int maxWidth) {
 
 // WiFi Functions
 bool initializeWiFi() {
+  if (strlen(config.wifiSSID) == 0) {
+    Serial.println("⚠️ WiFi SSID not configured");
+    return false;
+  }
+
   Serial.println("📡 Connecting to WiFi: " + String(config.wifiSSID));
+
+  WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_STA);
+  delay(100);
+
   WiFi.begin(config.wifiSSID, config.wifiPassword);
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 100) {
@@ -744,6 +754,7 @@ bool initializeWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
+    apMode = false;
     return true;
   } else {
     Serial.println("\n❌ WiFi Connection Failed");
@@ -752,6 +763,9 @@ bool initializeWiFi() {
 }
 
 void startAccessPoint() {
+  WiFi.disconnect();
+  WiFi.mode(WIFI_AP);
+  delay(100);
   WiFi.softAP("TrainBoard_AP", "config123");
   IPAddress ip = WiFi.softAPIP();
   Serial.println("🔧 AP Mode Started");
@@ -1428,9 +1442,13 @@ void setupWebServer() {
   });
 
   server.on("/save", HTTP_POST, []() {
-    if (server.hasArg("ssid")) strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
+    if (server.hasArg("ssid")) {
+      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
+      config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
+    }
     if (server.hasArg("password") && !server.arg("password").isEmpty()) {
       strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
+      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
     }
     if (server.hasArg("station")) {
       String station = server.arg("station");
@@ -1482,9 +1500,13 @@ void setupWebServer() {
     bool oldCallingAt = config.useCallingAt;
     int oldExtraServices = config.extraServices;
     
-    if (server.hasArg("ssid")) strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
+    if (server.hasArg("ssid")) {
+      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
+      config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
+    }
     if (server.hasArg("password") && !server.arg("password").isEmpty()) {
       strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
+      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
     }
     if (server.hasArg("station")) {
       String station = server.arg("station");
