@@ -1103,7 +1103,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           } else if (data.type === "train_update") {
             // Update current station in status bar
             if (data.station) {
-              document.getElementById("currentStation").textContent = data.station;
+              const stationEl = document.getElementById("currentStation");
+              if (stationEl) {
+                stationEl.textContent = data.station;
+              }
             }
           } else if (data.type === "metrics") {
             // Update RSSI
@@ -1114,13 +1117,23 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
               else if (rssi > -60) signal = "Good";
               else if (rssi > -70) signal = "Fair";
               
-              document.getElementById("rssiValue").textContent = rssi;
-              document.getElementById("wifiStrength").innerHTML = "📶 " + signal + " (" + rssi + " dBm)";
+              const rssiValueEl = document.getElementById("rssiValue");
+              if (rssiValueEl) {
+                rssiValueEl.textContent = rssi;
+              }
+
+              const wifiStrengthEl = document.getElementById("wifiStrength");
+              if (wifiStrengthEl) {
+                wifiStrengthEl.innerHTML = "📶 " + signal + " (" + rssi + " dBm)";
+              }
             }
           } else if (data.type === "state") {
             // Update station name from state
             if (data.stationName) {
-              document.getElementById("currentStation").textContent = data.stationName;
+              const stationEl = document.getElementById("currentStation");
+              if (stationEl) {
+                stationEl.textContent = data.stationName;
+              }
             }
             if (data.rssi) {
               const rssi = data.rssi;
@@ -1128,9 +1141,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
               if (rssi > -50) signal = "Excellent";
               else if (rssi > -60) signal = "Good";
               else if (rssi > -70) signal = "Fair";
-              
-              document.getElementById("rssiValue").textContent = rssi;
-              document.getElementById("wifiStrength").innerHTML = "📶 " + signal + " (" + rssi + " dBm)";
+
+              const rssiValueEl = document.getElementById("rssiValue");
+              if (rssiValueEl) {
+                rssiValueEl.textContent = rssi;
+              }
+
+              const wifiStrengthEl = document.getElementById("wifiStrength");
+              if (wifiStrengthEl) {
+                wifiStrengthEl.innerHTML = "📶 " + signal + " (" + rssi + " dBm)";
+              }
             }
           }
         } catch (e) {
@@ -1155,7 +1175,11 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     function updateWSStatus(connected) {
       const indicator = document.getElementById("wsIndicator");
       const statusText = document.getElementById("wsStatusText");
-      
+
+      if (!indicator || !statusText) {
+        return;
+      }
+
       if (connected) {
         indicator.classList.add("connected");
         statusText.textContent = "Connected";
