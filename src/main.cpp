@@ -158,6 +158,7 @@ void displaySplashScreen();
 void displayProgress(const char* step, int currentStep, int totalSteps, int progress);
 void displayWelcomeScreen();
 void displayAPScreen();
+void displayReadyScreen(const IPAddress& ip);
 void displayMessage(const char* line1, const char* line2 = "");
 void displayStatus(const char* status);
 String extractTagValue(String xml, String tag, String ns = "");
@@ -615,24 +616,51 @@ void displayWelcomeScreen() {
 void displayAPScreen() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_t0_11b_tf);
-  
+
   u8g2.setCursor(5, 10);
   u8g2.print("SETUP MODE");
-  
+
   u8g2.setFont(u8g2_font_helvB10_tr);
   u8g2.drawFrame(5, 18, 246, 26);
   u8g2.setCursor(10, 30);
   u8g2.print("SSID: TrainBoard_AP");
   u8g2.setCursor(10, 42);
   u8g2.print("Pass: config123");
-  
+
   u8g2.setFont(u8g2_font_t0_11_tf);
   u8g2.setCursor(5, 56);
   u8g2.print("Visit: ");
   u8g2.setFont(u8g2_font_t0_11b_tf);
   IPAddress ip = WiFi.softAPIP();
   u8g2.print(ip.toString().c_str());
-  
+
+  u8g2.sendBuffer();
+}
+
+void displayReadyScreen(const IPAddress& ip) {
+  u8g2.clearBuffer();
+
+  u8g2.setFont(u8g2_font_helvB12_tr);
+  const char* title = "Connected!";
+  int titleWidth = u8g2.getUTF8Width(title);
+  u8g2.setCursor((256 - titleWidth) / 2, 18);
+  u8g2.print(title);
+
+  u8g2.setFont(u8g2_font_t0_11b_tf);
+  String ipLine = "IP: " + ip.toString();
+  int ipWidth = u8g2.getUTF8Width(ipLine.c_str());
+  u8g2.setCursor((256 - ipWidth) / 2, 34);
+  u8g2.print(ipLine);
+
+  u8g2.setFont(u8g2_font_t0_11_tf);
+  String visitLine1 = "Visit " + ip.toString() + " in your";
+  String visitLine2 = "browser to change settings...";
+
+  u8g2.setCursor(10, 50);
+  u8g2.print(visitLine1);
+  u8g2.setCursor(10, 62);
+  u8g2.print(visitLine2);
+
   u8g2.sendBuffer();
 }
 
@@ -1736,10 +1764,14 @@ void setup() {
   
   // Setup OTA
   setupOTA();
-  
+
   displayProgress("System ready!", 5, 5, 100);
-  delay(1000);
-  
+  delay(500);
+
+  IPAddress localIp = WiFi.localIP();
+  displayReadyScreen(localIp);
+  delay(4000);
+
   Serial.println("\n✅ Setup complete!");
   Serial.println("📍 IP: " + WiFi.localIP().toString());
   Serial.println("🌐 WebSocket ready on port 81");
