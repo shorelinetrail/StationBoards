@@ -227,6 +227,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       gap: 20px;
     }
 
+    .form-row.form-row-three {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
     .button-group {
       display: flex;
       gap: 15px;
@@ -796,6 +800,26 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <label for="rotationspeed">Bottom Line Rotation Speed (seconds)</label>
           <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" required>
           <span class="help-text">How often the bottom line alternates between services (default: 15 seconds)</span>
+        </div>
+
+        <div class="form-row form-row-three">
+          <div class="form-group">
+            <label for="y1">First Line Vertical Position</label>
+            <input type="number" id="y1" name="y1" value="{Y1}" min="0" max="64" required>
+            <span class="help-text">Default 26. Higher values move the first line lower.</span>
+          </div>
+
+          <div class="form-group">
+            <label for="y2">Second Line Vertical Position</label>
+            <input type="number" id="y2" name="y2" value="{Y2}" min="0" max="64" required>
+            <span class="help-text">Default 40. Keep lower than the bottom line for spacing.</span>
+          </div>
+
+          <div class="form-group">
+            <label for="y3">Bottom Line Vertical Position</label>
+            <input type="number" id="y3" name="y3" value="{Y3}" min="0" max="64" required>
+            <span class="help-text">Default 54. Controls the alternating services baseline.</span>
+          </div>
         </div>
       </div>
 
@@ -1460,7 +1484,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       };
       
       // Auto-apply for all settings except WiFi (WiFi requires restart)
-      const autoApplyFields = ["station", "interval", "mode", "extra", "rotationspeed", "scrollspeed"];
+      const autoApplyFields = ["station", "interval", "mode", "extra", "rotationspeed", "scrollspeed", "y1", "y2", "y3"];
       autoApplyFields.forEach(function(fieldId) {
         const field = document.getElementById(fieldId);
         if (field) {
@@ -1502,6 +1526,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       formData.append('extra', document.getElementById('extra').value);
       formData.append('scrollspeed', document.getElementById('scrollspeed').value);
       formData.append('rotationspeed', document.getElementById('rotationspeed').value);
+      const y1Field = document.getElementById('y1');
+      if (y1Field) formData.append('y1', y1Field.value);
+      const y2Field = document.getElementById('y2');
+      if (y2Field) formData.append('y2', y2Field.value);
+      const y3Field = document.getElementById('y3');
+      if (y3Field) formData.append('y3', y3Field.value);
       
       // Show subtle notification
       showToast("Applying changes...", "info");
