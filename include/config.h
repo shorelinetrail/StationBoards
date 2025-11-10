@@ -65,7 +65,7 @@ public:
       strncpy(wifiPassword, doc["wifiPassword"], sizeof(wifiPassword) - 1);
       wifiPassword[sizeof(wifiPassword) - 1] = '\0';
     }
-    
+
     // Load Station
     if (doc.containsKey("stationCode")) {
       strncpy(stationCode, doc["stationCode"], sizeof(stationCode) - 1);
