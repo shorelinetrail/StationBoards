@@ -614,25 +614,59 @@ void displayWelcomeScreen() {
 
 void displayAPScreen() {
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_t0_11b_tf);
-  
-  u8g2.setCursor(5, 10);
-  u8g2.print("SETUP MODE");
-  
-  u8g2.setFont(u8g2_font_helvB10_tr);
-  u8g2.drawFrame(5, 18, 246, 26);
-  u8g2.setCursor(10, 30);
-  u8g2.print("SSID: TrainBoard_AP");
-  u8g2.setCursor(10, 42);
-  u8g2.print("Pass: config123");
-  
+  // Header bar
+  u8g2.setDrawColor(1);
+  u8g2.drawBox(0, 0, 256, 20);
+  u8g2.setDrawColor(0);
+  u8g2.setFont(u8g2_font_helvB12_tr);
+  const char *title = "SETUP MODE";
+  int titleWidth = u8g2.getUTF8Width(title);
+  u8g2.setCursor((256 - titleWidth) / 2, 15);
+  u8g2.print(title);
+
+  // Accent Wi-Fi icon in the header
+  u8g2.drawDisc(18, 10, 2, U8G2_DRAW_ALL);
+  u8g2.drawCircle(18, 10, 5, U8G2_DRAW_ALL);
+  u8g2.drawCircle(18, 10, 8, U8G2_DRAW_ALL);
+
+  u8g2.setDrawColor(1);
+
+  // Instructional copy
   u8g2.setFont(u8g2_font_t0_11_tf);
-  u8g2.setCursor(5, 56);
-  u8g2.print("Visit: ");
+  u8g2.setCursor(12, 34);
+  u8g2.print("1. Connect to the Wi-Fi network:");
+
+  // Highlighted credentials card
+  int cardX = 10;
+  int cardY = 38;
+  int cardW = 236;
+  int cardH = 24;
+  u8g2.drawRFrame(cardX, cardY, cardW, cardH, 4);
+  u8g2.setFont(u8g2_font_t0_11b_tf);
+  u8g2.setCursor(cardX + 8, cardY + 13);
+  u8g2.print("SSID");
+  u8g2.setFont(u8g2_font_t0_11_tf);
+  u8g2.setCursor(cardX + 48, cardY + 13);
+  u8g2.print(": TrainBoard_AP");
+  u8g2.setFont(u8g2_font_t0_11b_tf);
+  u8g2.setCursor(cardX + 8, cardY + 22);
+  u8g2.print("Password");
+  u8g2.setFont(u8g2_font_t0_11_tf);
+  u8g2.setCursor(cardX + 78, cardY + 22);
+  u8g2.print(": config123");
+
+  // Step two + URL
+  u8g2.setCursor(12, 64);
+  u8g2.print("2. Visit ");
   u8g2.setFont(u8g2_font_t0_11b_tf);
   IPAddress ip = WiFi.softAPIP();
   u8g2.print(ip.toString().c_str());
-  
+  u8g2.setFont(u8g2_font_t0_11_tf);
+  u8g2.print(" to configure.");
+
+  // Decorative underline
+  u8g2.drawHLine(10, 52, 236);
+
   u8g2.sendBuffer();
 }
 
