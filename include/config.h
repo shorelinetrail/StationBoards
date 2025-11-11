@@ -17,7 +17,7 @@ public:
   // Display Settings
   bool useCallingAt = false;
   bool showStationName = true;  // Show/hide station name to make room for extra service
-  int extraServices = 1;  // Number of extra services on bottom line (1-3)
+  int extraServices = 0;  // Number of extra services on bottom line (0-4)
   int refreshInterval = 60;  // Seconds between API calls
   int scrollSpeed = 50;  // Milliseconds for scrolling text
   int rotationSpeed = 15;  // Seconds between service rotations
@@ -88,7 +88,9 @@ public:
     // Load Display Settings
     useCallingAt = doc["useCallingAt"] | false;
     showStationName = doc["showStationName"] | true;
-    extraServices = doc["extraServices"] | 1;
+    extraServices = doc["extraServices"] | 0;
+    if (extraServices < 0) extraServices = 0;
+    if (extraServices > 4) extraServices = 4;
     refreshInterval = doc["refreshInterval"] | 60;
     scrollSpeed = doc["scrollSpeed"] | 50;
     rotationSpeed = doc["rotationSpeed"] | 15;

@@ -787,11 +787,22 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         </div>
 
         <div class="form-group">
+          <label for="showstation">Show Station Name at Top</label>
+          <select id="showstation" name="showstation">
+            <option value="1"{SHOWSTATION_SEL_1}>Show Station Name</option>
+            <option value="0"{SHOWSTATION_SEL_0}>Hide Station Name (adds extra service line)</option>
+          </select>
+          <span class="help-text">Hiding the station name adds an extra service at the top for more trains</span>
+        </div>
+
+        <div class="form-group">
           <label for="extra">Extra Services on Bottom Line</label>
           <select id="extra" name="extra">
+            <option value="0"{EXTRA_SEL_0}>No Extra Services</option>
             <option value="1"{EXTRA_SEL_1}>1 Extra Service</option>
             <option value="2"{EXTRA_SEL_2}>2 Extra Services</option>
             <option value="3"{EXTRA_SEL_3}>3 Extra Services</option>
+            <option value="4"{EXTRA_SEL_4}>4 Extra Services</option>
           </select>
           <span class="help-text">Number of additional services that rotate on the bottom line</span>
         </div>
