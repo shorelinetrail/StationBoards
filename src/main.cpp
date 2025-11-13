@@ -14,6 +14,12 @@
 #include "config.h"
 #include "web_pages.h"
 
+// Code Quality Improvements - Phase 2
+#include "constants.h"         // Named constants for all magic numbers
+#include "types.h"             // Data structures to organize globals
+#include "helpers.h"           // Validation and utility functions
+#include "display_functions.h" // Display component functions
+
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
 #endif
