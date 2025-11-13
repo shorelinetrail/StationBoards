@@ -15,6 +15,15 @@
 #include "web_pages.h"
 
 // Code Quality Improvements - Phase 2
+// Define guards before including headers to prevent duplicate definitions
+// (main.cpp has its own definitions of these that we'll migrate later)
+#define SERVICE_DATA_DEFINED
+#define FETCH_STATE_DEFINED
+#define DECODE_HTML_ENTITIES_DEFINED
+#define EXTRACT_TAG_VALUE_DEFINED
+#define FORMAT_ETD_DEFINED
+#define GENERATE_DEVICE_ID_DEFINED
+
 #include "constants.h"         // Named constants for all magic numbers
 #include "types.h"             // Data structures to organize globals
 #include "helpers.h"           // Validation and utility functions
@@ -166,8 +175,8 @@ void displayAPScreen();
 void displayReadyScreen(const IPAddress& ip);
 void displayMessage(const char* line1, const char* line2 = "");
 void displayStatus(const char* status);
-String extractTagValue(String xml, String tag, String ns = "");
-String decodeHTMLEntities(String text);
+// Note: extractTagValue, decodeHTMLEntities, formatETD, generateDeviceId
+// are defined later in this file - no forward declaration needed
 void handleFetchStateMachine();
 bool parseAndDisplayResponse(String response);
 bool asyncFetchStart();
@@ -179,10 +188,10 @@ void handleAlternatingService(unsigned long currentTime);
 void handleSystemError();
 void updateDisplay();
 bool checkFirstBoot();
-String generateDeviceId();
+// String generateDeviceId(); // Defined later, no forward declaration needed
 void setupOTA();
-String formatETD(String etd);
-String fitTextToWidth(String text, int maxWidth);
+// String formatETD(String etd); // Defined later, no forward declaration needed
+// String fitTextToWidth(...); // Template version in helpers.h handles this
 void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void sendMonitorHeartbeat();
 
