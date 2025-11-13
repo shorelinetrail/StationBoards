@@ -16,12 +16,12 @@
 
 // Code Quality Improvements - Phase 2
 // Define guards before including headers to prevent duplicate function definitions
-// Note: We use the header definitions for ServiceData and FetchState (commented below)
-// since other header code depends on them
+// Note: We use the header definitions for ServiceData, FetchState, and formatETD
+// since other header code (display_functions.h) depends on them
 #define DECODE_HTML_ENTITIES_DEFINED
 #define EXTRACT_TAG_VALUE_DEFINED
-#define FORMAT_ETD_DEFINED
 #define GENERATE_DEVICE_ID_DEFINED
+// Note: formatETD is NOT guarded - display_functions.h needs it from helpers.h
 
 #include "constants.h"         // Named constants for all magic numbers
 #include "types.h"             // Data structures to organize globals
@@ -788,12 +788,13 @@ bool checkFirstBoot() {
   return false;
 }
 
-String formatETD(String etd) {
-  if (etd.length() == 5 && etd.indexOf(":") != -1) {
-    return "Exp " + etd;
-  }
-  return etd;
-}
+// Note: formatETD is now defined in helpers.h
+// String formatETD(String etd) {
+//   if (etd.length() == 5 && etd.indexOf(":") != -1) {
+//     return "Exp " + etd;
+//   }
+//   return etd;
+// }
 
 String fitTextToWidth(String text, int maxWidth) {
   if (u8g2.getUTF8Width(text.c_str()) <= maxWidth) {
