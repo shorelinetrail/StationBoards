@@ -1766,42 +1766,81 @@ void setupWebServer() {
   });
 
   server.on("/save", HTTP_POST, []() {
+    // Validate SSID
     if (server.hasArg("ssid")) {
-      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
-      config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
+      String ssid = server.arg("ssid");
+      ValidationResult result = validateSSID(ssid);
+      if (!result.valid) {
+        server.send(400, "text/plain", "Invalid SSID: " + result.message);
+        return;
+      }
+      safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
     }
+
+    // Validate password
     if (server.hasArg("password") && !server.arg("password").isEmpty()) {
-      strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
-      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
+      String password = server.arg("password");
+      ValidationResult result = validatePassword(password);
+      if (!result.valid) {
+        server.send(400, "text/plain", "Invalid password: " + result.message);
+        return;
+      }
+      safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
     }
+
+    // Validate station code
     if (server.hasArg("station")) {
-      String station = server.arg("station");
-      station.trim();  // Remove any whitespace
-      station.toUpperCase();
-      // Extract only the 3-letter code if longer string provided
-      if (station.length() >= 3) {
-        station = station.substring(0, 3);
+      String station = sanitizeStationCode(server.arg("station"));
+      ValidationResult result = validateStationCode(station);
+      if (!result.valid) {
+        server.send(400, "text/plain", "Invalid station code: " + result.message);
+        return;
       }
-      // Only apply if we have exactly 3 characters
-      if (station.length() == 3) {
-        strncpy(config.stationCode, station.c_str(), sizeof(config.stationCode) - 1);
-        config.stationCode[3] = '\0';  // Ensure null termination
-      }
+      safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
     }
-    if (server.hasArg("interval")) config.refreshInterval = server.arg("interval").toInt();
+
+    // Validate refresh interval
+    if (server.hasArg("interval")) {
+      int interval = server.arg("interval").toInt();
+      ValidationResult result = validateRange(interval, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL, "Refresh interval");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.refreshInterval = interval;
+    }
+
     if (server.hasArg("mode")) config.useCallingAt = (server.arg("mode") == "1");
     if (server.hasArg("showstation")) config.showStationName = (server.arg("showstation") == "1");
+
+    // Validate extra services
     if (server.hasArg("extra")) {
-      config.extraServices = server.arg("extra").toInt();
-      if (config.extraServices < 0) config.extraServices = 0;
-      if (config.extraServices > 4) config.extraServices = 4;
+      int extra = server.arg("extra").toInt();
+      config.extraServices = constrainToRange(extra, 0, Data::MAX_EXTRA_SERVICES);
     }
-    if (server.hasArg("scrollspeed")) config.scrollSpeed = server.arg("scrollspeed").toInt();
+
+    // Validate scroll speed
+    if (server.hasArg("scrollspeed")) {
+      int speed = server.arg("scrollspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED, "Scroll speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.scrollSpeed = speed;
+    }
+
+    // Validate rotation speed
     if (server.hasArg("rotationspeed")) {
-      config.rotationSpeed = server.arg("rotationspeed").toInt();
-      if (config.rotationSpeed < 5) config.rotationSpeed = 5;
-      if (config.rotationSpeed > 60) config.rotationSpeed = 60;
+      int speed = server.arg("rotationspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED, "Rotation speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.rotationSpeed = speed;
     }
+
     if (server.hasArg("ytop")) config.yPosTop = server.arg("ytop").toInt();
     if (server.hasArg("y1")) config.yPos1st = server.arg("y1").toInt();
     if (server.hasArg("y2")) config.yPos2nd = server.arg("y2").toInt();
@@ -1823,43 +1862,82 @@ void setupWebServer() {
     String oldStation = String(config.stationCode);
     bool oldCallingAt = config.useCallingAt;
     int oldExtraServices = config.extraServices;
-    
+
+    // Validate SSID
     if (server.hasArg("ssid")) {
-      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
-      config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
+      String ssid = server.arg("ssid");
+      ValidationResult result = validateSSID(ssid);
+      if (!result.valid) {
+        server.send(400, "text/plain", "Invalid SSID: " + result.message);
+        return;
+      }
+      safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
     }
+
+    // Validate password
     if (server.hasArg("password") && !server.arg("password").isEmpty()) {
-      strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
-      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
+      String password = server.arg("password");
+      ValidationResult result = validatePassword(password);
+      if (!result.valid) {
+        server.send(400, "text/plain", "Invalid password: " + result.message);
+        return;
+      }
+      safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
     }
+
+    // Validate station code
     if (server.hasArg("station")) {
-      String station = server.arg("station");
-      station.trim();  // Remove any whitespace
-      station.toUpperCase();
-      // Extract only the 3-letter code if longer string provided
-      if (station.length() >= 3) {
-        station = station.substring(0, 3);
+      String station = sanitizeStationCode(server.arg("station"));
+      ValidationResult result = validateStationCode(station);
+      if (!result.valid) {
+        server.send(400, "text/plain", "Invalid station code: " + result.message);
+        return;
       }
-      // Only apply if we have exactly 3 characters
-      if (station.length() == 3) {
-        strncpy(config.stationCode, station.c_str(), sizeof(config.stationCode) - 1);
-        config.stationCode[3] = '\0';  // Ensure null termination
-      }
+      safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
     }
-    if (server.hasArg("interval")) config.refreshInterval = server.arg("interval").toInt();
+
+    // Validate refresh interval
+    if (server.hasArg("interval")) {
+      int interval = server.arg("interval").toInt();
+      ValidationResult result = validateRange(interval, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL, "Refresh interval");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.refreshInterval = interval;
+    }
+
     if (server.hasArg("mode")) config.useCallingAt = (server.arg("mode") == "1");
     if (server.hasArg("showstation")) config.showStationName = (server.arg("showstation") == "1");
+
+    // Validate extra services
     if (server.hasArg("extra")) {
-      config.extraServices = server.arg("extra").toInt();
-      if (config.extraServices < 0) config.extraServices = 0;
-      if (config.extraServices > 4) config.extraServices = 4;
+      int extra = server.arg("extra").toInt();
+      config.extraServices = constrainToRange(extra, 0, Data::MAX_EXTRA_SERVICES);
     }
-    if (server.hasArg("scrollspeed")) config.scrollSpeed = server.arg("scrollspeed").toInt();
+
+    // Validate scroll speed
+    if (server.hasArg("scrollspeed")) {
+      int speed = server.arg("scrollspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED, "Scroll speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.scrollSpeed = speed;
+    }
+
+    // Validate rotation speed
     if (server.hasArg("rotationspeed")) {
-      config.rotationSpeed = server.arg("rotationspeed").toInt();
-      if (config.rotationSpeed < 5) config.rotationSpeed = 5;
-      if (config.rotationSpeed > 60) config.rotationSpeed = 60;
+      int speed = server.arg("rotationspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED, "Rotation speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.rotationSpeed = speed;
     }
+
     if (server.hasArg("ytop")) config.yPosTop = server.arg("ytop").toInt();
     if (server.hasArg("y1")) config.yPos1st = server.arg("y1").toInt();
     if (server.hasArg("y2")) config.yPos2nd = server.arg("y2").toInt();
