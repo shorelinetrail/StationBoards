@@ -1111,11 +1111,11 @@ bool parseAndDisplayResponse(String response) {
     if (response.indexOf("GetStationBoardResult") != -1) {
       // Valid response, just no trains scheduled
       Serial.println("ℹ️ No trains scheduled at this station");
-      serviceCount = 0;
-      fetchingNewStation = false;
-      broadcastTrainUpdate();
-      broadcastStatus("No trains scheduled", "info");
-      return true;  // Success - valid response with zero services
+      Serial.println("✅ 0 services");
+
+      // Skip to the end to update global state properly
+      // newServiceCount is already 0 from initialization
+      goto update_globals;
     }
 
     // Not a valid station board response - this is an error
@@ -1277,6 +1277,7 @@ bool parseAndDisplayResponse(String response) {
 
   Serial.println("✅ " + String(newServiceCount) + " services");
 
+update_globals:
   // Only update serviceCount after parsing is complete
   // This ensures old data stays visible during parsing
   serviceCount = newServiceCount;
@@ -1285,9 +1286,14 @@ bool parseAndDisplayResponse(String response) {
     fetchingNewStation = false;  // Clear loading flag - we have data now
     broadcastTrainUpdate();  // Sends full train data to clients
     broadcastStatus("Train data updated", "success");
+  } else {
+    // No services found - clear loading flag and broadcast empty state
+    fetchingNewStation = false;
+    broadcastTrainUpdate();
+    broadcastStatus("No trains scheduled", "info");
   }
 
-  return serviceCount > 0;
+  return true;  // Return success whether we have services or not
 }
 
 // Animation - using WORKING logic from original
