@@ -5,19 +5,14 @@
 #include "constants.h"
 
 // ============ Service Data Structure ============
-// Note: Also defined in main.cpp - only use this if not already defined
-#ifndef SERVICE_DATA_DEFINED
 struct ServiceData {
   char std[Data::STD_TIME_SIZE];
   char etd[Data::ETD_SIZE];
   char destination[Data::DESTINATION_SIZE];
   char callingPoints[Data::CALLING_POINTS_SIZE];
 };
-#define SERVICE_DATA_DEFINED
-#endif
 
 // ============ Fetch State Machine ============
-#ifndef FETCH_STATE_DEFINED
 enum FetchState {
   FETCH_IDLE,
   FETCH_START,
@@ -26,8 +21,6 @@ enum FetchState {
   FETCH_DONE,
   FETCH_FAIL
 };
-#define FETCH_STATE_DEFINED
-#endif
 
 // ============ Error Codes ============
 enum ErrorCode {

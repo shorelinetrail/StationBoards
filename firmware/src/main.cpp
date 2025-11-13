@@ -15,10 +15,9 @@
 #include "web_pages.h"
 
 // Code Quality Improvements - Phase 2
-// Define guards before including headers to prevent duplicate definitions
-// (main.cpp has its own definitions of these that we'll migrate later)
-#define SERVICE_DATA_DEFINED
-#define FETCH_STATE_DEFINED
+// Define guards before including headers to prevent duplicate function definitions
+// Note: We use the header definitions for ServiceData and FetchState (commented below)
+// since other header code depends on them
 #define DECODE_HTML_ENTITIES_DEFINED
 #define EXTRACT_TAG_VALUE_DEFINED
 #define FORMAT_ETD_DEFINED
@@ -49,12 +48,13 @@ const char* apiPath = "/OpenLDBWS/ldb9.asmx";
 const char* apiToken = "73ee3834-af35-4f22-9b8b-480b70571c39";
 
 // ---------------- Data ----------------
-struct ServiceData {
-  char std[6];
-  char etd[10];
-  char destination[30];
-  char callingPoints[500];
-};
+// Note: ServiceData is now defined in types.h
+// struct ServiceData {
+//   char std[6];
+//   char etd[10];
+//   char destination[30];
+//   char callingPoints[500];
+// };
 
 ServiceData services[8];
 int serviceCount = 0;
@@ -72,14 +72,15 @@ bool firstBoot = false;
 bool fetchingNewStation = false;
 unsigned long lastDisplaySnapshot = 0;
 
-enum FetchState {
-  FETCH_IDLE,
-  FETCH_START,
-  FETCH_WAITING,
-  FETCH_READING,
-  FETCH_DONE,
-  FETCH_FAIL
-};
+// Note: FetchState enum is now defined in types.h
+// enum FetchState {
+//   FETCH_IDLE,
+//   FETCH_START,
+//   FETCH_WAITING,
+//   FETCH_READING,
+//   FETCH_DONE,
+//   FETCH_FAIL
+// };
 
 FetchState fetchState = FETCH_IDLE;
 WiFiClientSecure fetchClient;
