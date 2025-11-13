@@ -115,6 +115,9 @@ inline void safeStrCopy(char* dest, const String& src, size_t destSize) {
   dest[destSize - 1] = '\0';
 }
 
+// Note: These functions are also defined in main.cpp
+// Only use these definitions if not already defined
+#ifndef DECODE_HTML_ENTITIES_DEFINED
 /**
  * Decodes HTML entities in XML responses
  */
@@ -127,7 +130,10 @@ inline String decodeHTMLEntities(String text) {
   text.replace("&apos;", "'");
   return text;
 }
+#define DECODE_HTML_ENTITIES_DEFINED
+#endif
 
+#ifndef EXTRACT_TAG_VALUE_DEFINED
 /**
  * Extracts value from XML tag with optional namespace
  */
@@ -144,9 +150,12 @@ inline String extractTagValue(String xml, String tag, String ns = "") {
 
   return xml.substring(start, end);
 }
+#define EXTRACT_TAG_VALUE_DEFINED
+#endif
 
 // ============ Display Helpers ============
 
+#ifndef FORMAT_ETD_DEFINED
 /**
  * Formats ETD (Estimated Time of Departure) for display
  * Adds "Exp" prefix if it's a time, leaves text status as-is
@@ -157,18 +166,22 @@ inline String formatETD(String etd) {
   }
   return etd;
 }
+#define FORMAT_ETD_DEFINED
+#endif
 
 /**
  * Truncates text to fit within maxWidth pixels, adding "." if needed
+ * Template version that works with U8G2 display objects
  */
-inline String fitTextToWidth(String text, int maxWidth, const u8g2_t* u8g2_ptr) {
-  if (u8g2_GetUTF8Width(u8g2_ptr, text.c_str()) <= maxWidth) {
+template<typename T>
+inline String fitTextToWidth(String text, int maxWidth, T& display) {
+  if (display.getUTF8Width(text.c_str()) <= maxWidth) {
     return text;
   }
 
-  int ellipsisWidth = u8g2_GetUTF8Width(u8g2_ptr, ".");
+  int ellipsisWidth = display.getUTF8Width(".");
 
-  while (u8g2_GetUTF8Width(u8g2_ptr, text.c_str()) > maxWidth - ellipsisWidth && text.length() > 0) {
+  while (display.getUTF8Width(text.c_str()) > maxWidth - ellipsisWidth && text.length() > 0) {
     text.remove(text.length() - 1);
   }
 
@@ -181,6 +194,7 @@ inline String fitTextToWidth(String text, int maxWidth, const u8g2_t* u8g2_ptr) 
 
 // ============ Device ID Generation ============
 
+#ifndef GENERATE_DEVICE_ID_DEFINED
 /**
  * Generates unique device ID from ESP32 chip MAC address
  */
@@ -190,6 +204,8 @@ inline String generateDeviceId() {
   sprintf(id, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
   return String(id);
 }
+#define GENERATE_DEVICE_ID_DEFINED
+#endif
 
 // ============ Error Handling Helpers ============
 

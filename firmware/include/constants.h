@@ -32,7 +32,8 @@ namespace Display {
 }
 
 // ============ Network Constants ============
-namespace Network {
+// Note: Named 'Net' to avoid conflict with ESP32's Network object
+namespace Net {
   // Timeouts (milliseconds)
   const unsigned long WIFI_CONNECT_TIMEOUT = 30000;     // 30 seconds
   const unsigned long API_CONNECT_TIMEOUT = 8000;       // 8 seconds

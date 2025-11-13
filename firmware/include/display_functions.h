@@ -45,7 +45,7 @@ inline void displayServiceLine(const ServiceData& service, const char* label,
   int rightWidth = display.getUTF8Width(rightSide.c_str());
   int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
 
-  String destination = fitTextToWidth(String(service.destination), availableWidth, &display.u8g2);
+  String destination = fitTextToWidth(String(service.destination), availableWidth, display);
 
   display.setCursor(1, yPos);
   display.print(leftSide + destination);
@@ -134,7 +134,7 @@ inline void displayAlternatingServices(const ServiceData& serviceA, const Servic
   int leftAWidth = u8g2.getUTF8Width(leftA.c_str());
   int rightAWidth = u8g2.getUTF8Width(rightA.c_str());
   int availA = Display::WIDTH - leftAWidth - rightAWidth - Display::TEXT_SPACING;
-  String destA = fitTextToWidth(String(serviceA.destination), availA, &u8g2.u8g2);
+  String destA = fitTextToWidth(String(serviceA.destination), availA, u8g2);
 
   // Set clip window for this line
   u8g2.setClipWindow(0, baselineY - ascent, Display::CLIP_WINDOW_END, baselineY - descent);
@@ -152,7 +152,7 @@ inline void displayAlternatingServices(const ServiceData& serviceA, const Servic
     int leftBWidth = u8g2.getUTF8Width(leftB.c_str());
     int rightBWidth = u8g2.getUTF8Width(rightB.c_str());
     int availB = Display::WIDTH - leftBWidth - rightBWidth - Display::TEXT_SPACING;
-    String destB = fitTextToWidth(String(serviceB.destination), availB, &u8g2.u8g2);
+    String destB = fitTextToWidth(String(serviceB.destination), availB, u8g2);
 
     u8g2.setCursor(1, baselineY + textHeight - animOffset);
     u8g2.print(leftB + destB);

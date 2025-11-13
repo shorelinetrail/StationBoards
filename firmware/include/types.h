@@ -5,14 +5,19 @@
 #include "constants.h"
 
 // ============ Service Data Structure ============
+// Note: Also defined in main.cpp - only use this if not already defined
+#ifndef SERVICE_DATA_DEFINED
 struct ServiceData {
   char std[Data::STD_TIME_SIZE];
   char etd[Data::ETD_SIZE];
   char destination[Data::DESTINATION_SIZE];
   char callingPoints[Data::CALLING_POINTS_SIZE];
 };
+#define SERVICE_DATA_DEFINED
+#endif
 
 // ============ Fetch State Machine ============
+#ifndef FETCH_STATE_DEFINED
 enum FetchState {
   FETCH_IDLE,
   FETCH_START,
@@ -21,6 +26,8 @@ enum FetchState {
   FETCH_DONE,
   FETCH_FAIL
 };
+#define FETCH_STATE_DEFINED
+#endif
 
 // ============ Error Codes ============
 enum ErrorCode {
@@ -49,7 +56,7 @@ struct FetchStateData {
     startTime(0),
     lastAttempt(0),
     lastSuccess(0) {
-    buffer.reserve(Network::FETCH_BUFFER_SIZE);
+    buffer.reserve(Net::FETCH_BUFFER_SIZE);
   }
 
   void reset() {
@@ -147,7 +154,7 @@ struct MonitoringState {
 
   MonitoringState() :
     serverHost("192.168.0.75"),
-    serverPort(Network::MONITOR_PORT),
+    serverPort(Net::MONITOR_PORT),
     enabled(true),
     connected(false),
     lastHeartbeat(0),
