@@ -253,4 +253,42 @@ inline unsigned long elapsedTime(unsigned long lastTime) {
   return millis() - lastTime;
 }
 
+// ============ Animation Easing Functions ============
+
+/**
+ * Ease-out quadratic easing for smoother animations
+ * @param t Current time/progress (0.0 to 1.0)
+ * @return Eased value (0.0 to 1.0)
+ */
+inline float easeOutQuad(float t) {
+  return t * (2.0f - t);
+}
+
+/**
+ * Ease-in-out cubic easing for very smooth animations
+ * @param t Current time/progress (0.0 to 1.0)
+ * @return Eased value (0.0 to 1.0)
+ */
+inline float easeInOutCubic(float t) {
+  if (t < 0.5f) {
+    return 4.0f * t * t * t;
+  } else {
+    float f = (2.0f * t - 2.0f);
+    return 0.5f * f * f * f + 1.0f;
+  }
+}
+
+/**
+ * Calculate eased animation offset for smooth scrolling
+ * @param current Current offset
+ * @param max Maximum offset
+ * @return Eased offset value
+ */
+inline int getEasedOffset(int current, int max) {
+  if (max == 0) return 0;
+  float progress = (float)current / (float)max;
+  float eased = easeOutQuad(progress);
+  return (int)(eased * max);
+}
+
 #endif

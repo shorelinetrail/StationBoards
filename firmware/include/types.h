@@ -77,6 +77,7 @@ struct DisplayState {
   unsigned long lastSnapshot;
 
   bool fetchingNewStation;
+  bool dirty;  // Flag to indicate display needs update
 
   DisplayState() :
     serviceCount(0),
@@ -87,7 +88,8 @@ struct DisplayState {
     lastCallingAtScroll(0),
     lastRotation(0),
     lastSnapshot(0),
-    fetchingNewStation(false) {
+    fetchingNewStation(false),
+    dirty(true) {  // Start dirty to force initial draw
     strncpy(stationName, "Station", sizeof(stationName) - 1);
     stationName[sizeof(stationName) - 1] = '\0';
   }
@@ -95,12 +97,22 @@ struct DisplayState {
   void clearServices() {
     serviceCount = 0;
     fetchingNewStation = true;
+    dirty = true;
   }
 
   void resetAnimation() {
     isAnimating = false;
     animationOffset = 0;
     callingAtScrollOffset = 0;
+    dirty = true;
+  }
+
+  void markDirty() {
+    dirty = true;
+  }
+
+  void clearDirty() {
+    dirty = false;
   }
 };
 

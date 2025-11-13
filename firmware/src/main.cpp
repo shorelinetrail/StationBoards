@@ -432,46 +432,68 @@ void broadcastStatus(const char* message, const char* level = "info") {
 
 void broadcastTrainUpdate() {
   if (wsClients.count == 0) return;
-  
-  String json = "{";
+
+  // Pre-allocate buffer to reduce fragmentation (estimate ~1KB for 6 services)
+  String json;
+  json.reserve(1024);
+
+  json = "{";
   json += "\"type\":\"train_update\",";
-  json += "\"timestamp\":" + String(millis()) + ",";
-  json += "\"station\":\"" + String(displayState.stationName) + "\",";
-  json += "\"stationCode\":\"" + String(config.stationCode) + "\",";
-  json += "\"services\":" + String(displayState.serviceCount) + ",";
-  json += "\"trains\":[";
-  
+  json += "\"timestamp\":";
+  json += millis();
+  json += ",\"station\":\"";
+  json += displayState.stationName;
+  json += "\",\"stationCode\":\"";
+  json += config.stationCode;
+  json += "\",\"services\":";
+  json += displayState.serviceCount;
+  json += ",\"trains\":[";
+
   for (int i = 0; i < displayState.serviceCount && i < 6; i++) {
     if (i > 0) json += ",";
-    json += "{";
-    json += "\"std\":\"" + String(displayState.services[i].std) + "\",";
-    json += "\"etd\":\"" + String(displayState.services[i].etd) + "\",";
-    json += "\"destination\":\"" + String(displayState.services[i].destination) + "\"";
+    json += "{\"std\":\"";
+    json += displayState.services[i].std;
+    json += "\",\"etd\":\"";
+    json += displayState.services[i].etd;
+    json += "\",\"destination\":\"";
+    json += displayState.services[i].destination;
+    json += "\"";
     if (config.useCallingAt && i == 0 && strlen(displayState.services[i].callingPoints) > 0) {
-      json += ",\"callingAt\":\"" + String(displayState.services[i].callingPoints) + "\"";
+      json += ",\"callingAt\":\"";
+      json += displayState.services[i].callingPoints;
+      json += "\"";
     }
     json += "}";
   }
-  
+
   json += "]}";
-  
+
   webSocket.broadcastTXT(json);
   Serial.println("📡 Broadcast train update to " + String(wsClients.count) + " clients");
 }
 
 void broadcastMetrics() {
   if (wsClients.count == 0) return;
-  
-  String json = "{";
-  json += "\"type\":\"metrics\",";
-  json += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
-  json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
-  json += "\"uptime\":" + String(millis() / 1000) + ",";
-  json += "\"services\":" + String(displayState.serviceCount) + ",";
-  json += "\"station\":\"" + String(displayState.stationName) + "\",";
-  json += "\"lastUpdate\":" + String(fetchStateData.lastSuccess / 1000);
+
+  // Pre-allocate small buffer
+  String json;
+  json.reserve(256);
+
+  json = "{\"type\":\"metrics\",";
+  json += "\"freeHeap\":";
+  json += ESP.getFreeHeap();
+  json += ",\"rssi\":";
+  json += WiFi.RSSI();
+  json += ",\"uptime\":";
+  json += millis() / 1000;
+  json += ",\"services\":";
+  json += displayState.serviceCount;
+  json += ",\"station\":\"";
+  json += displayState.stationName;
+  json += "\",\"lastUpdate\":";
+  json += fetchStateData.lastSuccess / 1000;
   json += "}";
-  
+
   webSocket.broadcastTXT(json);
 }
 
@@ -542,45 +564,60 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
 void broadcastDisplaySnapshot() {
   if (wsClients.count == 0) return;
-  
-  String json = "{";
-  json += "\"type\":\"display_snapshot\",";
-  json += "\"timestamp\":" + String(millis()) + ",";
-  json += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
-  json += "\"mode\":\"" + String(config.useCallingAt ? "calling_at" : "normal") + "\",";
-  json += "\"displayState.serviceCount\":" + String(displayState.serviceCount) + ",";
-  json += "\"services\":[";
-  
+
+  // Pre-allocate buffer (~1KB with calling points)
+  String json;
+  json.reserve(1024);
+
+  json = "{\"type\":\"display_snapshot\",";
+  json += "\"timestamp\":";
+  json += millis();
+  json += ",\"displayState.stationName\":\"";
+  json += displayState.stationName;
+  json += "\",\"mode\":\"";
+  json += config.useCallingAt ? "calling_at" : "normal";
+  json += "\",\"displayState.serviceCount\":";
+  json += displayState.serviceCount;
+  json += ",\"services\":[";
+
   // Send up to 3 services for the preview
   for (int i = 0; i < min(displayState.serviceCount, 3); i++) {
     if (i > 0) json += ",";
-    json += "{";
-    json += "\"std\":\"" + String(displayState.services[i].std) + "\",";
-    json += "\"etd\":\"" + String(displayState.services[i].etd) + "\",";
-    json += "\"destination\":\"" + String(displayState.services[i].destination) + "\"";
-    json += "}";
+    json += "{\"std\":\"";
+    json += displayState.services[i].std;
+    json += "\",\"etd\":\"";
+    json += displayState.services[i].etd;
+    json += "\",\"destination\":\"";
+    json += displayState.services[i].destination;
+    json += "\"}";
   }
-  
+
   json += "],";
-  
+
   // Include calling points if in calling at mode
   if (config.useCallingAt && displayState.serviceCount > 0 && strlen(displayState.services[0].callingPoints) > 0) {
-    json += "\"callingPoints\":\"" + String(displayState.services[0].callingPoints) + "\",";
+    json += "\"callingPoints\":\"";
+    json += displayState.services[0].callingPoints;
+    json += "\",";
   }
-  
+
   // Current time
   time_t now = time(nullptr);
   if (now > 100000) {
     struct tm* timeInfo = localtime(&now);
     char timeString[9];
     strftime(timeString, sizeof(timeString), "%H:%M:%S", timeInfo);
-    json += "\"time\":\"" + String(timeString) + "\",";
+    json += "\"time\":\"";
+    json += timeString;
+    json += "\",";
   }
-  
-  json += "\"alternatingService\":" + String(displayState.currentAlternatingService) + ",";
-  json += "\"displayState.isAnimating\":" + String(displayState.isAnimating ? "true" : "false");
+
+  json += "\"alternatingService\":";
+  json += displayState.currentAlternatingService;
+  json += ",\"displayState.isAnimating\":";
+  json += displayState.isAnimating ? "true" : "false";
   json += "}";
-  
+
   webSocket.broadcastTXT(json);
 }
 
@@ -1305,6 +1342,7 @@ bool parseAndDisplayResponse(String response) {
   // Only update displayState.serviceCount after parsing is complete
   // This ensures old data stays visible during parsing
   displayState.serviceCount = newServiceCount;
+  displayState.markDirty();  // Mark display dirty when data updates
 
   if (displayState.serviceCount > 0) {
     displayState.fetchingNewStation = false;  // Clear loading flag - we have data now
@@ -1328,7 +1366,7 @@ void handleAlternatingService(unsigned long currentTime) {
 
   // When station name is hidden, we shift all service indices by 1
   int serviceOffset = config.showStationName ? 0 : 1;
-  
+
   int minServicesForAlt, maxServiceIndex, startIndex;
   if (config.useCallingAt) {
     // Calling At mode: need at least 2 services on bottom line to rotate
@@ -1341,27 +1379,31 @@ void handleAlternatingService(unsigned long currentTime) {
     maxServiceIndex = config.extraServices + 1 + serviceOffset;
     startIndex = 2 + serviceOffset;
   }
-  
+
   unsigned long rotationInterval = config.rotationSpeed * 1000UL;  // Use config setting
-  
+
   if (currentTime - displayState.lastRotation >= rotationInterval && displayState.serviceCount >= minServicesForAlt && !displayState.isAnimating) {
     displayState.isAnimating = true;
     displayState.animationOffset = 0;
     displayState.lastRotation = currentTime;
+    displayState.markDirty();  // Mark display dirty when animation starts
   }
 
   if (displayState.isAnimating) {
     displayState.animationOffset += scrollStep;
+    displayState.markDirty();  // Mark dirty during animation
+
     if (displayState.animationOffset >= maxOffset) {
       displayState.isAnimating = false;
-      
+
       displayState.currentAlternatingService++;
       int maxIndex = (config.useCallingAt ? config.extraServices + 1 : config.extraServices + 2) + serviceOffset;
       if (displayState.currentAlternatingService > maxIndex) {
         displayState.currentAlternatingService = startIndex;
       }
-      
+
       displayState.animationOffset = 0;
+      displayState.markDirty();  // Mark dirty when animation completes
     }
   }
 }
@@ -1974,7 +2016,25 @@ void loop() {
 
   handleFetchStateMachine();
   handleAlternatingService(currentTime);
-  updateDisplay();  // CRITICAL: Called every loop for smooth animations and clock updates!
+
+  // Smart display update - only redraw when needed
+  // Always update for: animations, scrolling text, or clock updates (every second)
+  static unsigned long lastClockUpdate = 0;
+  bool clockNeedsUpdate = (currentTime - lastClockUpdate >= 1000);
+
+  // Check if calling points need scrolling
+  bool callingPointsScrolling = config.useCallingAt && displayState.serviceCount > 0 &&
+                                 strlen(displayState.services[0].callingPoints) > 0 &&
+                                 (currentTime - displayState.lastCallingAtScroll >= config.scrollSpeed);
+
+  if (displayState.dirty || displayState.isAnimating || clockNeedsUpdate || callingPointsScrolling) {
+    updateDisplay();
+    displayState.clearDirty();
+
+    if (clockNeedsUpdate) {
+      lastClockUpdate = currentTime;
+    }
+  }
   
   // Handle monitoring server connection
   if (monitoringState.enabled) {

@@ -93,6 +93,7 @@ inline bool displayCallingPoints(const char* callingPoints, int yPos,
     if (currentTime - lastScroll > config.scrollSpeed) {
       scrollOffset++;
       lastScroll = currentTime;
+      // Note: Scrolling marks display dirty automatically via the loop
     }
 
     if (scrollOffset > fullTextWidth + 15) {
