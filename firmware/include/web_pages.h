@@ -1615,21 +1615,30 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       
       // Show subtle notification
       showToast("Applying changes...", "info");
-      
+
       fetch("/apply", {
         method: "POST",
         body: formData
       })
+      .then(function(response) {
+        if (!response.ok) {
+          // Validation failed - extract error message
+          return response.text().then(function(errorMsg) {
+            throw new Error(errorMsg || "Validation failed");
+          });
+        }
+        return response;
+      })
       .then(function() {
         showToast("Settings updated!", "success");
-        
+
         // Request updated state
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({command: "getState"}));
         }
       })
       .catch(function(error) {
-        showToast("Failed to apply settings", "error");
+        showToast(error.message || "Failed to apply settings", "error");
       });
     }
   </script>
