@@ -11,7 +11,7 @@ git pull origin claude/review-code-01MUitzRY6y7rFy8PVGpyZzb
 
 ### 2. Verify Files Exist
 ```bash
-ls -la include/
+ls -la firmware/include/
 
 # Should show:
 # constants.h
@@ -23,7 +23,10 @@ ls -la include/
 ```
 
 ### 3. Compile
+**IMPORTANT**: You must run the build from inside the firmware/ directory!
+
 ```bash
+cd firmware
 pio run
 ```
 
@@ -182,13 +185,13 @@ Once compilation succeeds, report back:
 ### Windows
 ```bash
 # Use PowerShell or Command Prompt
-cd C:\path\to\StationBoards
+cd C:\path\to\StationBoards\firmware
 pio run
 ```
 
 ### macOS/Linux
 ```bash
-cd ~/path/to/StationBoards
+cd ~/path/to/StationBoards/firmware
 pio run
 ```
 
