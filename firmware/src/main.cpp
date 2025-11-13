@@ -1105,14 +1105,26 @@ bool parseAndDisplayResponse(String response) {
 
   int servicesStart = response.indexOf("<lt5:trainServices>");
   if (servicesStart == -1) servicesStart = response.indexOf("<lt4:trainServices>");
-  
+
   if (servicesStart == -1) {
+    // Check if this is a valid response with no services, or an actual error
+    if (response.indexOf("GetStationBoardResult") != -1) {
+      // Valid response, just no trains scheduled
+      Serial.println("ℹ️ No trains scheduled at this station");
+      Serial.println("✅ 0 services");
+
+      // Skip to the end to update global state properly
+      // newServiceCount is already 0 from initialization
+      goto update_globals;
+    }
+
+    // Not a valid station board response - this is an error
     Serial.println("❌ No services tag found");
     Serial.println("🔍 Debug: Showing first 1000 chars of response:");
     Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     Serial.println(response.substring(0, min(1000, (int)response.length())));
     Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
+
     // Check for specific error messages
     if (response.indexOf("<faultstring>") != -1) {
       String faultMsg = extractTagValue(response, "faultstring", "");
@@ -1121,7 +1133,7 @@ bool parseAndDisplayResponse(String response) {
     if (response.indexOf("nrcc:") != -1) {
       Serial.println("⚠️ Response contains nrcc namespace - message field present");
     }
-    
+
     return false;
   }
 
@@ -1265,6 +1277,7 @@ bool parseAndDisplayResponse(String response) {
 
   Serial.println("✅ " + String(newServiceCount) + " services");
 
+update_globals:
   // Only update serviceCount after parsing is complete
   // This ensures old data stays visible during parsing
   serviceCount = newServiceCount;
@@ -1273,9 +1286,14 @@ bool parseAndDisplayResponse(String response) {
     fetchingNewStation = false;  // Clear loading flag - we have data now
     broadcastTrainUpdate();  // Sends full train data to clients
     broadcastStatus("Train data updated", "success");
+  } else {
+    // No services found - clear loading flag and broadcast empty state
+    fetchingNewStation = false;
+    broadcastTrainUpdate();
+    broadcastStatus("No trains scheduled", "info");
   }
 
-  return serviceCount > 0;
+  return true;  // Return success whether we have services or not
 }
 
 // Animation - using WORKING logic from original
