@@ -1105,14 +1105,26 @@ bool parseAndDisplayResponse(String response) {
 
   int servicesStart = response.indexOf("<lt5:trainServices>");
   if (servicesStart == -1) servicesStart = response.indexOf("<lt4:trainServices>");
-  
+
   if (servicesStart == -1) {
+    // Check if this is a valid response with no services, or an actual error
+    if (response.indexOf("GetStationBoardResult") != -1) {
+      // Valid response, just no trains scheduled
+      Serial.println("ℹ️ No trains scheduled at this station");
+      serviceCount = 0;
+      fetchingNewStation = false;
+      broadcastTrainUpdate();
+      broadcastStatus("No trains scheduled", "info");
+      return true;  // Success - valid response with zero services
+    }
+
+    // Not a valid station board response - this is an error
     Serial.println("❌ No services tag found");
     Serial.println("🔍 Debug: Showing first 1000 chars of response:");
     Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     Serial.println(response.substring(0, min(1000, (int)response.length())));
     Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
+
     // Check for specific error messages
     if (response.indexOf("<faultstring>") != -1) {
       String faultMsg = extractTagValue(response, "faultstring", "");
@@ -1121,7 +1133,7 @@ bool parseAndDisplayResponse(String response) {
     if (response.indexOf("nrcc:") != -1) {
       Serial.println("⚠️ Response contains nrcc namespace - message field present");
     }
-    
+
     return false;
   }
 
