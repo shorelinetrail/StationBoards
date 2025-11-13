@@ -1385,372 +1385,92 @@ void updateDisplay() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_t0_11_tf);
 
-  // Only show station name if enabled
+  // 1. Display station name OR first service at top
   if (config.showStationName) {
-    String displayName = displayState.stationName;
-    int nameWidth = u8g2.getUTF8Width(displayName.c_str());
-    
-    if (nameWidth > 250) {
-      while (u8g2.getUTF8Width(displayName.c_str()) > 250 && displayName.length() > 3) {
-        displayName.remove(displayName.length() - 1);
-      }
-      displayName += "...";
-      nameWidth = u8g2.getUTF8Width(displayName.c_str());
-    }
-    
-    u8g2.setCursor((Display::WIDTH - nameWidth) / 2, 12);
-    u8g2.print(displayName);
-  }
-  // When station name is hidden, show an extra service at the top
-  else if (displayState.serviceCount > 0) {
-    int yPosTop = config.yPosTop;
-    String leftSide = "1st " + String(displayState.services[0].std) + " ";
-    String rightSide = formatETD(String(displayState.services[0].etd));
-
-    int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-    int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-    int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
-    
-    String destination = fitTextToWidth(String(displayState.services[0].destination), availableWidth);
-    
-    u8g2.setCursor(1, yPosTop);
-    u8g2.print(leftSide + destination);
-    u8g2.setCursor(Display::ETD_RIGHT_X - rightWidth, yPosTop);
-    u8g2.print(rightSide);
+    displayStationName(displayState.stationName);
+  } else if (displayState.serviceCount > 0) {
+    displayServiceLine(displayState.services[0], "1st ", config.yPosTop, u8g2);
   }
 
-  // Display message when no services available
+  // 2. Handle no services case
   if (displayState.serviceCount == 0) {
-    u8g2.setFont(u8g2_font_helvB10_tr);
-    String msg = displayState.fetchingNewStation ? "Loading station data..." : "No trains scheduled";
-    int msgWidth = u8g2.getUTF8Width(msg.c_str());
-    u8g2.setCursor((Display::WIDTH - msgWidth) / 2, 35);
-    u8g2.print(msg);
+    displayNoServicesMessage(displayState.fetchingNewStation);
   }
+  // 3. Handle calling at mode
   else if (config.useCallingAt && displayState.serviceCount > 0) {
-    
-    // Calling points are always for displayState.services[0] (the first service)
-    // When station name is shown: display displayState.services[0] at yPos1st with calling points at yPos2nd
-    // When station name is hidden: displayState.services[0] is already shown at top, just show calling points at yPos1st
-    
+    int serviceOffset = getServiceOffset(config.showStationName);
+
+    // Show first service if station name is visible
     if (config.showStationName) {
-      // Display displayState.services[0] with "1st" label at yPos1st
-      int yPos = config.yPos1st;
-      String leftSide = "1st " + String(displayState.services[0].std) + " ";
-      String rightSide = formatETD(String(displayState.services[0].etd));
-
-      int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-      int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-      int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
-
-      String destination = fitTextToWidth(String(displayState.services[0].destination), availableWidth);
-
-      u8g2.setCursor(1, yPos);
-      u8g2.print(leftSide + destination);
-      u8g2.setCursor(Display::ETD_RIGHT_X - rightWidth, yPos);
-      u8g2.print(rightSide);
-      
-      // Display calling points at yPos2nd
-      if (strlen(displayState.services[0].callingPoints) > 0) {
-        String label = "Calling at: ";
-        int labelWidth = u8g2.getUTF8Width(label.c_str());
-        
-        String callingText = String(displayState.services[0].callingPoints);
-        String loopingText = callingText + " * " + callingText;
-        
-        int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
-        int availableSpace = Display::WIDTH - labelWidth - Display::TEXT_MARGIN;
-
-        bool needsScroll = fullTextWidth > availableSpace;
-
-        if (needsScroll) {
-          unsigned long currentTime = millis();
-          if (currentTime - displayState.lastCallingAtScroll > config.scrollSpeed) {
-            displayState.callingAtScrollOffset++;
-            displayState.lastCallingAtScroll = currentTime;
-          }
-
-          if (displayState.callingAtScrollOffset > fullTextWidth + 15) {
-            displayState.callingAtScrollOffset = 0;
-          }
-
-          u8g2.setCursor(1, config.yPos2nd);
-          u8g2.print(label);
-
-          u8g2.setClipWindow(labelWidth + 2, 0, 255, 63);
-          u8g2.setCursor(labelWidth + 2 - displayState.callingAtScrollOffset, config.yPos2nd);
-          u8g2.print(loopingText);
-          u8g2.setMaxClipWindow();
-        } else {
-          u8g2.setCursor(1, config.yPos2nd);
-          u8g2.print(label);
-          u8g2.print(callingText);
-          displayState.callingAtScrollOffset = 0;
-        }
-      } else {
-        // Show loading message when calling points aren't available yet
-        u8g2.setCursor(1, config.yPos2nd);
-        u8g2.print("Calling at: Loading stops...");
-        displayState.callingAtScrollOffset = 0;
-      }
+      displayServiceLine(displayState.services[0], "1st ", config.yPos1st, u8g2);
+      // Show calling points at yPos2nd
+      displayCallingPoints(displayState.services[0].callingPoints, config.yPos2nd,
+                          displayState.callingAtScrollOffset, displayState.lastCallingAtScroll);
     } else {
-      // Station name is hidden, displayState.services[0] is already displayed at top
-      // Just show calling points at yPos1st
-      if (strlen(displayState.services[0].callingPoints) > 0) {
-        String label = "Calling at: ";
-        int labelWidth = u8g2.getUTF8Width(label.c_str());
-        
-        String callingText = String(displayState.services[0].callingPoints);
-        String loopingText = callingText + " * " + callingText;
-        
-        int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
-        int availableSpace = Display::WIDTH - labelWidth - Display::TEXT_MARGIN;
-
-        bool needsScroll = fullTextWidth > availableSpace;
-
-        if (needsScroll) {
-          unsigned long currentTime = millis();
-          if (currentTime - displayState.lastCallingAtScroll > config.scrollSpeed) {
-            displayState.callingAtScrollOffset++;
-            displayState.lastCallingAtScroll = currentTime;
-          }
-
-          if (displayState.callingAtScrollOffset > fullTextWidth + 15) {
-            displayState.callingAtScrollOffset = 0;
-          }
-
-          u8g2.setCursor(1, config.yPos1st);
-          u8g2.print(label);
-
-          u8g2.setClipWindow(labelWidth + 2, 0, 255, 63);
-          u8g2.setCursor(labelWidth + 2 - displayState.callingAtScrollOffset, config.yPos1st);
-          u8g2.print(loopingText);
-          u8g2.setMaxClipWindow();
-        } else {
-          u8g2.setCursor(1, config.yPos1st);
-          u8g2.print(label);
-          u8g2.print(callingText);
-          displayState.callingAtScrollOffset = 0;
-        }
-      } else {
-        // Show loading message when calling points aren't available yet
-        u8g2.setCursor(1, config.yPos1st);
-        u8g2.print("Calling at: Loading stops...");
-        displayState.callingAtScrollOffset = 0;
-      }
-      
-      // Display displayState.services[1] with "2nd" label at yPos2nd
+      // Station name hidden: first service already shown at top
+      // Show calling points at yPos1st
+      displayCallingPoints(displayState.services[0].callingPoints, config.yPos1st,
+                          displayState.callingAtScrollOffset, displayState.lastCallingAtScroll);
+      // Show second service at yPos2nd if available
       if (displayState.serviceCount > 1) {
-        int yPos = config.yPos2nd;
-        String leftSide = "2nd " + String(displayState.services[1].std) + " ";
-        String rightSide = formatETD(String(displayState.services[1].etd));
-
-        int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-        int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-        int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
-
-        String destination = fitTextToWidth(String(displayState.services[1].destination), availableWidth);
-
-        u8g2.setCursor(1, yPos);
-        u8g2.print(leftSide + destination);
-        u8g2.setCursor(Display::ETD_RIGHT_X - rightWidth, yPos);
-        u8g2.print(rightSide);
+        displayServiceLine(displayState.services[1], "2nd ", config.yPos2nd, u8g2);
       }
     }
 
-    // Calculate serviceOffset for alternating services
-    // When station name is hidden, we've shown displayState.services[0] and displayState.services[1], so start alternating from displayState.services[2]
-    // When station name is shown, we've shown displayState.services[0], so start alternating from displayState.services[1]
-    int serviceOffset = config.showStationName ? 0 : 1;
+    // Display alternating services on bottom line if enough services
+    int minServices = getMinServicesForAlternating(config.useCallingAt, config.extraServices, config.showStationName);
+    int startIndex = getAlternatingStartIndex(config.useCallingAt, config.showStationName);
+    int maxIndex = getAlternatingMaxIndex(config.useCallingAt, config.extraServices, config.showStationName);
 
-    int minServices = 2 + config.extraServices + serviceOffset;
     if (displayState.serviceCount >= 2 + serviceOffset) {
-      int baselineY = config.yPosAlt;
-      int ascent = u8g2.getAscent();
-      int descent = u8g2.getDescent();
-      int textHeight = ascent - descent;
-
       int indexA = displayState.currentAlternatingService;
-      int indexB;
-      
-      // Calculate next index in rotation
-      indexB = indexA + 1;
-      int maxIndex = config.extraServices + 1 + serviceOffset;
-      if (indexB > maxIndex) indexB = 1 + serviceOffset;
+      int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      // Build service labels dynamically based on position
-      String labelA = "";
-      if (indexA == 1 + serviceOffset) labelA = serviceOffset == 0 ? "2nd " : "3rd ";
-      else if (indexA == 2 + serviceOffset) labelA = serviceOffset == 0 ? "3rd " : "4th ";
-      else if (indexA == 3 + serviceOffset) labelA = serviceOffset == 0 ? "4th " : "5th ";
-      else if (indexA == 4 + serviceOffset) labelA = serviceOffset == 0 ? "5th " : "6th ";
-      else labelA = serviceOffset == 0 ? "6th " : "7th ";
-      
-      labelA += String(displayState.services[indexA].std) + " ";
-      String rightA = formatETD(String(displayState.services[indexA].etd));
+      String labelA = getServiceLabel(indexA, serviceOffset);
+      String labelB = getServiceLabel(indexB, serviceOffset);
 
-      int leftAWidth = u8g2.getUTF8Width(labelA.c_str());
-      int rightAWidth = u8g2.getUTF8Width(rightA.c_str());
-      int availA = 256 - leftAWidth - rightAWidth - 10;
-
-      String destA = fitTextToWidth(String(displayState.services[indexA].destination), availA);
-
-      u8g2.setClipWindow(0, baselineY - ascent, 255, baselineY - descent);
-
-      if (displayState.isAnimating && displayState.serviceCount >= minServices) {
-        int offsetY = displayState.animationOffset;
-
-        u8g2.setCursor(1, baselineY - offsetY);
-        u8g2.print(labelA + destA);
-        u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY - offsetY);
-        u8g2.print(rightA);
-
-        String labelB = "";
-        if (indexB == 1 + serviceOffset) labelB = serviceOffset == 0 ? "2nd " : "3rd ";
-        else if (indexB == 2 + serviceOffset) labelB = serviceOffset == 0 ? "3rd " : "4th ";
-        else if (indexB == 3 + serviceOffset) labelB = serviceOffset == 0 ? "4th " : "5th ";
-        else if (indexB == 4 + serviceOffset) labelB = serviceOffset == 0 ? "5th " : "6th ";
-        else labelB = serviceOffset == 0 ? "6th " : "7th ";
-        
-        labelB += String(displayState.services[indexB].std) + " ";
-        String rightB = formatETD(String(displayState.services[indexB].etd));
-
-        int leftBWidth = u8g2.getUTF8Width(labelB.c_str());
-        int rightBWidth = u8g2.getUTF8Width(rightB.c_str());
-        int availB = 256 - leftBWidth - rightBWidth - 10;
-
-        String destB = fitTextToWidth(String(displayState.services[indexB].destination), availB);
-
-        u8g2.setCursor(1, baselineY + textHeight - offsetY);
-        u8g2.print(labelB + destB);
-        u8g2.setCursor(Display::ETD_RIGHT_X - rightBWidth, baselineY + textHeight - offsetY);
-        u8g2.print(rightB);
-      } else {
-        u8g2.setCursor(1, baselineY);
-        u8g2.print(labelA + destA);
-        u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY);
-        u8g2.print(rightA);
-      }
-
-      u8g2.setMaxClipWindow();
+      displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
+                                labelA.c_str(), labelB.c_str(), config.yPosAlt,
+                                displayState.animationOffset,
+                                displayState.isAnimating && displayState.serviceCount >= minServices);
     }
+  }
+  // 4. Handle standard mode (no calling at)
+  else {
+    int serviceOffset = getServiceOffset(config.showStationName);
 
-  } else {
-    // When station name is hidden, we show displayState.services[0] at top, so shift indices by 1
-    int serviceOffset = config.showStationName ? 0 : 1;
-    
+    // Display first 2 services in fixed positions
     for (int i = 0; i < min(displayState.serviceCount - serviceOffset, 2); i++) {
       int serviceIdx = i + serviceOffset;
       if (serviceIdx >= displayState.serviceCount) break;
-      
+
       int yPos = (i == 0) ? config.yPos1st : config.yPos2nd;
-      
-      String label = "";
-      if (serviceOffset == 0) {
-        label = (i == 0 ? "1st " : "2nd ");
-      } else {
-        label = (i == 0 ? "2nd " : "3rd ");
-      }
-      
-      String leftSide = label + String(displayState.services[serviceIdx].std) + " ";
-      String rightSide = formatETD(String(displayState.services[serviceIdx].etd));
+      String label = getServiceLabel(i, serviceOffset);
 
-      int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-      int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-      int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
-
-      String destination = fitTextToWidth(String(displayState.services[serviceIdx].destination), availableWidth);
-
-      u8g2.setCursor(1, yPos);
-      u8g2.print(leftSide + destination);
-      u8g2.setCursor(Display::ETD_RIGHT_X - rightWidth, yPos);
-      u8g2.print(rightSide);
+      displayServiceLine(displayState.services[serviceIdx], label.c_str(), yPos, u8g2);
     }
 
-    int minServices = 3 + config.extraServices + serviceOffset;
+    // Display alternating services on bottom line if enough services
+    int minServices = getMinServicesForAlternating(config.useCallingAt, config.extraServices, config.showStationName);
+    int startIndex = getAlternatingStartIndex(config.useCallingAt, config.showStationName);
+    int maxIndex = getAlternatingMaxIndex(config.useCallingAt, config.extraServices, config.showStationName);
+
     if (displayState.serviceCount >= 3 + serviceOffset) {
-      int baselineY = config.yPosAlt;
-      int ascent = u8g2.getAscent();
-      int descent = u8g2.getDescent();
-      int textHeight = ascent - descent;
-
       int indexA = displayState.currentAlternatingService;
-      int indexB;
-      
-      // Calculate next index in rotation
-      indexB = indexA + 1;
-      int maxIndex = config.extraServices + 2 + serviceOffset;
-      if (indexB > maxIndex) indexB = 2 + serviceOffset;
+      int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      // Build service labels dynamically
-      String labelA = "";
-      if (indexA == 2 + serviceOffset) labelA = serviceOffset == 0 ? "3rd " : "4th ";
-      else if (indexA == 3 + serviceOffset) labelA = serviceOffset == 0 ? "4th " : "5th ";
-      else if (indexA == 4 + serviceOffset) labelA = serviceOffset == 0 ? "5th " : "6th ";
-      else if (indexA == 5 + serviceOffset) labelA = serviceOffset == 0 ? "6th " : "7th ";
-      else labelA = serviceOffset == 0 ? "7th " : "8th ";
-      
-      labelA += String(displayState.services[indexA].std) + " ";
-      String rightA = formatETD(String(displayState.services[indexA].etd));
+      String labelA = getServiceLabel(indexA, serviceOffset);
+      String labelB = getServiceLabel(indexB, serviceOffset);
 
-      int leftAWidth = u8g2.getUTF8Width(labelA.c_str());
-      int rightAWidth = u8g2.getUTF8Width(rightA.c_str());
-      int availA = 256 - leftAWidth - rightAWidth - 10;
-
-      String destA = fitTextToWidth(String(displayState.services[indexA].destination), availA);
-
-      u8g2.setClipWindow(0, baselineY - ascent, 255, baselineY - descent);
-
-      if (displayState.isAnimating && displayState.serviceCount >= minServices) {
-        int offsetY = displayState.animationOffset;
-
-        u8g2.setCursor(1, baselineY - offsetY);
-        u8g2.print(labelA + destA);
-        u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY - offsetY);
-        u8g2.print(rightA);
-
-        String labelB = "";
-        if (indexB == 2 + serviceOffset) labelB = serviceOffset == 0 ? "3rd " : "4th ";
-        else if (indexB == 3 + serviceOffset) labelB = serviceOffset == 0 ? "4th " : "5th ";
-        else if (indexB == 4 + serviceOffset) labelB = serviceOffset == 0 ? "5th " : "6th ";
-        else if (indexB == 5 + serviceOffset) labelB = serviceOffset == 0 ? "6th " : "7th ";
-        else labelB = serviceOffset == 0 ? "7th " : "8th ";
-        
-        labelB += String(displayState.services[indexB].std) + " ";
-        String rightB = formatETD(String(displayState.services[indexB].etd));
-
-        int leftBWidth = u8g2.getUTF8Width(labelB.c_str());
-        int rightBWidth = u8g2.getUTF8Width(rightB.c_str());
-        int availB = 256 - leftBWidth - rightBWidth - 10;
-
-        String destB = fitTextToWidth(String(displayState.services[indexB].destination), availB);
-
-        u8g2.setCursor(1, baselineY + textHeight - offsetY);
-        u8g2.print(labelB + destB);
-        u8g2.setCursor(Display::ETD_RIGHT_X - rightBWidth, baselineY + textHeight - offsetY);
-        u8g2.print(rightB);
-      } else {
-        u8g2.setCursor(1, baselineY);
-        u8g2.print(labelA + destA);
-        u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY);
-        u8g2.print(rightA);
-      }
-
-      u8g2.setMaxClipWindow();
+      displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
+                                labelA.c_str(), labelB.c_str(), config.yPosAlt,
+                                displayState.animationOffset,
+                                displayState.isAnimating && displayState.serviceCount >= minServices);
     }
   }
 
-  // CRITICAL: Clock display - this was missing in refactored version!
-  time_t now = time(nullptr);
-  if (now > 100000) {
-    struct tm* timeInfo = localtime(&now);
-    char timeString[9];
-    strftime(timeString, sizeof(timeString), "%H:%M:%S", timeInfo);
-    u8g2.setFont(u8g2_font_t0_11_tf);
-    int width = u8g2.getUTF8Width(timeString);
-    u8g2.setCursor((Display::WIDTH -width) / 2, Display::HEIGHT);
-    u8g2.print(timeString);
-  }
+  // 5. Display clock at bottom
+  displayClock();
 
   u8g2.sendBuffer();
 }
