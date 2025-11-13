@@ -1766,36 +1766,47 @@ void setupWebServer() {
   });
 
   server.on("/save", HTTP_POST, []() {
+    Serial.println("📝 /save endpoint called");
+
     // Validate SSID
     if (server.hasArg("ssid")) {
       String ssid = server.arg("ssid");
+      Serial.printf("  Validating SSID: '%s'\n", ssid.c_str());
       ValidationResult result = validateSSID(ssid);
       if (!result.valid) {
+        Serial.printf("  ❌ SSID validation failed: %s\n", result.message.c_str());
         server.send(400, "text/plain", "Invalid SSID: " + result.message);
         return;
       }
+      Serial.println("  ✅ SSID valid");
       safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
     }
 
     // Validate password
     if (server.hasArg("password") && !server.arg("password").isEmpty()) {
       String password = server.arg("password");
+      Serial.println("  Validating password (hidden)");
       ValidationResult result = validatePassword(password);
       if (!result.valid) {
+        Serial.printf("  ❌ Password validation failed: %s\n", result.message.c_str());
         server.send(400, "text/plain", "Invalid password: " + result.message);
         return;
       }
+      Serial.println("  ✅ Password valid");
       safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
     }
 
     // Validate station code
     if (server.hasArg("station")) {
       String station = sanitizeStationCode(server.arg("station"));
+      Serial.printf("  Validating station code: '%s'\n", station.c_str());
       ValidationResult result = validateStationCode(station);
       if (!result.valid) {
+        Serial.printf("  ❌ Station code validation failed: %s\n", result.message.c_str());
         server.send(400, "text/plain", "Invalid station code: " + result.message);
         return;
       }
+      Serial.println("  ✅ Station code valid");
       safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
     }
 
@@ -1857,6 +1868,8 @@ void setupWebServer() {
   });
 
   server.on("/apply", HTTP_POST, []() {
+    Serial.println("⚙️  /apply endpoint called");
+
     String oldSSID = String(config.wifiSSID);
     String oldPassword = String(config.wifiPassword);
     String oldStation = String(config.stationCode);
@@ -1866,11 +1879,14 @@ void setupWebServer() {
     // Validate SSID
     if (server.hasArg("ssid")) {
       String ssid = server.arg("ssid");
+      Serial.printf("  Validating SSID: '%s'\n", ssid.c_str());
       ValidationResult result = validateSSID(ssid);
       if (!result.valid) {
+        Serial.printf("  ❌ SSID validation failed: %s\n", result.message.c_str());
         server.send(400, "text/plain", "Invalid SSID: " + result.message);
         return;
       }
+      Serial.println("  ✅ SSID valid");
       safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
     }
 
