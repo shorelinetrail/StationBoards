@@ -1475,21 +1475,48 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // Network form submission
     document.getElementById("networkForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
       if (!confirm("Save WiFi settings and restart?\n\nThe device will restart and may take 10-15 seconds to reconnect.")) {
-        e.preventDefault();
         return false;
       }
-      
+
       // Copy current settings to hidden fields
       document.getElementById("station-hidden").value = document.getElementById("station").value;
       document.getElementById("interval-hidden").value = document.getElementById("interval").value;
       document.getElementById("mode-hidden").value = document.getElementById("mode").value;
       document.getElementById("extra-hidden").value = document.getElementById("extra").value;
       document.getElementById("scrollspeed-hidden").value = document.getElementById("scrollspeed").value;
-      
+
       const btn = document.getElementById("saveBtn");
       btn.disabled = true;
       btn.classList.add("loading");
+
+      // Submit via fetch to handle validation errors
+      const form = e.target;
+      const formData = new FormData(form);
+
+      fetch(form.action, {
+        method: "POST",
+        body: new URLSearchParams(formData)
+      })
+      .then(function(response) {
+        if (!response.ok) {
+          // Validation failed - extract error message
+          return response.text().then(function(errorMsg) {
+            btn.disabled = false;
+            btn.classList.remove("loading");
+            throw new Error(errorMsg || "Validation failed");
+          });
+        }
+        // Success - device will restart, show message
+        showToast("Settings saved! Device restarting...", "success");
+      })
+      .catch(function(error) {
+        showToast(error.message || "Failed to save settings", "error");
+        btn.disabled = false;
+        btn.classList.remove("loading");
+      });
     });
 
     // Reset Modal
