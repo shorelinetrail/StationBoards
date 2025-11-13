@@ -137,8 +137,8 @@ const unsigned char logo_bitmap [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-	0x00, 0x00, 0xfc, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x07, 0x00, 0x00, 
+	0x00, 0xfc, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x07, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -553,7 +553,7 @@ void displaySplashScreen() {
   u8g2.clearBuffer();
   u8g2.drawXBMP(28, 12, 200, 40, logo_bitmap);
   u8g2.sendBuffer();
-  delay(5000);
+  delay(3000);
 }
 
 void displayProgress(const char* step, int currentStep, int totalSteps, int progress) {
@@ -695,31 +695,35 @@ void displayStatus(const char* status) {
 void displayReadyScreen(const IPAddress& ip) {
   u8g2.clearBuffer();
   
-  // Checkmark icon at top
-  u8g2.setFont(u8g2_font_helvB18_tr);
-  u8g2.setCursor(115, 18);
+  // Draw decorative border
+  u8g2.drawFrame(0, 0, 256, 64);
+  u8g2.drawFrame(2, 2, 252, 60);
+  
+  // Status indicator with checkmark and READY text
+  u8g2.setFont(u8g2_font_helvB14_tr);
+  u8g2.setCursor(8, 20);
   u8g2.print("✓");
   
-  // Instruction text
-  u8g2.setFont(u8g2_font_t0_11_tf);
-  String line1 = "Visit";
-  int line1Width = u8g2.getUTF8Width(line1.c_str());
-  u8g2.setCursor((256 - line1Width) / 2, 30);
-  u8g2.print(line1);
+  u8g2.setFont(u8g2_font_helvB10_tr);
+  u8g2.setCursor(26, 20);
+  u8g2.print("READY");
   
-  // IP Address - larger and prominent
-  u8g2.setFont(u8g2_font_helvB12_tr);
+  // Separator line
+  u8g2.drawHLine(10, 26, 236);
+  
+  // IP Address - very prominent and centered
+  u8g2.setFont(u8g2_font_helvB14_tr);
   String ipStr = ip.toString();
   int ipWidth = u8g2.getUTF8Width(ipStr.c_str());
-  u8g2.setCursor((256 - ipWidth) / 2, 44);
+  u8g2.setCursor((256 - ipWidth) / 2, 45);
   u8g2.print(ipStr);
   
-  // Continuation text
+  // Instructions
   u8g2.setFont(u8g2_font_t0_11_tf);
-  String line2 = "in your browser to change settings";
-  int line2Width = u8g2.getUTF8Width(line2.c_str());
-  u8g2.setCursor((256 - line2Width) / 2, 56);
-  u8g2.print(line2);
+  String instruction = "Open browser to configure";
+  int instrWidth = u8g2.getUTF8Width(instruction.c_str());
+  u8g2.setCursor((256 - instrWidth) / 2, 59);
+  u8g2.print(instruction);
   
   u8g2.sendBuffer();
 }
@@ -904,9 +908,6 @@ bool asyncFetchStart() {
   unsigned long currentTime = millis();
   handleAlternatingService(currentTime);
   updateDisplay();
-  
-  fetchClient.setInsecure();
-  fetchClient.setTimeout(15000);
 
   // Connect with periodic display updates
   Serial.println("🔌 Connecting to API...");
@@ -933,7 +934,10 @@ bool asyncFetchStart() {
   // Fetch 8 to have buffer for any configuration
   int numRows = 8;
   
-  String soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
+  // Build SOAP request more efficiently
+  String soapRequest;
+  soapRequest.reserve(512);  // Pre-allocate to avoid reallocations
+  soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
   soapRequest += "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">";
   soapRequest += "<soap:Header><AccessToken xmlns=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\">";
   soapRequest += "<TokenValue>" + String(apiToken) + "</TokenValue></AccessToken></soap:Header>";
@@ -948,6 +952,7 @@ bool asyncFetchStart() {
     soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
   }
   
+  // Use Connection: close - API server doesn't support keep-alive properly
   fetchClient.print("POST " + String(apiPath) + " HTTP/1.1\r\n"
                     "Host: " + String(apiHost) + "\r\n"
                     "Content-Type: text/xml\r\n"
@@ -972,7 +977,7 @@ void handleFetchStateMachine() {
     case FETCH_WAITING:
       if (fetchClient.connected() || fetchClient.available()) {
         fetchState = FETCH_READING;
-      } else if (millis() - fetchStartTime > 15000) {
+      } else if (millis() - fetchStartTime > 8000) {
         fetchClient.stop();
         Serial.println("❌ Timeout WAITING");
         displayStatus("TIMEOUT");
@@ -986,24 +991,29 @@ void handleFetchStateMachine() {
         static unsigned long lastDisplayUpdate = 0;
         unsigned long currentTime = millis();
         
+        // Read in chunks for much better performance (10-20x faster than char-by-char)
         while (fetchClient.available()) {
-          char c = fetchClient.read();
-          fetchBuffer += c;
+          // Read up to 512 bytes at a time
+          uint8_t buffer[512];
+          int bytesRead = fetchClient.read(buffer, sizeof(buffer));
+          if (bytesRead > 0) {
+            fetchBuffer.concat((const char*)buffer, bytesRead);
+          }
           
           // Update display every 200ms while reading to keep clock and animations alive
+          currentTime = millis();
           if (currentTime - lastDisplayUpdate > 200) {
             handleAlternatingService(currentTime);
             updateDisplay();
             lastDisplayUpdate = currentTime;
-            currentTime = millis(); // Update time after display
           }
         }
         
         // Check if done - connection closed and no more data
         if (!fetchClient.connected() && !fetchClient.available()) {
-          fetchClient.stop();
+          fetchClient.stop();  // Ensure clean disconnect
           if (fetchBuffer.length() > 100) {  // Valid response is always >100 bytes
-            Serial.println("✅ Fetched: " + String(fetchBuffer.length()) + " bytes");
+            Serial.println("✅ Fetched: " + String(fetchBuffer.length()) + " bytes in " + String(millis() - fetchStartTime) + "ms");
             fetchState = FETCH_DONE;
           } else {
             Serial.println("❌ Invalid response size: " + String(fetchBuffer.length()) + " bytes");
@@ -1011,8 +1021,8 @@ void handleFetchStateMachine() {
           }
         }
         
-        // Timeout protection
-        if (millis() - fetchStartTime > 20000) {
+        // Timeout for reading - API server can be slow with large responses
+        if (millis() - fetchStartTime > 15000) {
           fetchClient.stop();
           if (fetchBuffer.length() > 100) {
             // Got data but took too long - still use it
@@ -1357,7 +1367,7 @@ void updateDisplay() {
   // When station name is hidden, show an extra service at the top
   else if (serviceCount > 0) {
     const int ETD_RIGHT_X = 251;
-    int yPosTop = config.yPos1st - config.lineSpacing;
+    int yPosTop = config.yPosTop;
     String leftSide = "1st " + String(services[0].std) + " ";
     String rightSide = formatETD(String(services[0].etd));
     
@@ -1384,70 +1394,139 @@ void updateDisplay() {
   else if (config.useCallingAt && serviceCount > 0) {
     const int ETD_RIGHT_X = 251;  // Fixed position for right-aligned ETD
     
-    // When station name is hidden, we show services[0] at top, so shift indices by 1
-    int serviceOffset = config.showStationName ? 0 : 1;
-    int firstServiceIdx = serviceOffset;
+    // Calling points are always for services[0] (the first service)
+    // When station name is shown: display services[0] at yPos1st with calling points at yPos2nd
+    // When station name is hidden: services[0] is already shown at top, just show calling points at yPos1st
     
-    // Only display calling at section if we have the required service
-    if (firstServiceIdx < serviceCount) {
-    
-    int yPos = config.yPos1st;
-    String leftSide = (serviceOffset == 0 ? "1st " : "2nd ") + String(services[firstServiceIdx].std) + " ";
-    String rightSide = formatETD(String(services[firstServiceIdx].etd));
+    if (config.showStationName) {
+      // Display services[0] with "1st" label at yPos1st
+      int yPos = config.yPos1st;
+      String leftSide = "1st " + String(services[0].std) + " ";
+      String rightSide = formatETD(String(services[0].etd));
 
-    int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-    int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-    int availableWidth = 256 - leftWidth - rightWidth - 10;
+      int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
+      int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
+      int availableWidth = 256 - leftWidth - rightWidth - 10;
 
-    String destination = fitTextToWidth(String(services[firstServiceIdx].destination), availableWidth);
+      String destination = fitTextToWidth(String(services[0].destination), availableWidth);
 
-    u8g2.setCursor(1, yPos);
-    u8g2.print(leftSide + destination);
-    u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
-    u8g2.print(rightSide);
-
-    if (strlen(services[firstServiceIdx].callingPoints) > 0) {
-      String label = "Calling at: ";
-      int labelWidth = u8g2.getUTF8Width(label.c_str());
+      u8g2.setCursor(1, yPos);
+      u8g2.print(leftSide + destination);
+      u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
+      u8g2.print(rightSide);
       
-      String callingText = String(services[firstServiceIdx].callingPoints);
-      String loopingText = callingText + " * " + callingText;
-      
-      int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
-      int availableSpace = 256 - labelWidth - 5;
+      // Display calling points at yPos2nd
+      if (strlen(services[0].callingPoints) > 0) {
+        String label = "Calling at: ";
+        int labelWidth = u8g2.getUTF8Width(label.c_str());
+        
+        String callingText = String(services[0].callingPoints);
+        String loopingText = callingText + " * " + callingText;
+        
+        int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
+        int availableSpace = 256 - labelWidth - 5;
 
-      bool needsScroll = fullTextWidth > availableSpace;
+        bool needsScroll = fullTextWidth > availableSpace;
 
-      if (needsScroll) {
-        unsigned long currentTime = millis();
-        if (currentTime - lastCallingAtScroll > config.scrollSpeed) {
-          callingAtScrollOffset++;
-          lastCallingAtScroll = currentTime;
-        }
+        if (needsScroll) {
+          unsigned long currentTime = millis();
+          if (currentTime - lastCallingAtScroll > config.scrollSpeed) {
+            callingAtScrollOffset++;
+            lastCallingAtScroll = currentTime;
+          }
 
-        if (callingAtScrollOffset > fullTextWidth + 15) {
+          if (callingAtScrollOffset > fullTextWidth + 15) {
+            callingAtScrollOffset = 0;
+          }
+
+          u8g2.setCursor(1, config.yPos2nd);
+          u8g2.print(label);
+
+          u8g2.setClipWindow(labelWidth + 2, 0, 255, 63);
+          u8g2.setCursor(labelWidth + 2 - callingAtScrollOffset, config.yPos2nd);
+          u8g2.print(loopingText);
+          u8g2.setMaxClipWindow();
+        } else {
+          u8g2.setCursor(1, config.yPos2nd);
+          u8g2.print(label);
+          u8g2.print(callingText);
           callingAtScrollOffset = 0;
         }
-
-        u8g2.setCursor(1, config.yPos2nd);
-        u8g2.print(label);
-
-        u8g2.setClipWindow(labelWidth + 2, 0, 255, 63);
-        u8g2.setCursor(labelWidth + 2 - callingAtScrollOffset, config.yPos2nd);
-        u8g2.print(loopingText);
-        u8g2.setMaxClipWindow();
       } else {
+        // Show loading message when calling points aren't available yet
         u8g2.setCursor(1, config.yPos2nd);
-        u8g2.print(label);
-        u8g2.print(callingText);
+        u8g2.print("Calling at: Loading stops...");
         callingAtScrollOffset = 0;
       }
     } else {
-      // Show loading message when calling points aren't available yet
-      u8g2.setCursor(1, config.yPos2nd);
-      u8g2.print("Calling at: Loading stops...");
-      callingAtScrollOffset = 0;
+      // Station name is hidden, services[0] is already displayed at top
+      // Just show calling points at yPos1st
+      if (strlen(services[0].callingPoints) > 0) {
+        String label = "Calling at: ";
+        int labelWidth = u8g2.getUTF8Width(label.c_str());
+        
+        String callingText = String(services[0].callingPoints);
+        String loopingText = callingText + " * " + callingText;
+        
+        int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
+        int availableSpace = 256 - labelWidth - 5;
+
+        bool needsScroll = fullTextWidth > availableSpace;
+
+        if (needsScroll) {
+          unsigned long currentTime = millis();
+          if (currentTime - lastCallingAtScroll > config.scrollSpeed) {
+            callingAtScrollOffset++;
+            lastCallingAtScroll = currentTime;
+          }
+
+          if (callingAtScrollOffset > fullTextWidth + 15) {
+            callingAtScrollOffset = 0;
+          }
+
+          u8g2.setCursor(1, config.yPos1st);
+          u8g2.print(label);
+
+          u8g2.setClipWindow(labelWidth + 2, 0, 255, 63);
+          u8g2.setCursor(labelWidth + 2 - callingAtScrollOffset, config.yPos1st);
+          u8g2.print(loopingText);
+          u8g2.setMaxClipWindow();
+        } else {
+          u8g2.setCursor(1, config.yPos1st);
+          u8g2.print(label);
+          u8g2.print(callingText);
+          callingAtScrollOffset = 0;
+        }
+      } else {
+        // Show loading message when calling points aren't available yet
+        u8g2.setCursor(1, config.yPos1st);
+        u8g2.print("Calling at: Loading stops...");
+        callingAtScrollOffset = 0;
+      }
+      
+      // Display services[1] with "2nd" label at yPos2nd
+      if (serviceCount > 1) {
+        int yPos = config.yPos2nd;
+        String leftSide = "2nd " + String(services[1].std) + " ";
+        String rightSide = formatETD(String(services[1].etd));
+
+        int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
+        int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
+        int availableWidth = 256 - leftWidth - rightWidth - 10;
+
+        String destination = fitTextToWidth(String(services[1].destination), availableWidth);
+
+        u8g2.setCursor(1, yPos);
+        u8g2.print(leftSide + destination);
+        u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
+        u8g2.print(rightSide);
+      }
     }
+
+    // Calculate serviceOffset for alternating services
+    // When station name is hidden, we've shown services[0] and services[1], so start alternating from services[2]
+    // When station name is shown, we've shown services[0], so start alternating from services[1]
+    int serviceOffset = config.showStationName ? 0 : 1;
 
     int minServices = 2 + config.extraServices + serviceOffset;
     if (serviceCount >= 2 + serviceOffset) {
@@ -1520,8 +1599,6 @@ void updateDisplay() {
 
       u8g2.setMaxClipWindow();
     }
-    
-    }  // End of if (firstServiceIdx < serviceCount)
 
   } else {
     const int ETD_RIGHT_X = 251;  // Fixed position for right-aligned ETD
@@ -1665,6 +1742,7 @@ void setupWebServer() {
     html.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
     html.replace("{SCROLL}", String(config.scrollSpeed));
     html.replace("{ROTATION}", String(config.rotationSpeed));
+    html.replace("{YTOP}", String(config.yPosTop));
     html.replace("{Y1}", String(config.yPos1st));
     html.replace("{Y2}", String(config.yPos2nd));
     html.replace("{Y3}", String(config.yPosAlt));
@@ -1711,6 +1789,7 @@ void setupWebServer() {
       if (config.rotationSpeed < 5) config.rotationSpeed = 5;
       if (config.rotationSpeed > 60) config.rotationSpeed = 60;
     }
+    if (server.hasArg("ytop")) config.yPosTop = server.arg("ytop").toInt();
     if (server.hasArg("y1")) config.yPos1st = server.arg("y1").toInt();
     if (server.hasArg("y2")) config.yPos2nd = server.arg("y2").toInt();
     if (server.hasArg("y3")) config.yPosAlt = server.arg("y3").toInt();
@@ -1768,6 +1847,7 @@ void setupWebServer() {
       if (config.rotationSpeed < 5) config.rotationSpeed = 5;
       if (config.rotationSpeed > 60) config.rotationSpeed = 60;
     }
+    if (server.hasArg("ytop")) config.yPosTop = server.arg("ytop").toInt();
     if (server.hasArg("y1")) config.yPos1st = server.arg("y1").toInt();
     if (server.hasArg("y2")) config.yPos2nd = server.arg("y2").toInt();
     if (server.hasArg("y3")) config.yPosAlt = server.arg("y3").toInt();
@@ -1964,6 +2044,11 @@ void setup() {
   // Setup web server and WebSocket
   displayProgress("Starting services...", 5, 5, 80);
   setupWebServer();
+  
+  // Setup fetch client once for better performance
+  fetchClient.setInsecure();
+  fetchClient.setTimeout(8000);  // Reduced from 15s to 8s for faster failure detection
+  fetchBuffer.reserve(16384);  // Pre-allocate buffer
   
   // Setup OTA
   setupOTA();

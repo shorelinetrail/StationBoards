@@ -815,6 +815,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         <div class="form-row form-row-three">
           <div class="form-group">
+            <label for="ytop">Top Line Position (No Station Name)</label>
+            <input type="number" id="ytop" name="ytop" value="{YTOP}" min="0" max="64" required>
+            <span class="help-text">Default 12. Position when station name is hidden.</span>
+          </div>
+
+          <div class="form-group">
             <label for="y1">First Line Vertical Position</label>
             <input type="number" id="y1" name="y1" value="{Y1}" min="0" max="64" required>
             <span class="help-text">Default 26. Higher values move the first line lower.</span>
@@ -1519,7 +1525,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       };
       
       // Auto-apply for all settings except WiFi (WiFi requires restart)
-      const autoApplyFields = ["station", "interval", "mode", "extra", "rotationspeed", "scrollspeed", "y1", "y2", "y3"];
+      const autoApplyFields = ["station", "interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3"];
       autoApplyFields.forEach(function(fieldId) {
         const field = document.getElementById(fieldId);
         if (field) {
@@ -1558,9 +1564,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       formData.append('station', stationValue);
       formData.append('interval', document.getElementById('interval').value);
       formData.append('mode', document.getElementById('mode').value);
+      formData.append('showstation', document.getElementById('showstation').value);
       formData.append('extra', document.getElementById('extra').value);
       formData.append('scrollspeed', document.getElementById('scrollspeed').value);
       formData.append('rotationspeed', document.getElementById('rotationspeed').value);
+      const ytopField = document.getElementById('ytop');
+      if (ytopField) formData.append('ytop', ytopField.value);
       const y1Field = document.getElementById('y1');
       if (y1Field) formData.append('y1', y1Field.value);
       const y2Field = document.getElementById('y2');

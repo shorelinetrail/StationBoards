@@ -23,6 +23,7 @@ public:
   int rotationSpeed = 15;  // Seconds between service rotations
   
   // Display Positions
+  int yPosTop = 12;  // Y position for top service when station name is hidden
   int yPos1st = 26;
   int yPos2nd = 38;
   int yPosAlt = 50;
@@ -96,6 +97,7 @@ public:
     rotationSpeed = doc["rotationSpeed"] | 15;
     
     // Load Positions
+    yPosTop = doc["yPosTop"] | 12;
     yPos1st = doc["yPos1st"] | 26;
     yPos2nd = doc["yPos2nd"] | 38;
     yPosAlt = doc["yPosAlt"] | 50;
@@ -134,6 +136,7 @@ public:
     doc["rotationSpeed"] = rotationSpeed;
     
     // Save Positions
+    doc["yPosTop"] = yPosTop;
     doc["yPos1st"] = yPos1st;
     doc["yPos2nd"] = yPos2nd;
     doc["yPosAlt"] = yPosAlt;
