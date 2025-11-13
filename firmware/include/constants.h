@@ -100,6 +100,9 @@ namespace Timing {
   const unsigned long MONITOR_LOOP_THROTTLE = 500;        // milliseconds
   const unsigned long MONITOR_DISCONNECT_DELAY = 2000;    // milliseconds
 
+  // Animation timing
+  const unsigned long SERVICE_ANIMATION_DURATION = 400;   // milliseconds for smooth scroll
+
   // Delays
   const unsigned long SPLASH_SCREEN_DELAY = 3000;
   const unsigned long WELCOME_SCREEN_DELAY = 3000;

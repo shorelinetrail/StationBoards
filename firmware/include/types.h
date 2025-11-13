@@ -71,6 +71,7 @@ struct DisplayState {
 
   bool isAnimating;
   int animationOffset;
+  unsigned long animationStartTime;  // Track when animation started for easing
   int callingAtScrollOffset;
   unsigned long lastCallingAtScroll;
   unsigned long lastRotation;
@@ -84,6 +85,7 @@ struct DisplayState {
     currentAlternatingService(2),
     isAnimating(false),
     animationOffset(0),
+    animationStartTime(0),
     callingAtScrollOffset(0),
     lastCallingAtScroll(0),
     lastRotation(0),

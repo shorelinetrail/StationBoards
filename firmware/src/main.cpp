@@ -1353,7 +1353,7 @@ bool parseAndDisplayResponse(String response) {
   return displayState.serviceCount > 0;
 }
 
-// Animation - using WORKING logic from original
+// Animation - smooth easing-based animation
 void handleAlternatingService(unsigned long currentTime) {
   // Don't animate if no extra services configured
   if (config.extraServices == 0) {
@@ -1361,7 +1361,6 @@ void handleAlternatingService(unsigned long currentTime) {
   }
 
   int textHeight = u8g2.getAscent() - u8g2.getDescent();
-  const int scrollStep = 2;
   const int maxOffset = textHeight;
 
   // When station name is hidden, we shift all service indices by 1
@@ -1382,20 +1381,28 @@ void handleAlternatingService(unsigned long currentTime) {
 
   unsigned long rotationInterval = config.rotationSpeed * 1000UL;  // Use config setting
 
-  if (currentTime - displayState.lastRotation >= rotationInterval && displayState.serviceCount >= minServicesForAlt && !displayState.isAnimating) {
+  // Start new animation if it's time
+  if (currentTime - displayState.lastRotation >= rotationInterval &&
+      displayState.serviceCount >= minServicesForAlt &&
+      !displayState.isAnimating) {
     displayState.isAnimating = true;
     displayState.animationOffset = 0;
+    displayState.animationStartTime = currentTime;
     displayState.lastRotation = currentTime;
     displayState.markDirty();  // Mark display dirty when animation starts
   }
 
+  // Update animation with smooth easing
   if (displayState.isAnimating) {
-    displayState.animationOffset += scrollStep;
-    displayState.markDirty();  // Mark dirty during animation
+    unsigned long elapsed = currentTime - displayState.animationStartTime;
 
-    if (displayState.animationOffset >= maxOffset) {
+    // Calculate progress (0.0 to 1.0) based on animation duration
+    if (elapsed >= Timing::SERVICE_ANIMATION_DURATION) {
+      // Animation complete
       displayState.isAnimating = false;
+      displayState.animationOffset = maxOffset;  // Ensure we end exactly at maxOffset
 
+      // Move to next service
       displayState.currentAlternatingService++;
       int maxIndex = (config.useCallingAt ? config.extraServices + 1 : config.extraServices + 2) + serviceOffset;
       if (displayState.currentAlternatingService > maxIndex) {
@@ -1403,7 +1410,13 @@ void handleAlternatingService(unsigned long currentTime) {
       }
 
       displayState.animationOffset = 0;
-      displayState.markDirty();  // Mark dirty when animation completes
+      displayState.markDirty();
+    } else {
+      // Animation in progress - apply easing
+      float progress = (float)elapsed / (float)Timing::SERVICE_ANIMATION_DURATION;
+      float eased = easeOutQuad(progress);  // Smooth deceleration
+      displayState.animationOffset = (int)(eased * maxOffset);
+      displayState.markDirty();  // Mark dirty during animation
     }
   }
 }
