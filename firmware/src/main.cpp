@@ -1412,10 +1412,10 @@ void handleAlternatingService(unsigned long currentTime) {
       displayState.animationOffset = 0;
       displayState.markDirty();
     } else {
-      // Animation in progress - apply easing
+      // Animation in progress - apply smooth easing
       float progress = (float)elapsed / (float)Timing::SERVICE_ANIMATION_DURATION;
-      float eased = easeOutQuad(progress);  // Smooth deceleration
-      displayState.animationOffset = (int)(eased * maxOffset);
+      float eased = easeInOutCubic(progress);  // Very smooth start and end
+      displayState.animationOffset = (int)(eased * maxOffset + 0.5f);  // Round to nearest pixel
       displayState.markDirty();  // Mark dirty during animation
     }
   }

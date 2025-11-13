@@ -101,7 +101,7 @@ namespace Timing {
   const unsigned long MONITOR_DISCONNECT_DELAY = 2000;    // milliseconds
 
   // Animation timing
-  const unsigned long SERVICE_ANIMATION_DURATION = 400;   // milliseconds for smooth scroll
+  const unsigned long SERVICE_ANIMATION_DURATION = 500;   // milliseconds for smooth scroll
 
   // Delays
   const unsigned long SPLASH_SCREEN_DELAY = 3000;
