@@ -56,11 +56,11 @@ const char* apiToken = "73ee3834-af35-4f22-9b8b-480b70571c39";
 //   char callingPoints[500];
 // };
 
-ServiceData services[8];
+ServiceData services[Data::MAX_SERVICES];
 int serviceCount = 0;
 unsigned long lastDataUpdate = 0;
 unsigned long lastRotation = 0;
-char stationName[50] = "Station";
+char stationName[Data::STATION_NAME_SIZE] = "Station";
 int currentAlternatingService = 2;
 bool isAnimating = false;
 int animationOffset = 0;
@@ -582,18 +582,18 @@ void displayProgress(const char* step, int currentStep, int totalSteps, int prog
   
   String percentText = String(progress) + "%";
   int percentWidth = u8g2.getUTF8Width(percentText.c_str());
-  u8g2.setCursor(256 - percentWidth - 5, 12);
+  u8g2.setCursor(Display::WIDTH -percentWidth - 5, 12);
   u8g2.print(percentText);
   
   u8g2.setCursor(5, 28);
   u8g2.print(step);
-  
-  int segments = 10;
-  int segmentWidth = 22;
-  int segmentHeight = 16;
-  int spacing = 2;
-  int startX = 5;
-  int startY = 36;
+
+  int segments = Display::PROGRESS_SEGMENTS;
+  int segmentWidth = Display::PROGRESS_SEGMENT_WIDTH;
+  int segmentHeight = Display::PROGRESS_SEGMENT_HEIGHT;
+  int spacing = Display::PROGRESS_SPACING;
+  int startX = Display::PROGRESS_START_X;
+  int startY = Display::PROGRESS_START_Y;
   
   int filledSegments = (progress * segments) / 100;
   
@@ -615,7 +615,7 @@ void displayWelcomeScreen() {
   
   String welcome = "Welcome!";
   int width = u8g2.getUTF8Width(welcome.c_str());
-  u8g2.setCursor((256 - width) / 2, 16);
+  u8g2.setCursor((Display::WIDTH -width) / 2, 16);
   u8g2.print(welcome);
   
   u8g2.setFont(u8g2_font_t0_11_tf);
@@ -634,12 +634,12 @@ void displayAPScreen() {
   
   // Header bar
   u8g2.setDrawColor(1);
-  u8g2.drawBox(0, 0, 256, 18);
+  u8g2.drawBox(0, 0, Display::WIDTH,18);
   u8g2.setDrawColor(0);
   u8g2.setFont(u8g2_font_helvB10_tr);
   const char *title = "SETUP MODE";
   int titleWidth = u8g2.getUTF8Width(title);
-  u8g2.setCursor((256 - titleWidth) / 2, 13);
+  u8g2.setCursor((Display::WIDTH -titleWidth) / 2, 13);
   u8g2.print(title);
 
   // WiFi icon in header
@@ -681,7 +681,7 @@ void displayAPScreen() {
   IPAddress ip = WiFi.softAPIP();
   String url = ip.toString();
   int urlWidth = u8g2.getUTF8Width(url.c_str());
-  u8g2.setCursor((256 - urlWidth) / 2, cardY + 9);
+  u8g2.setCursor((Display::WIDTH -urlWidth) / 2, cardY + 9);
   u8g2.print(url);
 
   u8g2.sendBuffer();
@@ -712,7 +712,7 @@ void displayReadyScreen(const IPAddress& ip) {
   u8g2.clearBuffer();
   
   // Draw decorative border
-  u8g2.drawFrame(0, 0, 256, 64);
+  u8g2.drawFrame(0, 0, Display::WIDTH,64);
   u8g2.drawFrame(2, 2, 252, 60);
   
   // Status indicator with checkmark and READY text
@@ -731,14 +731,14 @@ void displayReadyScreen(const IPAddress& ip) {
   u8g2.setFont(u8g2_font_helvB14_tr);
   String ipStr = ip.toString();
   int ipWidth = u8g2.getUTF8Width(ipStr.c_str());
-  u8g2.setCursor((256 - ipWidth) / 2, 45);
+  u8g2.setCursor((Display::WIDTH -ipWidth) / 2, 45);
   u8g2.print(ipStr);
   
   // Instructions
   u8g2.setFont(u8g2_font_t0_11_tf);
   String instruction = "Open browser to configure";
   int instrWidth = u8g2.getUTF8Width(instruction.c_str());
-  u8g2.setCursor((256 - instrWidth) / 2, 59);
+  u8g2.setCursor((Display::WIDTH -instrWidth) / 2, 59);
   u8g2.print(instruction);
   
   u8g2.sendBuffer();
@@ -867,9 +867,9 @@ void startAccessPoint() {
 
 void initializeTimeSync() {
   Serial.println("🕒 Syncing time with NTP...");
-  configTime(0, 0, "pool.ntp.org");
+  configTime(0, 0, Data::NTP_SERVER);
   unsigned long startTime = millis();
-  while (!time(nullptr) && millis() - startTime < 10000) {
+  while (!time(nullptr) && millis() - startTime < Net::NTP_SYNC_TIMEOUT) {
     delay(500);
     Serial.print(".");
   }
@@ -1378,25 +1378,24 @@ void updateDisplay() {
       nameWidth = u8g2.getUTF8Width(displayName.c_str());
     }
     
-    u8g2.setCursor((256 - nameWidth) / 2, 12);
+    u8g2.setCursor((Display::WIDTH - nameWidth) / 2, 12);
     u8g2.print(displayName);
   }
   // When station name is hidden, show an extra service at the top
   else if (serviceCount > 0) {
-    const int ETD_RIGHT_X = 251;
     int yPosTop = config.yPosTop;
     String leftSide = "1st " + String(services[0].std) + " ";
     String rightSide = formatETD(String(services[0].etd));
-    
+
     int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
     int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-    int availableWidth = 256 - leftWidth - rightWidth - 10;
+    int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
     
     String destination = fitTextToWidth(String(services[0].destination), availableWidth);
     
     u8g2.setCursor(1, yPosTop);
     u8g2.print(leftSide + destination);
-    u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPosTop);
+    u8g2.setCursor(Display::Display::ETD_RIGHT_X - rightWidth, yPosTop);
     u8g2.print(rightSide);
   }
 
@@ -1405,11 +1404,10 @@ void updateDisplay() {
     u8g2.setFont(u8g2_font_helvB10_tr);
     String msg = fetchingNewStation ? "Loading station data..." : "No trains scheduled";
     int msgWidth = u8g2.getUTF8Width(msg.c_str());
-    u8g2.setCursor((256 - msgWidth) / 2, 35);
+    u8g2.setCursor((Display::WIDTH - msgWidth) / 2, 35);
     u8g2.print(msg);
   }
   else if (config.useCallingAt && serviceCount > 0) {
-    const int ETD_RIGHT_X = 251;  // Fixed position for right-aligned ETD
     
     // Calling points are always for services[0] (the first service)
     // When station name is shown: display services[0] at yPos1st with calling points at yPos2nd
@@ -1423,13 +1421,13 @@ void updateDisplay() {
 
       int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
       int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-      int availableWidth = 256 - leftWidth - rightWidth - 10;
+      int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
 
       String destination = fitTextToWidth(String(services[0].destination), availableWidth);
 
       u8g2.setCursor(1, yPos);
       u8g2.print(leftSide + destination);
-      u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
+      u8g2.setCursor(Display::ETD_RIGHT_X - rightWidth, yPos);
       u8g2.print(rightSide);
       
       // Display calling points at yPos2nd
@@ -1441,7 +1439,7 @@ void updateDisplay() {
         String loopingText = callingText + " * " + callingText;
         
         int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
-        int availableSpace = 256 - labelWidth - 5;
+        int availableSpace = Display::WIDTH - labelWidth - Display::TEXT_MARGIN;
 
         bool needsScroll = fullTextWidth > availableSpace;
 
@@ -1486,7 +1484,7 @@ void updateDisplay() {
         String loopingText = callingText + " * " + callingText;
         
         int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
-        int availableSpace = 256 - labelWidth - 5;
+        int availableSpace = Display::WIDTH - labelWidth - Display::TEXT_MARGIN;
 
         bool needsScroll = fullTextWidth > availableSpace;
 
@@ -1529,13 +1527,13 @@ void updateDisplay() {
 
         int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
         int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-        int availableWidth = 256 - leftWidth - rightWidth - 10;
+        int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
 
         String destination = fitTextToWidth(String(services[1].destination), availableWidth);
 
         u8g2.setCursor(1, yPos);
         u8g2.print(leftSide + destination);
-        u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
+        u8g2.setCursor(Display::ETD_RIGHT_X - rightWidth, yPos);
         u8g2.print(rightSide);
       }
     }
@@ -1641,13 +1639,13 @@ void updateDisplay() {
 
       int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
       int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-      int availableWidth = 256 - leftWidth - rightWidth - 10;
+      int availableWidth = Display::WIDTH - leftWidth - rightWidth - Display::TEXT_SPACING;
 
       String destination = fitTextToWidth(String(services[serviceIdx].destination), availableWidth);
 
       u8g2.setCursor(1, yPos);
       u8g2.print(leftSide + destination);
-      u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
+      u8g2.setCursor(Display::ETD_RIGHT_X - rightWidth, yPos);
       u8g2.print(rightSide);
     }
 
@@ -1732,7 +1730,7 @@ void updateDisplay() {
     strftime(timeString, sizeof(timeString), "%H:%M:%S", timeInfo);
     u8g2.setFont(u8g2_font_t0_11_tf);
     int width = u8g2.getUTF8Width(timeString);
-    u8g2.setCursor((256 - width) / 2, 64);
+    u8g2.setCursor((Display::WIDTH -width) / 2, Display::HEIGHT);
     u8g2.print(timeString);
   }
 
@@ -2108,7 +2106,7 @@ void loop() {
 
   if (apMode) {
     static unsigned long lastAPUpdate = 0;
-    if (millis() - lastAPUpdate > 30000) {
+    if (millis() - lastAPUpdate > Timing::AP_DISPLAY_UPDATE) {
       displayAPScreen();
       lastAPUpdate = millis();
     }
@@ -2124,7 +2122,7 @@ void loop() {
     unsigned long timeSinceLastAttempt = currentTime - lastFetchAttempt;
     
     bool shouldFetch = (timeSinceLastSuccess >= config.refreshInterval * 1000UL);
-    bool enoughTimeSinceAttempt = (timeSinceLastAttempt >= 30000UL);
+    bool enoughTimeSinceAttempt = (timeSinceLastAttempt >= Net::MIN_FETCH_RETRY_INTERVAL);
     bool forceFetch = (lastFetchAttempt == 0 && lastSuccessfulFetch == 0);
     
     if ((shouldFetch && enoughTimeSinceAttempt) || forceFetch) {
@@ -2169,16 +2167,16 @@ void loop() {
   }
   
   // Broadcast metrics periodically
-  if (currentTime - lastMetricsBroadcast >= 10000) {  // Every 10 seconds
+  if (currentTime - lastMetricsBroadcast >= Timing::METRICS_BROADCAST_INTERVAL) {
     broadcastMetrics();
     lastMetricsBroadcast = currentTime;
   }
 
   // Broadcast display snapshot for live preview
-  if (currentTime - lastDisplaySnapshot >= 2000) {  // Every 2 seconds
+  if (currentTime - lastDisplaySnapshot >= Timing::SNAPSHOT_BROADCAST_INTERVAL) {
     broadcastDisplaySnapshot();
     lastDisplaySnapshot = currentTime;
   }
-  
-  delay(20);
+
+  delay(Timing::LOOP_DELAY);
 }
