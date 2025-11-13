@@ -1395,7 +1395,7 @@ void updateDisplay() {
     
     u8g2.setCursor(1, yPosTop);
     u8g2.print(leftSide + destination);
-    u8g2.setCursor(Display::Display::ETD_RIGHT_X - rightWidth, yPosTop);
+    u8g2.setCursor(Display::ETD_RIGHT_X - rightWidth, yPosTop);
     u8g2.print(rightSide);
   }
 
@@ -1582,7 +1582,7 @@ void updateDisplay() {
 
         u8g2.setCursor(1, baselineY - offsetY);
         u8g2.print(labelA + destA);
-        u8g2.setCursor(ETD_RIGHT_X - rightAWidth, baselineY - offsetY);
+        u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY - offsetY);
         u8g2.print(rightA);
 
         String labelB = "";
@@ -1603,12 +1603,12 @@ void updateDisplay() {
 
         u8g2.setCursor(1, baselineY + textHeight - offsetY);
         u8g2.print(labelB + destB);
-        u8g2.setCursor(ETD_RIGHT_X - rightBWidth, baselineY + textHeight - offsetY);
+        u8g2.setCursor(Display::ETD_RIGHT_X - rightBWidth, baselineY + textHeight - offsetY);
         u8g2.print(rightB);
       } else {
         u8g2.setCursor(1, baselineY);
         u8g2.print(labelA + destA);
-        u8g2.setCursor(ETD_RIGHT_X - rightAWidth, baselineY);
+        u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY);
         u8g2.print(rightA);
       }
 
@@ -1616,8 +1616,6 @@ void updateDisplay() {
     }
 
   } else {
-    const int ETD_RIGHT_X = 251;  // Fixed position for right-aligned ETD
-    
     // When station name is hidden, we show services[0] at top, so shift indices by 1
     int serviceOffset = config.showStationName ? 0 : 1;
     
@@ -1688,7 +1686,7 @@ void updateDisplay() {
 
         u8g2.setCursor(1, baselineY - offsetY);
         u8g2.print(labelA + destA);
-        u8g2.setCursor(ETD_RIGHT_X - rightAWidth, baselineY - offsetY);
+        u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY - offsetY);
         u8g2.print(rightA);
 
         String labelB = "";
@@ -1709,12 +1707,12 @@ void updateDisplay() {
 
         u8g2.setCursor(1, baselineY + textHeight - offsetY);
         u8g2.print(labelB + destB);
-        u8g2.setCursor(ETD_RIGHT_X - rightBWidth, baselineY + textHeight - offsetY);
+        u8g2.setCursor(Display::ETD_RIGHT_X - rightBWidth, baselineY + textHeight - offsetY);
         u8g2.print(rightB);
       } else {
         u8g2.setCursor(1, baselineY);
         u8g2.print(labelA + destA);
-        u8g2.setCursor(ETD_RIGHT_X - rightAWidth, baselineY);
+        u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY);
         u8g2.print(rightA);
       }
 
