@@ -1104,10 +1104,31 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           railStationData = fallbackRailStations;
         });
 
-      // Load TFL stations
-      tflStationData = tflUndergroundStations;
+      // Load TFL Underground stations from API
+      const tflStationsURL = "https://api.tfl.gov.uk/StopPoint/Mode/tube";
+
+      fetchWithTimeout(tflStationsURL, {}, 10000)
+        .then(response => {
+          if (!response.ok) throw new Error("TFL API failed");
+          return response.json();
+        })
+        .then(data => {
+          tflStationData = data
+            .filter(stop => stop.stopType === "NaptanMetroStation")
+            .map(stop => ({
+              name: stop.commonName.replace(" Underground Station", "").replace(" Rail Station", ""),
+              code: stop.naptanId,
+              line: stop.lines ? stop.lines.map(l => l.name).join(", ") : ""
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          console.log(`Loaded ${tflStationData.length} TFL Underground stations from API`);
+        })
+        .catch(error => {
+          console.log("Using fallback TFL data:", error.message);
+          tflStationData = tflUndergroundStations;
+        });
+
       stationDataLoaded = true;
-      console.log(`Loaded ${tflStationData.length} TFL Underground stations`);
     };
 
     // ==================== Station Autocomplete ====================
