@@ -11,6 +11,7 @@
 #include <WebSocketsServer.h>
 #include <WebSocketsClient.h>
 #include <HTTPUpdate.h>
+#include <ESPmDNS.h>
 #include "config.h"
 #include "web_pages.h"
 
@@ -2302,12 +2303,20 @@ void setup() {
   // Setup web server and WebSocket
   displayProgress("Starting services...", 5, 5, 80);
   setupWebServer();
-  
+
+  // Setup mDNS
+  if (MDNS.begin("stationboard")) {
+    Serial.println("✅ mDNS responder started: stationboard.local");
+    MDNS.addService("http", "tcp", 80);
+  } else {
+    Serial.println("⚠️  Error setting up mDNS responder");
+  }
+
   // Setup fetch client once for better performance
   fetchClient.setInsecure();
   fetchClient.setTimeout(8000);  // Reduced from 15s to 8s for faster failure detection
   fetchStateData.buffer.reserve(16384);  // Pre-allocate buffer
-  
+
   // Setup OTA
   setupOTA();
 
@@ -2320,6 +2329,7 @@ void setup() {
 
   Serial.println("\n✅ Setup complete!");
   Serial.println("📍 IP: " + WiFi.localIP().toString());
+  Serial.println("🌐 Access via: http://stationboard.local");
   Serial.println("🌐 WebSocket ready on port 81");
   Serial.println("📊 Free heap: " + String(ESP.getFreeHeap()) + " bytes");
   
