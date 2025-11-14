@@ -49,8 +49,8 @@ namespace Net {
   const size_t HTTP_CHUNK_SIZE = 512;
 
   // WiFi configuration
-  const char* DEFAULT_AP_SSID = "TrainBoard_AP";
-  const char* DEFAULT_AP_PASSWORD = "config123";  // TODO: Generate random password
+  inline const char* DEFAULT_AP_SSID = "TrainBoard_AP";
+  inline const char* DEFAULT_AP_PASSWORD = "config123";  // TODO: Generate random password
 
   // Server ports
   const uint16_t HTTP_PORT = 80;
@@ -80,9 +80,9 @@ namespace Data {
   const int MAX_ROTATION_SPEED = 60;
 
   // API configuration
-  const char* API_HOST = "lite.realtime.nationalrail.co.uk";
-  const char* API_PATH = "/OpenLDBWS/ldb9.asmx";
-  const char* NTP_SERVER = "pool.ntp.org";
+  inline const char* API_HOST = "lite.realtime.nationalrail.co.uk";
+  inline const char* API_PATH = "/OpenLDBWS/ldb9.asmx";
+  inline const char* NTP_SERVER = "pool.ntp.org";
 
   // Response validation
   const size_t MIN_VALID_RESPONSE_SIZE = 100;  // Bytes
@@ -114,8 +114,8 @@ namespace Timing {
 
 // ============ OTA Constants ============
 namespace OTA {
-  const char* HOSTNAME = "trainboard";
-  const char* PASSWORD = "trainboard2024";
+  inline const char* HOSTNAME = "trainboard";
+  inline const char* PASSWORD = "trainboard2024";
 }
 
 // ============ WebSocket Constants ============
@@ -125,31 +125,31 @@ namespace WebSocket {
 
 // ============ Error Messages ============
 namespace ErrorMsg {
-  const char* WIFI_NOT_CONFIGURED = "WiFi SSID not configured";
-  const char* WIFI_CONNECT_FAILED = "WiFi Connection Failed";
-  const char* WIFI_DISCONNECTED = "WiFi disconnected";
-  const char* API_CONNECT_FAILED = "API connection failed";
-  const char* TIMEOUT_WAITING = "Timeout WAITING";
-  const char* TIMEOUT_READING = "Timeout READING";
-  const char* INVALID_RESPONSE = "Invalid response size";
-  const char* PARSE_FAILED = "Parse failed";
-  const char* NO_SERVICES_TAG = "No services tag found";
-  const char* SOAP_FAULT = "SOAP Fault detected";
-  const char* SPIFFS_MOUNT_FAILED = "SPIFFS Mount Failed";
-  const char* SYSTEM_ERROR = "System Error";
+  inline const char* WIFI_NOT_CONFIGURED = "WiFi SSID not configured";
+  inline const char* WIFI_CONNECT_FAILED = "WiFi Connection Failed";
+  inline const char* WIFI_DISCONNECTED = "WiFi disconnected";
+  inline const char* API_CONNECT_FAILED = "API connection failed";
+  inline const char* TIMEOUT_WAITING = "Timeout WAITING";
+  inline const char* TIMEOUT_READING = "Timeout READING";
+  inline const char* INVALID_RESPONSE = "Invalid response size";
+  inline const char* PARSE_FAILED = "Parse failed";
+  inline const char* NO_SERVICES_TAG = "No services tag found";
+  inline const char* SOAP_FAULT = "SOAP Fault detected";
+  inline const char* SPIFFS_MOUNT_FAILED = "SPIFFS Mount Failed";
+  inline const char* SYSTEM_ERROR = "System Error";
 }
 
 // ============ Success Messages ============
 namespace SuccessMsg {
-  const char* WIFI_CONNECTED = "WiFi Connected";
-  const char* TIME_SYNCED = "Time synchronized";
-  const char* OTA_READY = "OTA Ready";
-  const char* HTTP_SERVER_STARTED = "HTTP server started";
-  const char* WEBSOCKET_STARTED = "WebSocket server started";
-  const char* SETUP_COMPLETE = "Setup complete";
-  const char* CONFIG_LOADED = "Config loaded";
-  const char* CONFIG_SAVED = "Config saved";
-  const char* PARSE_SUCCESSFUL = "Parse successful";
+  inline const char* WIFI_CONNECTED = "WiFi Connected";
+  inline const char* TIME_SYNCED = "Time synchronized";
+  inline const char* OTA_READY = "OTA Ready";
+  inline const char* HTTP_SERVER_STARTED = "HTTP server started";
+  inline const char* WEBSOCKET_STARTED = "WebSocket server started";
+  inline const char* SETUP_COMPLETE = "Setup complete";
+  inline const char* CONFIG_LOADED = "Config loaded";
+  inline const char* CONFIG_SAVED = "Config saved";
+  inline const char* PARSE_SUCCESSFUL = "Parse successful";
 }
 
 #endif
