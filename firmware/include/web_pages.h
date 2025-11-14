@@ -758,6 +758,29 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="tflkey-help">Free API key from <a href="https://api.tfl.gov.uk" target="_blank">api.tfl.gov.uk</a></span>
         </div>
 
+        <div class="form-group" id="tflLineFilterGroup" style="display:none;">
+          <label for="tflLineFilter">
+            Line Filter
+            <span class="info-tooltip" title="Show arrivals for specific line only, or all lines" aria-label="Information: Filter by line">?</span>
+          </label>
+          <select id="tflLineFilter" name="tflLineFilter" aria-describedby="linefilter-help">
+            <option value=""{TFL_LINE_ALL}>All Lines</option>
+            <option value="bakerloo"{TFL_LINE_BAKERLOO}>Bakerloo</option>
+            <option value="central"{TFL_LINE_CENTRAL}>Central</option>
+            <option value="circle"{TFL_LINE_CIRCLE}>Circle</option>
+            <option value="district"{TFL_LINE_DISTRICT}>District</option>
+            <option value="hammersmith-city"{TFL_LINE_HAMMERSMITH}>Hammersmith & City</option>
+            <option value="jubilee"{TFL_LINE_JUBILEE}>Jubilee</option>
+            <option value="metropolitan"{TFL_LINE_METROPOLITAN}>Metropolitan</option>
+            <option value="northern"{TFL_LINE_NORTHERN}>Northern</option>
+            <option value="piccadilly"{TFL_LINE_PICCADILLY}>Piccadilly</option>
+            <option value="victoria"{TFL_LINE_VICTORIA}>Victoria</option>
+            <option value="waterloo-city"{TFL_LINE_WATERLOO}>Waterloo & City</option>
+            <option value="elizabeth"{TFL_LINE_ELIZABETH}>Elizabeth</option>
+          </select>
+          <span class="help-text" id="linefilter-help">Filter arrivals by Underground line (empty = all lines)</span>
+        </div>
+
         <div class="form-group">
           <label for="station">
             <span id="stationLabel">Station Code (CRS)</span>
@@ -1665,6 +1688,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       // Service type selection handler
       const serviceTypeSelect = document.getElementById("serviceType");
       const tflApiKeyGroup = document.getElementById("tflApiKeyGroup");
+      const tflLineFilterGroup = document.getElementById("tflLineFilterGroup");
       const stationLabel = document.getElementById("stationLabel");
       const stationTooltip = document.getElementById("stationTooltip");
       const railPresets = document.getElementById("railPresets");
@@ -1673,6 +1697,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const updateServiceTypeUI = () => {
         const isUnderground = serviceTypeSelect.value === "1";
         tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+        tflLineFilterGroup.style.display = isUnderground ? "block" : "none";
         railPresets.style.display = isUnderground ? "none" : "flex";
         tflPresets.style.display = isUnderground ? "flex" : "none";
 
