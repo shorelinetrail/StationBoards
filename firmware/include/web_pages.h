@@ -758,38 +758,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="tflkey-help">Free API key from <a href="https://api.tfl.gov.uk" target="_blank">api.tfl.gov.uk</a></span>
         </div>
 
-        <div class="form-group" id="tflLineFilterGroup" style="display:none;">
-          <label for="tflLineFilter">
-            Line Filter
-            <span class="info-tooltip" title="Show arrivals for specific line only, or all lines" aria-label="Information: Filter by line">?</span>
-          </label>
-          <select id="tflLineFilter" name="tflLineFilter" aria-describedby="linefilter-help">
-            <option value=""{TFL_LINE_ALL}>All Lines</option>
-            <option value="bakerloo"{TFL_LINE_BAKERLOO}>Bakerloo</option>
-            <option value="central"{TFL_LINE_CENTRAL}>Central</option>
-            <option value="circle"{TFL_LINE_CIRCLE}>Circle</option>
-            <option value="district"{TFL_LINE_DISTRICT}>District</option>
-            <option value="hammersmith-city"{TFL_LINE_HAMMERSMITH}>Hammersmith & City</option>
-            <option value="jubilee"{TFL_LINE_JUBILEE}>Jubilee</option>
-            <option value="metropolitan"{TFL_LINE_METROPOLITAN}>Metropolitan</option>
-            <option value="northern"{TFL_LINE_NORTHERN}>Northern</option>
-            <option value="piccadilly"{TFL_LINE_PICCADILLY}>Piccadilly</option>
-            <option value="victoria"{TFL_LINE_VICTORIA}>Victoria</option>
-            <option value="waterloo-city"{TFL_LINE_WATERLOO}>Waterloo & City</option>
-            <option value="elizabeth"{TFL_LINE_ELIZABETH}>Elizabeth</option>
-          </select>
-          <span class="help-text" id="linefilter-help">Filter arrivals by Underground line (empty = all lines)</span>
-        </div>
-
-        <div class="form-group" id="tflDirectionFilterGroup" style="display:none;">
-          <label for="tflDirectionFilter">
-            Direction Filter
-            <span class="info-tooltip" title="Filter by destination (e.g., 'Edgware', 'Wimbledon'). Leave empty for all directions" aria-label="Information: Filter by direction">?</span>
-          </label>
-          <input type="text" id="tflDirectionFilter" name="tflDirectionFilter" value="{TFL_DIRECTION_FILTER}" placeholder="e.g., Edgware, Wimbledon (leave empty for all)" aria-describedby="directionfilter-help">
-          <span class="help-text" id="directionfilter-help">Filter arrivals by destination (empty = all directions)</span>
-        </div>
-
         <div class="form-group">
           <label for="station">
             <span id="stationLabel">Station Code (CRS)</span>
@@ -816,6 +784,26 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <div id="stationAutocomplete" class="autocomplete-results" role="listbox" aria-label="Station suggestions"></div>
           </div>
           <span class="help-text" id="station-help">Start typing to search for a station</span>
+        </div>
+
+        <div class="form-group" id="tflLineFilterGroup" style="display:none;">
+          <label for="tflLineFilter">
+            Line Filter
+            <span class="info-tooltip" title="Show arrivals for specific line only, or all lines" aria-label="Information: Filter by line">?</span>
+          </label>
+          <select id="tflLineFilter" name="tflLineFilter" aria-describedby="linefilter-help">
+            <option value=""{TFL_LINE_ALL}>All Lines</option>
+          </select>
+          <span class="help-text" id="linefilter-help">Filter arrivals by Underground line (dynamically populated based on station)</span>
+        </div>
+
+        <div class="form-group" id="tflDirectionFilterGroup" style="display:none;">
+          <label for="tflDirectionFilter">
+            Direction Filter
+            <span class="info-tooltip" title="Filter by destination (e.g., 'Edgware', 'Wimbledon'). Leave empty for all directions" aria-label="Information: Filter by direction">?</span>
+          </label>
+          <input type="text" id="tflDirectionFilter" name="tflDirectionFilter" value="{TFL_DIRECTION_FILTER}" placeholder="e.g., Edgware, Wimbledon (leave empty for all)" aria-describedby="directionfilter-help">
+          <span class="help-text" id="directionfilter-help">Filter arrivals by destination (empty = all directions)</span>
         </div>
 
         <div class="form-row">
@@ -1150,7 +1138,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             .map(stop => ({
               name: stop.commonName.replace(" Underground Station", "").replace(" Rail Station", ""),
               code: stop.naptanId,
-              line: stop.lines ? stop.lines.map(l => l.name).join(", ") : ""
+              line: stop.lines ? stop.lines.map(l => l.name).join(", ") : "",
+              lineIds: stop.lines ? stop.lines.map(l => l.id) : []
             }))
             .sort((a, b) => a.name.localeCompare(b.name));
           console.log(`Loaded ${tflStationData.length} TFL Underground stations from API`);
@@ -1238,6 +1227,55 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       });
     };
 
+    const updateLineFilter = (stationCode) => {
+      const serviceTypeSelect = document.getElementById("serviceType");
+      const isUnderground = serviceTypeSelect && serviceTypeSelect.value === "1";
+
+      if (!isUnderground) return;
+
+      // Find the station in tflStationData
+      const station = tflStationData.find(s => s.code === stationCode);
+      if (!station || !station.lineIds) return;
+
+      const lineFilter = document.getElementById("tflLineFilter");
+      const currentValue = lineFilter.value;  // Preserve current selection if valid
+
+      // Clear and repopulate the dropdown
+      lineFilter.innerHTML = '<option value="">All Lines</option>';
+
+      // Map of line IDs to display names
+      const lineNames = {
+        'bakerloo': 'Bakerloo',
+        'central': 'Central',
+        'circle': 'Circle',
+        'district': 'District',
+        'hammersmith-city': 'Hammersmith & City',
+        'jubilee': 'Jubilee',
+        'metropolitan': 'Metropolitan',
+        'northern': 'Northern',
+        'piccadilly': 'Piccadilly',
+        'victoria': 'Victoria',
+        'waterloo-city': 'Waterloo & City',
+        'elizabeth': 'Elizabeth'
+      };
+
+      // Add options for lines that serve this station
+      station.lineIds.forEach(lineId => {
+        const option = document.createElement('option');
+        option.value = lineId;
+        option.textContent = lineNames[lineId] || lineId;
+        if (lineId === currentValue) {
+          option.selected = true;
+        }
+        lineFilter.appendChild(option);
+      });
+
+      // If previous selection is not valid for this station, reset to "All Lines"
+      if (!station.lineIds.includes(currentValue)) {
+        lineFilter.value = '';
+      }
+    };
+
     const selectStationFromAutocomplete = (code, name) => {
       const input = document.getElementById("station");
 
@@ -1251,6 +1289,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.classList.add("success");
       input.classList.remove("error");
       input.blur();
+
+      // Update line filter for TFL stations
+      updateLineFilter(code);
 
       autoApplySettings(code);
     };
@@ -1722,6 +1763,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       };
 
       serviceTypeSelect.addEventListener("change", () => {
+        const stationInput = document.getElementById("station");
+        const currentStation = stationInput.value.trim();
+
+        // Clear station when switching providers to avoid invalid codes
+        if (currentStation) {
+          stationInput.value = "";
+          document.getElementById("currentStation").textContent = "Not set";
+          showToast("⚠️ Station cleared - please select a new station for this service type", "warning");
+        }
+
         updateServiceTypeUI();
         autoApplySettings();
       });
@@ -1729,10 +1780,24 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       // Initialize UI on load
       updateServiceTypeUI();
 
-      // Update current station display
+      // Setup preset button event listeners
+      document.querySelectorAll('.preset-btn').forEach(button => {
+        button.addEventListener('click', () => {
+          const code = button.getAttribute('data-station');
+          if (code) {
+            const stationInput = document.getElementById("station");
+            stationInput.value = code;
+            updateLineFilter(code);
+            autoApplySettings(code);
+          }
+        });
+      });
+
+      // Update current station display and line filter on page load
       const stationInput = document.getElementById("station");
       if (stationInput.value) {
         document.getElementById("currentStation").textContent = stationInput.value;
+        updateLineFilter(stationInput.value);
       }
 
       // Auto-apply for all settings except WiFi
