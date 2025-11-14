@@ -2075,7 +2075,7 @@ void setupWebServer() {
     String soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
     soapRequest += "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:typ=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\" xmlns:ldb=\"http://thalesgroup.com/RTTI/2017-10-01/ldb/\">";
     soapRequest += "<soap:Header><typ:AccessToken><typ:TokenValue>";
-    soapRequest += NR_API_KEY;
+    soapRequest += String(apiToken);
     soapRequest += "</typ:TokenValue></typ:AccessToken></soap:Header>";
     soapRequest += "<soap:Body><ldb:GetDepBoardWithDetailsRequest>";
     soapRequest += "<ldb:numRows>1</ldb:numRows>";
