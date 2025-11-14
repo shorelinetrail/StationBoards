@@ -832,16 +832,23 @@ String generateDeviceId() {
 
 bool checkFirstBoot() {
   if (!SPIFFS.exists("/config.json")) {
-    Serial.println("🆕 First boot detected");
+    Serial.println("🆕 First boot detected - no config.json");
+    // Create the firstboot flag so web interface knows to show wizard
+    File flagFile = SPIFFS.open("/firstboot.flag", "w");
+    if (flagFile) {
+      flagFile.println("1");
+      flagFile.close();
+      Serial.println("✅ Created firstboot.flag for wizard");
+    }
     return true;
   }
-  
+
   if (SPIFFS.exists("/firstboot.flag")) {
     Serial.println("🆕 First boot flag found");
-    SPIFFS.remove("/firstboot.flag");
+    // Don't remove the flag here - let the wizard complete endpoint remove it
     return true;
   }
-  
+
   return false;
 }
 
