@@ -3,24 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="StationBoards monitoring dashboard for ESP32 train departure displays">
   <title>StationBoards Monitor</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM"
+        crossorigin="anonymous">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+        integrity="sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd"
+        crossorigin="anonymous">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <nav class="navbar navbar-dark bg-primary">
+  <nav class="navbar navbar-dark bg-primary" role="navigation">
     <div class="container-fluid">
       <span class="navbar-brand mb-0 h1">
-        <i class="bi bi-broadcast"></i> StationBoards Monitor
+        <i class="bi bi-broadcast" aria-hidden="true"></i> StationBoards Monitor
       </span>
       <div class="d-flex align-items-center gap-3">
-        <span class="badge bg-light text-dark">
-          <span id="deviceCount">0</span> Devices
+        <span class="badge bg-light text-dark" aria-label="Total device count">
+          <span id="deviceCount" aria-live="polite">0</span> Devices
         </span>
-        <span class="badge bg-success" id="onlineCount">0 Online</span>
-        <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#firmwareModal">
-          <i class="bi bi-cloud-upload"></i> Firmware
+        <span class="badge bg-success" id="onlineCount" aria-live="polite" aria-label="Online device count">0 Online</span>
+        <button class="btn btn-light btn-sm"
+                data-action="firmware"
+                aria-label="Manage firmware">
+          <i class="bi bi-cloud-upload" aria-hidden="true"></i> Firmware
         </button>
       </div>
     </div>
@@ -31,26 +40,36 @@
     <div class="row mb-3">
       <div class="col-md-6">
         <div class="input-group">
-          <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input type="text" class="form-control" id="searchInput" placeholder="Search devices...">
+          <label for="searchInput" class="input-group-text">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <span class="visually-hidden">Search devices</span>
+          </label>
+          <input type="text"
+                 class="form-control"
+                 id="searchInput"
+                 placeholder="Search devices..."
+                 aria-label="Search devices by name, ID, or station code">
         </div>
       </div>
       <div class="col-md-3">
-        <select class="form-select" id="statusFilter">
+        <label for="statusFilter" class="visually-hidden">Filter by status</label>
+        <select class="form-select" id="statusFilter" aria-label="Filter devices by status">
           <option value="all">All Devices</option>
           <option value="online">Online Only</option>
           <option value="offline">Offline Only</option>
         </select>
       </div>
       <div class="col-md-3">
-        <button class="btn btn-outline-primary w-100" onclick="refreshDevices()">
-          <i class="bi bi-arrow-clockwise"></i> Refresh
+        <button class="btn btn-outline-primary w-100"
+                data-action="refresh"
+                aria-label="Refresh device list">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
         </button>
       </div>
     </div>
 
     <!-- Devices Grid -->
-    <div class="row" id="devicesGrid">
+    <div class="row" id="devicesGrid" role="region" aria-label="Device list" aria-live="polite">
       <div class="col-12 text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Loading...</span>
@@ -61,15 +80,15 @@
   </div>
 
   <!-- Device Details Modal -->
-  <div class="modal fade" id="deviceModal" tabindex="-1">
+  <div class="modal fade" id="deviceModal" tabindex="-1" aria-labelledby="deviceModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">
+          <h5 class="modal-title" id="deviceModalLabel">
             <span id="modalDeviceName"></span>
             <span class="badge ms-2" id="modalDeviceStatus"></span>
           </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <ul class="nav nav-tabs mb-3" role="tablist">
@@ -206,26 +225,35 @@
             </div>
 
             <!-- Actions Tab -->
-            <div class="tab-pane fade" id="actionsTab">
+            <div class="tab-pane fade" id="actionsTab" role="tabpanel" aria-labelledby="actionsTab-tab">
               <h6>Device Actions</h6>
               <div class="d-grid gap-2">
-                <button class="btn btn-warning" onclick="restartDevice()">
-                  <i class="bi bi-arrow-clockwise"></i> Restart Device
+                <button class="btn btn-warning"
+                        data-action="restart"
+                        aria-label="Restart this device">
+                  <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Restart Device
                 </button>
-                <button class="btn btn-info" onclick="showOTADialog()">
-                  <i class="bi bi-cloud-download"></i> OTA Firmware Update
+                <button class="btn btn-info"
+                        data-action="show-ota"
+                        aria-label="Show OTA firmware update options">
+                  <i class="bi bi-cloud-download" aria-hidden="true"></i> OTA Firmware Update
                 </button>
               </div>
-              
-              <div id="otaDialog" class="mt-3" style="display: none;">
+
+              <div id="otaDialog" class="mt-3" style="display: none;" aria-live="polite">
                 <div class="card">
                   <div class="card-body">
                     <h6>Select Firmware</h6>
-                    <select class="form-select mb-2" id="firmwareSelect">
+                    <label for="firmwareSelect" class="visually-hidden">Choose firmware version</label>
+                    <select class="form-select mb-2"
+                            id="firmwareSelect"
+                            aria-label="Select firmware version for OTA update">
                       <option value="">Loading firmware...</option>
                     </select>
-                    <button class="btn btn-primary w-100" onclick="startOTA()">
-                      <i class="bi bi-upload"></i> Start Update
+                    <button class="btn btn-primary w-100"
+                            data-action="start-ota"
+                            aria-label="Start OTA firmware update">
+                      <i class="bi bi-upload" aria-hidden="true"></i> Start Update
                     </button>
                   </div>
                 </div>
@@ -238,35 +266,47 @@
   </div>
 
   <!-- Firmware Upload Modal -->
-  <div class="modal fade" id="firmwareModal" tabindex="-1">
+  <div class="modal fade" id="firmwareModal" tabindex="-1" aria-labelledby="firmwareModalLabel" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Firmware Management</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <h5 class="modal-title" id="firmwareModalLabel">Firmware Management</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <h6>Upload New Firmware</h6>
           <form id="firmwareUploadForm">
             <div class="mb-3">
-              <label class="form-label">Version</label>
-              <input type="text" class="form-control" id="firmwareVersion" placeholder="2.0.0" required>
+              <label for="firmwareVersion" class="form-label">Version</label>
+              <input type="text"
+                     class="form-control"
+                     id="firmwareVersion"
+                     placeholder="2.0.0"
+                     aria-label="Firmware version number"
+                     required>
             </div>
             <div class="mb-3">
-              <label class="form-label">Firmware File (.bin)</label>
-              <input type="file" class="form-control" id="firmwareFile" accept=".bin" required>
+              <label for="firmwareFile" class="form-label">Firmware File (.bin)</label>
+              <input type="file"
+                     class="form-control"
+                     id="firmwareFile"
+                     accept=".bin"
+                     aria-label="Select firmware binary file"
+                     required>
             </div>
-            <button type="submit" class="btn btn-primary w-100">
-              <i class="bi bi-cloud-upload"></i> Upload
+            <button type="submit" class="btn btn-primary w-100" aria-label="Upload firmware">
+              <i class="bi bi-cloud-upload" aria-hidden="true"></i> Upload
             </button>
           </form>
 
           <hr>
 
           <h6>Available Firmware</h6>
-          <div id="firmwareList" class="list-group">
+          <div id="firmwareList" class="list-group" role="list" aria-label="Available firmware versions">
             <div class="text-center py-3">
-              <div class="spinner-border spinner-border-sm" role="status"></div>
+              <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
               <span class="ms-2">Loading...</span>
             </div>
           </div>
@@ -275,8 +315,12 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"
+          integrity="sha384-BR1KpLNl/mgjOqAqCWDBRpJZPpuYvr2vRRN/z/g7dLPL51DP7sBvF+MNFQr8wmDM"
+          crossorigin="anonymous"></script>
   <script src="/js/dashboard.js"></script>
 </body>
 </html>
