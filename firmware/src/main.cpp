@@ -1540,14 +1540,21 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
+    Serial.println("📄 Root endpoint accessed");
+    Serial.print("   Checking for firstboot.flag... ");
+
     // Check if first boot flag exists - if so, serve setup wizard
-    if (SPIFFS.exists("/firstboot.flag")) {
+    bool flagExists = SPIFFS.exists("/firstboot.flag");
+    Serial.println(flagExists ? "FOUND" : "NOT FOUND");
+
+    if (flagExists) {
       Serial.println("🧙 First boot detected - serving setup wizard");
       String html = FPSTR(SETUP_WIZARD_PAGE);
       server.send(200, "text/html", html);
       return;
     }
 
+    Serial.println("📋 Serving normal config page");
     // Normal config page
     String html = FPSTR(CONFIG_PAGE_TEMPLATE);
 
@@ -2186,6 +2193,31 @@ void setupWebServer() {
     json += "\"lastUpdate\":" + String(fetchStateData.lastSuccess / 1000);
     json += "}";
     server.send(200, "application/json", json);
+  });
+
+  server.on("/debug/files", HTTP_GET, []() {
+    Serial.println("🔍 Debug: Listing SPIFFS files");
+    String html = "<html><body><h1>SPIFFS Debug</h1>";
+    html += "<h2>Files:</h2><ul>";
+
+    File root = SPIFFS.open("/");
+    File file = root.openNextFile();
+    while (file) {
+      html += "<li>" + String(file.name()) + " (" + String(file.size()) + " bytes)</li>";
+      Serial.println("  📄 " + String(file.name()) + " (" + String(file.size()) + " bytes)");
+      file = root.openNextFile();
+    }
+    html += "</ul>";
+
+    html += "<h2>Flag States:</h2><ul>";
+    html += "<li>firstboot.flag exists: " + String(SPIFFS.exists("/firstboot.flag") ? "YES" : "NO") + "</li>";
+    html += "<li>config.json exists: " + String(SPIFFS.exists("/config.json") ? "YES" : "NO") + "</li>";
+    html += "<li>systemFlags.firstBoot: " + String(systemFlags.firstBoot ? "true" : "false") + "</li>";
+    html += "</ul>";
+
+    html += "<p><a href='/'>Go to home</a></p>";
+    html += "</body></html>";
+    server.send(200, "text/html", html);
   });
 
   server.begin();
