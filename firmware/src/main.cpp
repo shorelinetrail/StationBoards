@@ -2263,13 +2263,13 @@ void setup() {
     systemFlags.systemError = true;
     return;
   }
-  
-  // Check for first boot
-  systemFlags.firstBoot = checkFirstBoot();
-  
-  // Load or create configuration
+
+  // Load or create configuration (must load BEFORE checking first boot)
   displayProgress("Loading configuration...", 2, 5, 20);
   config.load();
+
+  // Check for first boot (after config is loaded so we can check WiFi settings)
+  systemFlags.firstBoot = checkFirstBoot();
   
   // Ensure device ID is set
   if (config.deviceId.length() == 0 || config.deviceId == "") {
