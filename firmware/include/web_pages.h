@@ -2908,12 +2908,20 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
         .then(response => response.json())
         .then(data => {
           resultBox.style.display = 'block';
-          if (data.valid) {
+          if (data.valid && !data.warning && data.name) {
+            // Success - verified with API
             resultBox.style.background = '#d4edda';
             resultBox.style.borderColor = '#28a745';
             resultMsg.style.color = '#155724';
             resultMsg.innerHTML = `<strong>✓ Valid Station!</strong><br>${escapeHtml(data.name)}<br>Services: ${data.serviceCount || 'Unknown'}`;
+          } else if (data.valid && data.warning) {
+            // Warning - couldn't verify but format is valid
+            resultBox.style.background = '#fff3cd';
+            resultBox.style.borderColor = '#ffc107';
+            resultMsg.style.color = '#856404';
+            resultMsg.innerHTML = `<strong>⚠ Could Not Verify</strong><br>${escapeHtml(data.message)}<br><small>You can still continue with this station code</small>`;
           } else {
+            // Invalid station
             resultBox.style.background = '#f8d7da';
             resultBox.style.borderColor = '#dc3545';
             resultMsg.style.color = '#721c24';

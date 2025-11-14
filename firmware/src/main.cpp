@@ -2092,12 +2092,16 @@ void setupWebServer() {
     // Try to fetch service data from National Rail to validate
     WiFiClientSecure client;
     client.setInsecure();
+    client.setTimeout(5000);  // 5 second timeout
 
+    Serial.println("  Attempting to connect to National Rail API...");
     if (!client.connect("lite.realtime.nationalrail.co.uk", 443)) {
       Serial.println("  ⚠️  Could not connect to National Rail API");
-      server.send(200, "application/json", "{\"valid\":true,\"message\":\"Could not verify, but format is valid\"}");
+      server.send(200, "application/json", "{\"valid\":true,\"warning\":true,\"message\":\"Could not verify with API, but format is valid\"}");
       return;
     }
+
+    Serial.println("  ✅ Connected to National Rail API");
 
     // Build minimal SOAP request to check if station exists
     String soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
@@ -2167,8 +2171,8 @@ void setupWebServer() {
       String json = "{\"valid\":true,\"name\":\"" + stationName + "\",\"serviceCount\":" + String(serviceCount) + "}";
       server.send(200, "application/json", json);
     } else {
-      Serial.println("  ⚠️  Could not verify station");
-      server.send(200, "application/json", "{\"valid\":true,\"message\":\"Could not verify with API, but format is valid\"}");
+      Serial.println("  ⚠️  Could not parse station data from API");
+      server.send(200, "application/json", "{\"valid\":true,\"warning\":true,\"message\":\"Could not verify with API, but format is valid\"}");
     }
   });
 
