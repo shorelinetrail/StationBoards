@@ -1404,6 +1404,9 @@ void setupWebServer() {
     html.replace("{TFL_LINE_WATERLOO}", lineFilter == "waterloo-city" ? " selected" : "");
     html.replace("{TFL_LINE_ELIZABETH}", lineFilter == "elizabeth" ? " selected" : "");
 
+    // TFL Direction Filter
+    html.replace("{TFL_DIRECTION_FILTER}", String(config.tflDirectionFilter));
+
     html.replace("{STATION}", String(config.stationCode));
     html.replace("{STATION_NAME}", String(displayState.stationName));
     html.replace("{INTERVAL}", String(config.refreshInterval));
@@ -1465,6 +1468,16 @@ void setupWebServer() {
       if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setLineFilter(lineFilter);
         Serial.println("  🚇 TFL line filter updated: " + (lineFilter.length() > 0 ? lineFilter : "All Lines"));
+      }
+    }
+
+    // Handle TFL Direction Filter
+    if (server.hasArg("tflDirectionFilter")) {
+      String directionFilter = server.arg("tflDirectionFilter");
+      safeStrCopy(config.tflDirectionFilter, directionFilter, sizeof(config.tflDirectionFilter));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setDirectionFilter(directionFilter);
+        Serial.println("  🚇 TFL direction filter updated: " + (directionFilter.length() > 0 ? directionFilter : "All Directions"));
       }
     }
 
@@ -1616,6 +1629,16 @@ void setupWebServer() {
       if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setLineFilter(lineFilter);
         Serial.println("  🚇 TFL line filter updated: " + (lineFilter.length() > 0 ? lineFilter : "All Lines"));
+      }
+    }
+
+    // Handle TFL Direction Filter
+    if (server.hasArg("tflDirectionFilter")) {
+      String directionFilter = server.arg("tflDirectionFilter");
+      safeStrCopy(config.tflDirectionFilter, directionFilter, sizeof(config.tflDirectionFilter));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setDirectionFilter(directionFilter);
+        Serial.println("  🚇 TFL direction filter updated: " + (directionFilter.length() > 0 ? directionFilter : "All Directions"));
       }
     }
 
@@ -2194,6 +2217,7 @@ void setup() {
   if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
     tflUndergroundProvider.setApiKey(String(config.tflApiKey));
     tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
+    tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
     serviceProvider = &tflUndergroundProvider;
     Serial.println("🚇 Using TFL Underground provider");
   } else {

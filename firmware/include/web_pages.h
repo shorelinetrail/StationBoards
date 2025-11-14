@@ -781,6 +781,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="linefilter-help">Filter arrivals by Underground line (empty = all lines)</span>
         </div>
 
+        <div class="form-group" id="tflDirectionFilterGroup" style="display:none;">
+          <label for="tflDirectionFilter">
+            Direction Filter
+            <span class="info-tooltip" title="Filter by destination (e.g., 'Edgware', 'Wimbledon'). Leave empty for all directions" aria-label="Information: Filter by direction">?</span>
+          </label>
+          <input type="text" id="tflDirectionFilter" name="tflDirectionFilter" value="{TFL_DIRECTION_FILTER}" placeholder="e.g., Edgware, Wimbledon (leave empty for all)" aria-describedby="directionfilter-help">
+          <span class="help-text" id="directionfilter-help">Filter arrivals by destination (empty = all directions)</span>
+        </div>
+
         <div class="form-group">
           <label for="station">
             <span id="stationLabel">Station Code (CRS)</span>
@@ -1689,6 +1698,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const serviceTypeSelect = document.getElementById("serviceType");
       const tflApiKeyGroup = document.getElementById("tflApiKeyGroup");
       const tflLineFilterGroup = document.getElementById("tflLineFilterGroup");
+      const tflDirectionFilterGroup = document.getElementById("tflDirectionFilterGroup");
       const stationLabel = document.getElementById("stationLabel");
       const stationTooltip = document.getElementById("stationTooltip");
       const railPresets = document.getElementById("railPresets");
@@ -1698,6 +1708,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const isUnderground = serviceTypeSelect.value === "1";
         tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
         tflLineFilterGroup.style.display = isUnderground ? "block" : "none";
+        tflDirectionFilterGroup.style.display = isUnderground ? "block" : "none";
         railPresets.style.display = isUnderground ? "none" : "flex";
         tflPresets.style.display = isUnderground ? "flex" : "none";
 
