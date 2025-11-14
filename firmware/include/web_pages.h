@@ -2430,14 +2430,12 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
             <span class="help-text">Start typing to search for your station</span>
           </div>
 
-          <div class="info-box" id="stationValidResult" style="display: none; margin-top: 20px;">
-            <p id="stationValidMessage"></p>
+          <div class="info-box" style="margin-top: 20px;">
+            <p style="margin: 0;">
+              <strong>ℹ️ Note:</strong> Station validation is not available during initial setup.
+              Your station will be validated once connected to WiFi.
+            </p>
           </div>
-
-          <button type="button" class="btn btn-outline" onclick="validateStationCode()" id="validateStationBtn" style="width: 100%; margin-top: 10px; margin-bottom: 10px;">
-            <span id="validateStationBtnText">✓ Validate Station</span>
-            <span id="validateStationBtnSpinner" style="display: none;">Validating...</span>
-          </button>
 
           <div class="button-group">
             <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
