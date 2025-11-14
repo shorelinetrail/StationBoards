@@ -1434,14 +1434,20 @@ void setupWebServer() {
 
     // Validate station code
     if (server.hasArg("station")) {
-      String station = sanitizeStationCode(server.arg("station"));
+      String station = server.arg("station");
+      station.trim();
+      station.toUpperCase();
       Serial.printf("  Validating station code: '%s'\n", station.c_str());
-      ValidationResult result = validateStationCode(station);
-      if (!result.valid) {
-        Serial.printf("  ❌ Station code validation failed: %s\n", result.message.c_str());
-        server.send(400, "text/plain", "Invalid station code: " + result.message);
+
+      // Use service provider to validate station code
+      if (serviceProvider && !serviceProvider->isValidStationCode(station.c_str())) {
+        String errorMsg = "Invalid station code for " + String(serviceProvider->getProviderName());
+        errorMsg += ". Expected format: " + String(serviceProvider->getStationCodeDescription());
+        Serial.println("  ❌ " + errorMsg);
+        server.send(400, "text/plain", errorMsg);
         return;
       }
+
       Serial.println("  ✅ Station code valid");
       safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
     }
@@ -1566,12 +1572,20 @@ void setupWebServer() {
 
     // Validate station code
     if (server.hasArg("station")) {
-      String station = sanitizeStationCode(server.arg("station"));
-      ValidationResult result = validateStationCode(station);
-      if (!result.valid) {
-        server.send(400, "text/plain", "Invalid station code: " + result.message);
+      String station = server.arg("station");
+      station.trim();
+      station.toUpperCase();
+
+      // Use service provider to validate station code
+      if (serviceProvider && !serviceProvider->isValidStationCode(station.c_str())) {
+        String errorMsg = "Invalid station code for " + String(serviceProvider->getProviderName());
+        errorMsg += ". Expected format: " + String(serviceProvider->getStationCodeDescription());
+        Serial.println("  ❌ " + errorMsg);
+        server.send(400, "text/plain", errorMsg);
         return;
       }
+
+      Serial.println("  ✅ Station code valid: " + station);
       safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
     }
 
