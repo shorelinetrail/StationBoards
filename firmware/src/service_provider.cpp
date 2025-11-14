@@ -303,6 +303,18 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       }
     }
 
+    // Filter by direction if directionFilter is set
+    if (directionFilter.length() > 0 && towards) {
+      String towardsStr = String(towards);
+      towardsStr.toLowerCase();
+      String dirFilterLower = directionFilter;
+      dirFilterLower.toLowerCase();
+
+      if (towardsStr.indexOf(dirFilterLower) == -1) {
+        continue;  // Skip this arrival, doesn't match direction filter
+      }
+    }
+
     // Format scheduled time from expectedArrival
     String scheduledTime = formatTime(String(expectedArrival));
 
