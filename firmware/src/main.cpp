@@ -831,8 +831,22 @@ String generateDeviceId() {
 }
 
 bool checkFirstBoot() {
+  // Check if config.json exists
   if (!SPIFFS.exists("/config.json")) {
     Serial.println("🆕 First boot detected - no config.json");
+    // Create the firstboot flag so web interface knows to show wizard
+    File flagFile = SPIFFS.open("/firstboot.flag", "w");
+    if (flagFile) {
+      flagFile.println("1");
+      flagFile.close();
+      Serial.println("✅ Created firstboot.flag for wizard");
+    }
+    return true;
+  }
+
+  // Check if WiFi is configured (even if config.json exists)
+  if (strlen(config.wifiSSID) == 0) {
+    Serial.println("🆕 First boot detected - WiFi not configured");
     // Create the firstboot flag so web interface knows to show wizard
     File flagFile = SPIFFS.open("/firstboot.flag", "w");
     if (flagFile) {
