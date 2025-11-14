@@ -1883,4 +1883,958 @@ const char RESET_SUCCESS_PAGE[] PROGMEM = R"HTMLCODE(
 </html>
 )HTMLCODE";
 
+const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="StationBoards Setup Wizard - First Time Configuration">
+  <title>StationBoards Setup Wizard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .wizard-card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      overflow: hidden;
+      animation: slideUp 0.5s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .wizard-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .wizard-header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .wizard-header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .progress-bar {
+      background: rgba(255,255,255,0.2);
+      height: 4px;
+      margin-top: 20px;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      background: white;
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .step-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      transition: all 0.3s ease;
+    }
+
+    .step-dot.active {
+      background: white;
+      width: 30px;
+      border-radius: 5px;
+    }
+
+    .wizard-content {
+      padding: 40px 30px;
+    }
+
+    .step {
+      display: none;
+    }
+
+    .step.active {
+      display: block;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .step h2 {
+      color: #667eea;
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .step-description {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 30px;
+      line-height: 1.6;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="password"],
+    .form-group input[type="number"],
+    .form-group select {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    .btn {
+      padding: 14px 28px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #d0d0d0;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 15px;
+      margin-top: 30px;
+    }
+
+    .button-group .btn {
+      flex: 1;
+    }
+
+    .network-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .network-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e0e0e0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .network-item:last-child {
+      border-bottom: none;
+    }
+
+    .network-item:hover {
+      background: #f8f9fa;
+    }
+
+    .network-item.selected {
+      background: #e7f3ff;
+      border-left: 4px solid #667eea;
+    }
+
+    .network-name {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .network-signal {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .signal-bars {
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      text-align: center;
+      color: #666;
+      margin-top: 10px;
+    }
+
+    .autocomplete-wrapper {
+      position: relative;
+    }
+
+    .autocomplete-results {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 2px solid #667eea;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .autocomplete-results.show {
+      display: block;
+    }
+
+    .autocomplete-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.2s ease;
+    }
+
+    .autocomplete-item:hover {
+      background: #f8f9fa;
+    }
+
+    .station-name {
+      font-weight: 600;
+      color: #333;
+      display: block;
+    }
+
+    .station-code {
+      font-size: 12px;
+      color: #667eea;
+      font-weight: 500;
+    }
+
+    .preset-stations {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .preset-btn {
+      padding: 12px 8px;
+      background: #f8f9fa;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .preset-btn:hover {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .completion-icon {
+      font-size: 80px;
+      text-align: center;
+      margin: 20px 0;
+      animation: bounce 0.6s ease;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    .info-box {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+
+    .info-box p {
+      color: #004085;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .summary-item:last-child {
+      border-bottom: none;
+    }
+
+    .summary-label {
+      font-weight: 600;
+      color: #666;
+    }
+
+    .summary-value {
+      color: #333;
+      font-weight: 500;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      border-left: 4px solid #dc3545;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 15px 0;
+      color: #721c24;
+      font-size: 14px;
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .wizard-content {
+        padding: 30px 20px;
+      }
+
+      .preset-stations {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="wizard-card">
+      <div class="wizard-header">
+        <h1>🚆 Welcome to StationBoards</h1>
+        <p>Let's set up your live train departure board</p>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="step-indicator">
+          <div class="step-dot" data-step="0"></div>
+          <div class="step-dot" data-step="1"></div>
+          <div class="step-dot" data-step="2"></div>
+          <div class="step-dot" data-step="3"></div>
+        </div>
+      </div>
+
+      <div class="wizard-content">
+        <!-- Step 0: Welcome -->
+        <div class="step active" id="step-0">
+          <h2>Welcome! 👋</h2>
+          <p class="step-description">
+            Thank you for choosing StationBoards! This quick setup wizard will help you configure your
+            live train departure board in just a few steps.
+          </p>
+
+          <div class="info-box">
+            <p>
+              <strong>What you'll need:</strong><br>
+              • Your WiFi network name and password<br>
+              • The station code you want to display (e.g., PAD for Paddington)<br>
+              • About 2 minutes of your time
+            </p>
+          </div>
+
+          <div class="button-group">
+            <button class="btn btn-primary" onclick="nextStep()">Let's Get Started →</button>
+          </div>
+        </div>
+
+        <!-- Step 1: WiFi Setup -->
+        <div class="step" id="step-1">
+          <h2>WiFi Connection 📡</h2>
+          <p class="step-description">
+            Connect your StationBoard to your WiFi network to receive live train data.
+          </p>
+
+          <div class="error-message" id="wifiError"></div>
+
+          <button type="button" class="btn btn-secondary" onclick="scanNetworks()" id="scanBtn" style="width: 100%; margin-bottom: 20px;">
+            <span id="scanBtnText">🔍 Scan for Networks</span>
+            <span id="scanBtnSpinner" style="display: none;">Scanning...</span>
+          </button>
+
+          <div id="networkListContainer" style="display: none;">
+            <div class="network-list" id="networkList"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="ssid">WiFi Network Name (SSID)</label>
+            <input type="text" id="ssid" placeholder="Enter network name" required>
+            <span class="help-text">Or select from scanned networks above</span>
+          </div>
+
+          <div class="form-group">
+            <label for="password">WiFi Password</label>
+            <input type="password" id="password" placeholder="Enter password">
+            <span class="help-text">Leave blank if network has no password</span>
+          </div>
+
+          <div class="button-group">
+            <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+            <button class="btn btn-primary" onclick="nextStep()" id="wifiNextBtn">Next →</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Station Selection -->
+        <div class="step" id="step-2">
+          <h2>Choose Your Station 🚉</h2>
+          <p class="step-description">
+            Select the station you want to display departures for.
+          </p>
+
+          <div class="preset-stations">
+            <button type="button" class="preset-btn" onclick="selectStation('PAD', 'Paddington')">PAD<br><small>Paddington</small></button>
+            <button type="button" class="preset-btn" onclick="selectStation('VIC', 'Victoria')">VIC<br><small>Victoria</small></button>
+            <button type="button" class="preset-btn" onclick="selectStation('WAT', 'Waterloo')">WAT<br><small>Waterloo</small></button>
+            <button type="button" class="preset-btn" onclick="selectStation('KGX', 'Kings Cross')">KGX<br><small>Kings Cross</small></button>
+            <button type="button" class="preset-btn" onclick="selectStation('EUS', 'Euston')">EUS<br><small>Euston</small></button>
+            <button type="button" class="preset-btn" onclick="selectStation('LST', 'Liverpool St')">LST<br><small>Liverpool St</small></button>
+          </div>
+
+          <div class="form-group">
+            <label for="station">Station Code or Name</label>
+            <div class="autocomplete-wrapper">
+              <input type="text" id="station" placeholder="Type to search..." required>
+              <div id="stationAutocomplete" class="autocomplete-results"></div>
+            </div>
+            <span class="help-text">Enter a 3-letter station code (e.g., PAD) or search by name</span>
+          </div>
+
+          <div class="button-group">
+            <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+            <button class="btn btn-primary" onclick="nextStep()" id="stationNextBtn">Next →</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Display Preferences -->
+        <div class="step" id="step-3">
+          <h2>Display Preferences ⚙️</h2>
+          <p class="step-description">
+            Customize how your departure board looks. You can change these settings later.
+          </p>
+
+          <div class="form-group">
+            <label for="mode">Display Mode</label>
+            <select id="mode">
+              <option value="0">Standard View - Show multiple trains</option>
+              <option value="1">Calling At - Show stops for first train</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="extra">Extra Services</label>
+            <select id="extra">
+              <option value="0">No extra services</option>
+              <option value="1">1 extra service (rotating)</option>
+              <option value="2">2 extra services (rotating)</option>
+              <option value="3">3 extra services (rotating)</option>
+            </select>
+            <span class="help-text">Additional trains shown on the bottom line</span>
+          </div>
+
+          <div class="form-group">
+            <label for="interval">Refresh Interval (seconds)</label>
+            <input type="number" id="interval" value="60" min="30" max="600">
+            <span class="help-text">How often to fetch new train data (recommended: 60-120)</span>
+          </div>
+
+          <div class="button-group">
+            <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+            <button class="btn btn-primary" onclick="showSummary()">Review Settings →</button>
+          </div>
+        </div>
+
+        <!-- Step 4: Summary & Complete -->
+        <div class="step" id="step-4">
+          <h2>Summary & Complete ✓</h2>
+          <p class="step-description">
+            Please review your settings before completing setup.
+          </p>
+
+          <div id="summaryContent"></div>
+
+          <div class="info-box" style="margin-top: 30px;">
+            <p>
+              <strong>What happens next:</strong><br>
+              When you click "Complete Setup", your device will save these settings and restart.
+              It will then connect to your WiFi network and start displaying live train departures!
+            </p>
+          </div>
+
+          <div class="error-message" id="completeError"></div>
+
+          <div class="button-group">
+            <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+            <button class="btn btn-primary" onclick="completeSetup()" id="completeBtn">Complete Setup 🎉</button>
+          </div>
+        </div>
+
+        <!-- Step 5: Completion -->
+        <div class="step" id="step-5">
+          <div class="completion-icon">🎉</div>
+          <h2 style="text-align: center;">Setup Complete!</h2>
+          <p class="step-description" style="text-align: center;">
+            Your StationBoard is now configured and restarting...
+          </p>
+
+          <div class="spinner"></div>
+          <p class="loading-text">Connecting to <strong id="finalSSID"></strong>...</p>
+          <p class="loading-text">This may take 15-20 seconds</p>
+
+          <div class="info-box" style="margin-top: 30px;">
+            <p style="text-align: center;">
+              After restart, reconnect to your WiFi network and visit the device's new IP address
+              to access the full configuration interface.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 0;
+    const totalSteps = 4;
+    let stationData = [];
+    let stationDataLoaded = false;
+    let selectedNetworkSSID = '';
+
+    // Utility: Escape HTML
+    const escapeHtml = (unsafe) => {
+      if (unsafe === null || unsafe === undefined) return '';
+      return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
+    // Utility: Debounce
+    const debounce = (func, wait) => {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    };
+
+    // Update progress bar and step indicators
+    function updateProgress() {
+      const progress = (currentStep / totalSteps) * 100;
+      document.getElementById('progressFill').style.width = progress + '%';
+
+      document.querySelectorAll('.step-dot').forEach((dot, index) => {
+        dot.classList.toggle('active', index === currentStep);
+      });
+    }
+
+    // Navigate to next step
+    function nextStep() {
+      // Validation
+      if (currentStep === 1) {
+        const ssid = document.getElementById('ssid').value.trim();
+        if (!ssid) {
+          showError('wifiError', 'Please enter a WiFi network name');
+          return;
+        }
+        hideError('wifiError');
+      }
+
+      if (currentStep === 2) {
+        const station = document.getElementById('station').value.trim();
+        if (!station || station.length < 3) {
+          alert('Please select or enter a valid station code');
+          return;
+        }
+      }
+
+      if (currentStep >= totalSteps) return;
+
+      document.getElementById('step-' + currentStep).classList.remove('active');
+      currentStep++;
+      document.getElementById('step-' + currentStep).classList.add('active');
+      updateProgress();
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Navigate to previous step
+    function prevStep() {
+      if (currentStep <= 0) return;
+
+      document.getElementById('step-' + currentStep).classList.remove('active');
+      currentStep--;
+      document.getElementById('step-' + currentStep).classList.add('active');
+      updateProgress();
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Show error message
+    function showError(elementId, message) {
+      const errorEl = document.getElementById(elementId);
+      errorEl.textContent = message;
+      errorEl.classList.add('show');
+    }
+
+    // Hide error message
+    function hideError(elementId) {
+      const errorEl = document.getElementById(elementId);
+      errorEl.classList.remove('show');
+    }
+
+    // Scan WiFi networks
+    function scanNetworks() {
+      const btn = document.getElementById('scanBtn');
+      const btnText = document.getElementById('scanBtnText');
+      const btnSpinner = document.getElementById('scanBtnSpinner');
+
+      btn.disabled = true;
+      btnText.style.display = 'none';
+      btnSpinner.style.display = 'inline';
+
+      fetch('/scan')
+        .then(response => response.json())
+        .then(data => {
+          displayNetworks(data.networks);
+        })
+        .catch(error => {
+          console.error('Scan error:', error);
+          showError('wifiError', 'Failed to scan networks. Please enter WiFi details manually.');
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          btnSpinner.style.display = 'none';
+        });
+    }
+
+    // Display scanned networks
+    function displayNetworks(networks) {
+      const container = document.getElementById('networkListContainer');
+      const list = document.getElementById('networkList');
+
+      if (networks.length === 0) {
+        showError('wifiError', 'No networks found. Please enter WiFi details manually.');
+        return;
+      }
+
+      hideError('wifiError');
+      container.style.display = 'block';
+
+      list.innerHTML = networks.map(network => {
+        const strength = network.rssi > -50 ? '▂▄▆█' : network.rssi > -70 ? '▂▄▆' : '▂▄';
+        return `<div class="network-item" onclick="selectNetwork('${escapeHtml(network.ssid)}')">
+          <span class="network-name">${escapeHtml(network.ssid)}</span>
+          <span class="network-signal">
+            <span class="signal-bars">${strength}</span>
+            ${escapeHtml(network.rssi)} dBm
+          </span>
+        </div>`;
+      }).join('');
+    }
+
+    // Select a network from the list
+    function selectNetwork(ssid) {
+      selectedNetworkSSID = ssid;
+      document.getElementById('ssid').value = ssid;
+      document.getElementById('password').focus();
+
+      // Highlight selected network
+      document.querySelectorAll('.network-item').forEach(item => {
+        item.classList.toggle('selected', item.textContent.includes(ssid));
+      });
+
+      hideError('wifiError');
+    }
+
+    // Load station data for autocomplete
+    function loadStationData() {
+      const fallbackStations = [
+        {name: "London Paddington", code: "PAD"}, {name: "London Victoria", code: "VIC"},
+        {name: "London Waterloo", code: "WAT"}, {name: "London Kings Cross", code: "KGX"},
+        {name: "London Euston", code: "EUS"}, {name: "London Liverpool Street", code: "LST"},
+        {name: "London St Pancras International", code: "STP"}, {name: "London Bridge", code: "LBG"},
+        {name: "Birmingham New Street", code: "BHM"}, {name: "Manchester Piccadilly", code: "MAN"},
+        {name: "Edinburgh Waverley", code: "EDB"}, {name: "Glasgow Central", code: "GLC"},
+        {name: "Leeds", code: "LDS"}, {name: "Liverpool Lime Street", code: "LIV"},
+        {name: "Bristol Temple Meads", code: "BRI"}, {name: "Cardiff Central", code: "CDF"}
+      ];
+
+      const stationsURL = "https://raw.githubusercontent.com/davwheat/uk-railway-stations/main/stations.json";
+
+      fetch(stationsURL, { timeout: 10000 })
+        .then(response => response.ok ? response.json() : Promise.reject())
+        .then(data => {
+          stationData = data.map(station => ({
+            name: station.stationName || station.name,
+            code: (station.crsCode || station.code || "").toUpperCase()
+          })).filter(station => station.code && station.code.length === 3);
+          stationDataLoaded = true;
+          console.log(`Loaded ${stationData.length} stations`);
+        })
+        .catch(() => {
+          console.log("Using fallback station data");
+          stationData = fallbackStations;
+          stationDataLoaded = true;
+        });
+    }
+
+    // Setup station autocomplete
+    function setupStationAutocomplete() {
+      const input = document.getElementById('station');
+      const results = document.getElementById('stationAutocomplete');
+
+      const handleInput = debounce((e) => {
+        const query = e.target.value.toUpperCase().trim();
+
+        if (query.length < 2 || !stationDataLoaded) {
+          results.classList.remove('show');
+          return;
+        }
+
+        const matches = stationData.filter(station =>
+          station.name.toUpperCase().includes(query) ||
+          station.code.includes(query)
+        ).slice(0, 10);
+
+        if (matches.length === 0) {
+          results.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No stations found</div>';
+          results.classList.add('show');
+          return;
+        }
+
+        results.innerHTML = matches.map(station => `
+          <div class="autocomplete-item" onclick="selectStation('${escapeHtml(station.code)}', '${escapeHtml(station.name)}')">
+            <span class="station-name">${escapeHtml(station.name)}</span>
+            <span class="station-code">${escapeHtml(station.code)}</span>
+          </div>
+        `).join('');
+
+        results.classList.add('show');
+      }, 300);
+
+      input.addEventListener('input', handleInput);
+
+      document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+          results.classList.remove('show');
+        }
+      });
+    }
+
+    // Select a station
+    function selectStation(code, name) {
+      document.getElementById('station').value = code;
+      document.getElementById('stationAutocomplete').classList.remove('show');
+    }
+
+    // Show summary before completion
+    function showSummary() {
+      const ssid = document.getElementById('ssid').value;
+      const station = document.getElementById('station').value;
+      const mode = document.getElementById('mode').options[document.getElementById('mode').selectedIndex].text;
+      const extra = document.getElementById('extra').value;
+      const interval = document.getElementById('interval').value;
+
+      const summary = `
+        <div class="summary-item">
+          <span class="summary-label">WiFi Network:</span>
+          <span class="summary-value">${escapeHtml(ssid)}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Station Code:</span>
+          <span class="summary-value">${escapeHtml(station)}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Display Mode:</span>
+          <span class="summary-value">${escapeHtml(mode)}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Extra Services:</span>
+          <span class="summary-value">${escapeHtml(extra)}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Refresh Interval:</span>
+          <span class="summary-value">${escapeHtml(interval)} seconds</span>
+        </div>
+      `;
+
+      document.getElementById('summaryContent').innerHTML = summary;
+      nextStep();
+    }
+
+    // Complete setup and submit
+    function completeSetup() {
+      const btn = document.getElementById('completeBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      hideError('completeError');
+
+      const formData = new URLSearchParams();
+      formData.append('ssid', document.getElementById('ssid').value);
+      formData.append('password', document.getElementById('password').value);
+      formData.append('station', document.getElementById('station').value);
+      formData.append('mode', document.getElementById('mode').value);
+      formData.append('extra', document.getElementById('extra').value);
+      formData.append('interval', document.getElementById('interval').value);
+      formData.append('scrollspeed', '50');  // Default
+      formData.append('rotationspeed', '15');  // Default
+
+      fetch('/wizard-complete', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Setup failed');
+
+        // Show completion screen
+        document.getElementById('step-' + currentStep).classList.remove('active');
+        document.getElementById('step-5').classList.add('active');
+        document.getElementById('finalSSID').textContent = document.getElementById('ssid').value;
+
+        // Update progress to 100%
+        document.getElementById('progressFill').style.width = '100%';
+
+        // After 15 seconds, try to redirect
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 15000);
+      })
+      .catch(error => {
+        console.error('Setup error:', error);
+        showError('completeError', 'Failed to save settings. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Complete Setup 🎉';
+      });
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      updateProgress();
+      loadStationData();
+      setupStationAutocomplete();
+    });
+  </script>
+</body>
+</html>
+)HTMLCODE";
+
 #endif

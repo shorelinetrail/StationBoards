@@ -1533,8 +1533,17 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
+    // Check if first boot flag exists - if so, serve setup wizard
+    if (SPIFFS.exists("/firstboot.flag")) {
+      Serial.println("🧙 First boot detected - serving setup wizard");
+      String html = FPSTR(SETUP_WIZARD_PAGE);
+      server.send(200, "text/html", html);
+      return;
+    }
+
+    // Normal config page
     String html = FPSTR(CONFIG_PAGE_TEMPLATE);
-    
+
     html.replace("{SSID}", String(config.wifiSSID));
     html.replace("{STATION}", String(config.stationCode));
     html.replace("{STATION_NAME}", String(displayState.stationName));
@@ -1556,7 +1565,7 @@ void setupWebServer() {
     html.replace("{Y3}", String(config.yPosAlt));
     html.replace("{IP}", WiFi.localIP().toString());
     html.replace("{DEVICE_ID}", config.deviceId);
-    
+
     server.send(200, "text/html", html);
   });
 
@@ -1829,18 +1838,137 @@ void setupWebServer() {
     if (SPIFFS.exists("/config.json")) {
       SPIFFS.remove("/config.json");
     }
-    
+
     File flagFile = SPIFFS.open("/firstboot.flag", "w");
     if (flagFile) {
       flagFile.println("1");
       flagFile.close();
     }
-    
+
     broadcastStatus("Factory reset initiated", "warning");
-    
+
     String html = FPSTR(RESET_SUCCESS_PAGE);
     server.send(200, "text/html", html);
-    
+
+    delay(2000);
+    ESP.restart();
+  });
+
+  server.on("/wizard-complete", HTTP_POST, []() {
+    Serial.println("🧙 Setup wizard completion endpoint called");
+
+    // Validate and save all settings
+    bool allValid = true;
+
+    // Validate SSID
+    if (server.hasArg("ssid")) {
+      String ssid = server.arg("ssid");
+      Serial.printf("  Validating SSID: '%s'\n", ssid.c_str());
+      ValidationResult result = validateSSID(ssid);
+      if (!result.valid) {
+        Serial.printf("  ❌ SSID validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid SSID: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ SSID valid");
+      safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
+    }
+
+    // Validate and save password if provided
+    if (server.hasArg("password") && server.arg("password").length() > 0) {
+      String password = server.arg("password");
+      ValidationResult result = validatePassword(password);
+      if (!result.valid) {
+        Serial.printf("  ❌ Password validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid password: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ Password valid");
+      safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
+    } else {
+      // No password - clear it
+      config.wifiPassword[0] = '\0';
+    }
+
+    // Validate station code
+    if (server.hasArg("station")) {
+      String station = sanitizeStationCode(server.arg("station"));
+      ValidationResult result = validateStationCode(station);
+      if (!result.valid) {
+        Serial.printf("  ❌ Station code validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid station code: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ Station code valid");
+      safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
+    }
+
+    // Save display mode
+    if (server.hasArg("mode")) {
+      config.useCallingAt = (server.arg("mode") == "1");
+    }
+
+    // Save extra services
+    if (server.hasArg("extra")) {
+      int extra = server.arg("extra").toInt();
+      if (extra >= 0 && extra <= 4) {
+        config.extraServices = extra;
+      }
+    }
+
+    // Validate and save refresh interval
+    if (server.hasArg("interval")) {
+      int interval = server.arg("interval").toInt();
+      ValidationResult result = validateRange(interval, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL, "Refresh interval");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.refreshInterval = interval;
+    }
+
+    // Save scroll speed
+    if (server.hasArg("scrollspeed")) {
+      int speed = server.arg("scrollspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED, "Scroll speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.scrollSpeed = speed;
+    }
+
+    // Save rotation speed
+    if (server.hasArg("rotationspeed")) {
+      int speed = server.arg("rotationspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED, "Rotation speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.rotationSpeed = speed;
+    }
+
+    // Save configuration
+    if (!config.save()) {
+      Serial.println("❌ Failed to save configuration");
+      server.send(500, "text/plain", "Failed to save configuration");
+      return;
+    }
+
+    Serial.println("✅ Wizard configuration saved successfully");
+
+    // Remove first boot flag
+    if (SPIFFS.exists("/firstboot.flag")) {
+      SPIFFS.remove("/firstboot.flag");
+      Serial.println("✅ First boot flag removed");
+    }
+
+    // Send success response
+    server.send(200, "text/plain", "Setup complete");
+
+    // Restart device after a short delay
+    Serial.println("🔄 Restarting device with new configuration...");
     delay(2000);
     ESP.restart();
   });
