@@ -831,17 +831,38 @@ String generateDeviceId() {
 }
 
 bool checkFirstBoot() {
+  // Check if config.json exists
   if (!SPIFFS.exists("/config.json")) {
-    Serial.println("🆕 First boot detected");
+    Serial.println("🆕 First boot detected - no config.json");
+    // Create the firstboot flag so web interface knows to show wizard
+    File flagFile = SPIFFS.open("/firstboot.flag", "w");
+    if (flagFile) {
+      flagFile.println("1");
+      flagFile.close();
+      Serial.println("✅ Created firstboot.flag for wizard");
+    }
     return true;
   }
-  
+
+  // Check if WiFi is configured (even if config.json exists)
+  if (strlen(config.wifiSSID) == 0) {
+    Serial.println("🆕 First boot detected - WiFi not configured");
+    // Create the firstboot flag so web interface knows to show wizard
+    File flagFile = SPIFFS.open("/firstboot.flag", "w");
+    if (flagFile) {
+      flagFile.println("1");
+      flagFile.close();
+      Serial.println("✅ Created firstboot.flag for wizard");
+    }
+    return true;
+  }
+
   if (SPIFFS.exists("/firstboot.flag")) {
     Serial.println("🆕 First boot flag found");
-    SPIFFS.remove("/firstboot.flag");
+    // Don't remove the flag here - let the wizard complete endpoint remove it
     return true;
   }
-  
+
   return false;
 }
 
@@ -1533,8 +1554,24 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
+    Serial.println("📄 Root endpoint accessed");
+    Serial.print("   Checking for firstboot.flag... ");
+
+    // Check if first boot flag exists - if so, serve setup wizard
+    bool flagExists = SPIFFS.exists("/firstboot.flag");
+    Serial.println(flagExists ? "FOUND" : "NOT FOUND");
+
+    if (flagExists) {
+      Serial.println("🧙 First boot detected - serving setup wizard");
+      String html = FPSTR(SETUP_WIZARD_PAGE);
+      server.send(200, "text/html", html);
+      return;
+    }
+
+    Serial.println("📋 Serving normal config page");
+    // Normal config page
     String html = FPSTR(CONFIG_PAGE_TEMPLATE);
-    
+
     html.replace("{SSID}", String(config.wifiSSID));
     html.replace("{STATION}", String(config.stationCode));
     html.replace("{STATION_NAME}", String(displayState.stationName));
@@ -1556,7 +1593,7 @@ void setupWebServer() {
     html.replace("{Y3}", String(config.yPosAlt));
     html.replace("{IP}", WiFi.localIP().toString());
     html.replace("{DEVICE_ID}", config.deviceId);
-    
+
     server.send(200, "text/html", html);
   });
 
@@ -1829,20 +1866,314 @@ void setupWebServer() {
     if (SPIFFS.exists("/config.json")) {
       SPIFFS.remove("/config.json");
     }
-    
+
     File flagFile = SPIFFS.open("/firstboot.flag", "w");
     if (flagFile) {
       flagFile.println("1");
       flagFile.close();
     }
-    
+
     broadcastStatus("Factory reset initiated", "warning");
-    
+
     String html = FPSTR(RESET_SUCCESS_PAGE);
     server.send(200, "text/html", html);
-    
+
     delay(2000);
     ESP.restart();
+  });
+
+  server.on("/wizard-complete", HTTP_POST, []() {
+    Serial.println("🧙 Setup wizard completion endpoint called");
+
+    // Validate and save all settings
+    bool allValid = true;
+
+    // Validate SSID
+    if (server.hasArg("ssid")) {
+      String ssid = server.arg("ssid");
+      Serial.printf("  Validating SSID: '%s'\n", ssid.c_str());
+      ValidationResult result = validateSSID(ssid);
+      if (!result.valid) {
+        Serial.printf("  ❌ SSID validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid SSID: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ SSID valid");
+      safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
+    }
+
+    // Validate and save password if provided
+    if (server.hasArg("password") && server.arg("password").length() > 0) {
+      String password = server.arg("password");
+      ValidationResult result = validatePassword(password);
+      if (!result.valid) {
+        Serial.printf("  ❌ Password validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid password: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ Password valid");
+      safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
+    } else {
+      // No password - clear it
+      config.wifiPassword[0] = '\0';
+    }
+
+    // Validate station code
+    if (server.hasArg("station")) {
+      String station = sanitizeStationCode(server.arg("station"));
+      ValidationResult result = validateStationCode(station);
+      if (!result.valid) {
+        Serial.printf("  ❌ Station code validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid station code: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ Station code valid");
+      safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
+    }
+
+    // Save display mode
+    if (server.hasArg("mode")) {
+      config.useCallingAt = (server.arg("mode") == "1");
+    }
+
+    // Save show station name setting
+    if (server.hasArg("showstation")) {
+      config.showStationName = (server.arg("showstation") == "1");
+    }
+
+    // Save extra services
+    if (server.hasArg("extra")) {
+      int extra = server.arg("extra").toInt();
+      if (extra >= 0 && extra <= 4) {
+        config.extraServices = extra;
+      }
+    }
+
+    // Validate and save refresh interval
+    if (server.hasArg("interval")) {
+      int interval = server.arg("interval").toInt();
+      ValidationResult result = validateRange(interval, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL, "Refresh interval");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.refreshInterval = interval;
+    }
+
+    // Save scroll speed
+    if (server.hasArg("scrollspeed")) {
+      int speed = server.arg("scrollspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED, "Scroll speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.scrollSpeed = speed;
+    }
+
+    // Save rotation speed
+    if (server.hasArg("rotationspeed")) {
+      int speed = server.arg("rotationspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED, "Rotation speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.rotationSpeed = speed;
+    }
+
+    // Save configuration
+    if (!config.save()) {
+      Serial.println("❌ Failed to save configuration");
+      server.send(500, "text/plain", "Failed to save configuration");
+      return;
+    }
+
+    Serial.println("✅ Wizard configuration saved successfully");
+
+    // Remove first boot flag
+    if (SPIFFS.exists("/firstboot.flag")) {
+      SPIFFS.remove("/firstboot.flag");
+      Serial.println("✅ First boot flag removed");
+    }
+
+    // Send success response
+    server.send(200, "text/plain", "Setup complete");
+
+    // Restart device after a short delay
+    Serial.println("🔄 Restarting device with new configuration...");
+    delay(2000);
+    ESP.restart();
+  });
+
+  server.on("/test-wifi", HTTP_POST, []() {
+    Serial.println("🔌 WiFi connection test endpoint called");
+
+    if (!server.hasArg("ssid")) {
+      server.send(400, "application/json", "{\"success\":false,\"message\":\"SSID required\"}");
+      return;
+    }
+
+    String ssid = server.arg("ssid");
+    String password = server.hasArg("password") ? server.arg("password") : "";
+
+    Serial.printf("  Testing connection to: %s\n", ssid.c_str());
+
+    // Disconnect from current WiFi
+    WiFi.disconnect();
+    delay(100);
+
+    // Try to connect to the specified network
+    WiFi.begin(ssid.c_str(), password.c_str());
+
+    // Wait up to 10 seconds for connection
+    unsigned long startTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
+      delay(500);
+      Serial.print(".");
+    }
+
+    String json = "{";
+    if (WiFi.status() == WL_CONNECTED) {
+      int rssi = WiFi.RSSI();
+      String quality = rssi > -50 ? "Excellent" : rssi > -60 ? "Good" : rssi > -70 ? "Fair" : "Weak";
+
+      Serial.println("\n  ✅ Test connection successful!");
+      Serial.printf("  RSSI: %d dBm (%s)\n", rssi, quality.c_str());
+
+      json += "\"success\":true,";
+      json += "\"rssi\":" + String(rssi) + ",";
+      json += "\"quality\":\"" + quality + "\"";
+
+      // Disconnect from test network
+      WiFi.disconnect();
+      delay(100);
+
+      // Reconnect to original network if configured
+      if (strlen(config.wifiSSID) > 0) {
+        Serial.println("  Reconnecting to original network...");
+        WiFi.begin(config.wifiSSID, config.wifiPassword);
+      }
+    } else {
+      Serial.println("\n  ❌ Test connection failed");
+
+      json += "\"success\":false,";
+      json += "\"message\":\"Could not connect to network. Check SSID and password.\"";
+
+      // Try to reconnect to original network
+      if (strlen(config.wifiSSID) > 0) {
+        Serial.println("  Reconnecting to original network...");
+        WiFi.begin(config.wifiSSID, config.wifiPassword);
+      }
+    }
+    json += "}";
+
+    server.send(200, "application/json", json);
+  });
+
+  server.on("/validate-station", HTTP_GET, []() {
+    Serial.println("🚉 Station validation endpoint called");
+
+    if (!server.hasArg("code")) {
+      server.send(400, "application/json", "{\"valid\":false,\"message\":\"Station code required\"}");
+      return;
+    }
+
+    String stationCode = server.arg("code");
+    stationCode.toUpperCase();
+    Serial.printf("  Validating station: %s\n", stationCode.c_str());
+
+    // Basic validation
+    if (stationCode.length() != 3) {
+      server.send(200, "application/json", "{\"valid\":false,\"message\":\"Station code must be 3 letters\"}");
+      return;
+    }
+
+    // Try to fetch service data from National Rail to validate
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(5000);  // 5 second timeout
+
+    Serial.println("  Attempting to connect to National Rail API...");
+    if (!client.connect("lite.realtime.nationalrail.co.uk", 443)) {
+      Serial.println("  ⚠️  Could not connect to National Rail API");
+      server.send(200, "application/json", "{\"valid\":true,\"warning\":true,\"message\":\"Could not verify with API, but format is valid\"}");
+      return;
+    }
+
+    Serial.println("  ✅ Connected to National Rail API");
+
+    // Build minimal SOAP request to check if station exists
+    String soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
+    soapRequest += "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:typ=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\" xmlns:ldb=\"http://thalesgroup.com/RTTI/2017-10-01/ldb/\">";
+    soapRequest += "<soap:Header><typ:AccessToken><typ:TokenValue>";
+    soapRequest += String(apiToken);
+    soapRequest += "</typ:TokenValue></typ:AccessToken></soap:Header>";
+    soapRequest += "<soap:Body><ldb:GetDepBoardWithDetailsRequest>";
+    soapRequest += "<ldb:numRows>1</ldb:numRows>";
+    soapRequest += "<ldb:crs>" + stationCode + "</ldb:crs>";
+    soapRequest += "</ldb:GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
+
+    client.println("POST /OpenLDBWS/ldb11.asmx HTTP/1.1");
+    client.println("Host: lite.realtime.nationalrail.co.uk");
+    client.println("Content-Type: text/xml; charset=utf-8");
+    client.println("SOAPAction: \"http://thalesgroup.com/RTTI/2017-10-01/ldb/GetDepBoardWithDetails\"");
+    client.print("Content-Length: ");
+    client.println(soapRequest.length());
+    client.println();
+    client.print(soapRequest);
+
+    // Wait for response
+    unsigned long timeout = millis();
+    while (!client.available() && millis() - timeout < 5000) {
+      delay(10);
+    }
+
+    String response = "";
+    bool foundStationName = false;
+    String stationName = "";
+    int serviceCount = 0;
+
+    while (client.available()) {
+      String line = client.readStringUntil('\n');
+      response += line;
+
+      // Check for error
+      if (line.indexOf("faultcode") >= 0 || line.indexOf("Invalid CRS") >= 0) {
+        Serial.println("  ❌ Invalid station code");
+        client.stop();
+        server.send(200, "application/json", "{\"valid\":false,\"message\":\"Station code not found in National Rail database\"}");
+        return;
+      }
+
+      // Extract station name
+      if (line.indexOf("<lt4:locationName>") >= 0) {
+        int start = line.indexOf("<lt4:locationName>") + 18;
+        int end = line.indexOf("</lt4:locationName>");
+        if (end > start) {
+          stationName = line.substring(start, end);
+          foundStationName = true;
+        }
+      }
+
+      // Count services
+      if (line.indexOf("<lt7:service>") >= 0) {
+        serviceCount++;
+      }
+    }
+
+    client.stop();
+
+    if (foundStationName) {
+      Serial.printf("  ✅ Valid station: %s\n", stationName.c_str());
+      Serial.printf("  Services available: %d\n", serviceCount);
+
+      String json = "{\"valid\":true,\"name\":\"" + stationName + "\",\"serviceCount\":" + String(serviceCount) + "}";
+      server.send(200, "application/json", json);
+    } else {
+      Serial.println("  ⚠️  Could not parse station data from API");
+      server.send(200, "application/json", "{\"valid\":true,\"warning\":true,\"message\":\"Could not verify with API, but format is valid\"}");
+    }
   });
 
   server.on("/scan", HTTP_GET, []() {
@@ -1880,6 +2211,31 @@ void setupWebServer() {
     json += "\"lastUpdate\":" + String(fetchStateData.lastSuccess / 1000);
     json += "}";
     server.send(200, "application/json", json);
+  });
+
+  server.on("/debug/files", HTTP_GET, []() {
+    Serial.println("🔍 Debug: Listing SPIFFS files");
+    String html = "<html><body><h1>SPIFFS Debug</h1>";
+    html += "<h2>Files:</h2><ul>";
+
+    File root = SPIFFS.open("/");
+    File file = root.openNextFile();
+    while (file) {
+      html += "<li>" + String(file.name()) + " (" + String(file.size()) + " bytes)</li>";
+      Serial.println("  📄 " + String(file.name()) + " (" + String(file.size()) + " bytes)");
+      file = root.openNextFile();
+    }
+    html += "</ul>";
+
+    html += "<h2>Flag States:</h2><ul>";
+    html += "<li>firstboot.flag exists: " + String(SPIFFS.exists("/firstboot.flag") ? "YES" : "NO") + "</li>";
+    html += "<li>config.json exists: " + String(SPIFFS.exists("/config.json") ? "YES" : "NO") + "</li>";
+    html += "<li>systemFlags.firstBoot: " + String(systemFlags.firstBoot ? "true" : "false") + "</li>";
+    html += "</ul>";
+
+    html += "<p><a href='/'>Go to home</a></p>";
+    html += "</body></html>";
+    server.send(200, "text/html", html);
   });
 
   server.begin();
