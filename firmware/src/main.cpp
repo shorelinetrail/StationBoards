@@ -14,6 +14,20 @@
 #include "config.h"
 #include "web_pages.h"
 
+// Code Quality Improvements - Phase 2
+// Define guards before including headers to prevent duplicate function definitions
+// Note: We use the header definitions for ServiceData, FetchState, and formatETD
+// since other header code (display_functions.h) depends on them
+#define DECODE_HTML_ENTITIES_DEFINED
+#define EXTRACT_TAG_VALUE_DEFINED
+#define GENERATE_DEVICE_ID_DEFINED
+// Note: formatETD is NOT guarded - display_functions.h needs it from helpers.h
+
+#include "constants.h"         // Named constants for all magic numbers
+#include "types.h"             // Data structures to organize globals
+#include "helpers.h"           // Validation and utility functions
+#include "display_functions.h" // Display component functions
+
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
 #endif
@@ -34,59 +48,81 @@ const char* apiPath = "/OpenLDBWS/ldb9.asmx";
 const char* apiToken = "73ee3834-af35-4f22-9b8b-480b70571c39";
 
 // ---------------- Data ----------------
-struct ServiceData {
-  char std[6];
-  char etd[10];
-  char destination[30];
-  char callingPoints[500];
-};
+// Note: ServiceData is now defined in types.h
+// struct ServiceData {
+//   char std[6];
+//   char etd[10];
+//   char destination[30];
+//   char callingPoints[500];
+// };
 
-ServiceData services[8];
-int serviceCount = 0;
-unsigned long lastDataUpdate = 0;
-unsigned long lastRotation = 0;
-char stationName[50] = "Station";
-int currentAlternatingService = 2;
-bool isAnimating = false;
-int animationOffset = 0;
-int callingAtScrollOffset = 0;
-unsigned long lastCallingAtScroll = 0;
-bool apMode = false;
-bool systemError = false;
-bool firstBoot = false;
-bool fetchingNewStation = false;
-unsigned long lastDisplaySnapshot = 0;
+// Phase 2 Step 4: Migrate to DisplayState struct
+DisplayState displayState;
 
-enum FetchState {
-  FETCH_IDLE,
-  FETCH_START,
-  FETCH_WAITING,
-  FETCH_READING,
-  FETCH_DONE,
-  FETCH_FAIL
-};
+// Migrated to displayState:
+// - services[] → displayState.services[]
+// - serviceCount → displayState.serviceCount
+// - stationName → displayState.stationName
+// - currentAlternatingService → displayState.currentAlternatingService
+// - isAnimating → displayState.isAnimating
+// - animationOffset → displayState.animationOffset
+// - callingAtScrollOffset → displayState.callingAtScrollOffset
+// - lastCallingAtScroll → displayState.lastCallingAtScroll
+// - fetchingNewStation → displayState.fetchingNewStation
+// - lastRotation → displayState.lastRotation
+// - lastDisplaySnapshot → displayState.lastSnapshot
 
-FetchState fetchState = FETCH_IDLE;
-WiFiClientSecure fetchClient;
-String fetchBuffer;
-unsigned long fetchStartTime = 0;
-unsigned long lastFetchAttempt = 0;
-unsigned long lastSuccessfulFetch = 0;
+unsigned long lastDataUpdate = 0;  // Not in DisplayState - timing related
 
-// WebSocket connected clients
-uint8_t connectedClients[10] = {0};  // ← FIXED: Initialized array
-uint8_t clientCount = 0;
-unsigned long lastMetricsBroadcast = 0;
+// Phase 2 Step 4: Migrate to SystemFlags struct
+SystemFlags systemFlags;
 
-// Remote monitoring server configuration
-String monitorServerHost = "192.168.0.75";  // TODO: Make this configurable
-int monitorServerPort = 3000;
-bool monitoringEnabled = true;  // Enabled - display updates prevent blocking issues
-WebSocketsClient monitorClient;
-unsigned long lastMonitorHeartbeat = 0;
-const unsigned long MONITOR_HEARTBEAT_INTERVAL = 30000;
-bool monitorConnected = false;
-unsigned long lastMonitorDisconnect = 0;
+// Migrated to systemFlags:
+// - apMode → systemFlags.apMode
+// - systemError → systemFlags.systemError
+// - firstBoot → systemFlags.firstBoot
+
+// Note: FetchState enum is now defined in types.h
+// enum FetchState {
+//   FETCH_IDLE,
+//   FETCH_START,
+//   FETCH_WAITING,
+//   FETCH_READING,
+//   FETCH_DONE,
+//   FETCH_FAIL
+// };
+
+// Phase 2 Step 4: Migrate to FetchStateData struct
+FetchStateData fetchStateData;
+WiFiClientSecure fetchClient;  // Keep separate - not in FetchStateData
+
+// Migrated to fetchStateData:
+// - fetchState → fetchStateData.state
+// - fetchBuffer → fetchStateData.buffer
+// - fetchStartTime → fetchStateData.startTime
+// - lastFetchAttempt → fetchStateData.lastAttempt
+// - lastSuccessfulFetch → fetchStateData.lastSuccess
+
+// Phase 2 Step 4: Migrate to WebSocketClients struct
+WebSocketClients wsClients;
+
+// Migrated to wsClients:
+// - connectedClients[] → wsClients.clients[]
+// - clientCount → wsClients.count
+// - lastMetricsBroadcast → wsClients.lastMetricsBroadcast
+
+// Phase 2 Step 4: Migrate to MonitoringState struct
+MonitoringState monitoringState;
+WebSocketsClient monitorClient;  // Keep separate - not in MonitoringState
+
+// Migrated to monitoringState:
+// - monitorServerHost → monitoringState.serverHost
+// - monitorServerPort → monitoringState.serverPort
+// - monitoringEnabled → monitoringState.enabled
+// - monitorConnected → monitoringState.connected
+// - lastMonitorHeartbeat → monitoringState.lastHeartbeat
+// - lastMonitorDisconnect → monitoringState.lastDisconnect
+// - MONITOR_HEARTBEAT_INTERVAL → Timing::MONITOR_HEARTBEAT_INTERVAL (from constants.h)
 
 // ---------------- Logo Bitmap ----------------
 const unsigned char logo_bitmap [] PROGMEM = {
@@ -160,8 +196,8 @@ void displayAPScreen();
 void displayReadyScreen(const IPAddress& ip);
 void displayMessage(const char* line1, const char* line2 = "");
 void displayStatus(const char* status);
-String extractTagValue(String xml, String tag, String ns = "");
-String decodeHTMLEntities(String text);
+// Note: extractTagValue, decodeHTMLEntities, formatETD, generateDeviceId
+// are defined later in this file - no forward declaration needed
 void handleFetchStateMachine();
 bool parseAndDisplayResponse(String response);
 bool asyncFetchStart();
@@ -173,10 +209,10 @@ void handleAlternatingService(unsigned long currentTime);
 void handleSystemError();
 void updateDisplay();
 bool checkFirstBoot();
-String generateDeviceId();
+// String generateDeviceId(); // Defined later, no forward declaration needed
 void setupOTA();
-String formatETD(String etd);
-String fitTextToWidth(String text, int maxWidth);
+// String formatETD(String etd); // Defined later, no forward declaration needed
+// String fitTextToWidth(...); // Template version in helpers.h handles this
 void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void sendMonitorHeartbeat();
 
@@ -188,14 +224,14 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_DISCONNECTED:
       Serial.println("❌ Monitoring server disconnected");
-      monitorConnected = false;
-      lastMonitorDisconnect = millis();
+      monitoringState.connected = false;
+      monitoringState.lastDisconnect = millis();
       break;
       
     case WStype_CONNECTED:
       {
         Serial.println("✅ Connected to monitoring server");
-        monitorConnected = true;
+        monitoringState.connected = true;
         
         // Register device
         String registerMsg = "{";
@@ -205,11 +241,11 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         registerMsg += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
         registerMsg += "\"firmwareVersion\":\"" + config.firmwareVersion + "\",";
         registerMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
-        registerMsg += "\"stationName\":\"" + String(stationName) + "\",";
+        registerMsg += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
         registerMsg += "\"rssi\":" + String(WiFi.RSSI()) + ",";
         registerMsg += "\"uptime\":" + String(millis() / 1000) + ",";
         registerMsg += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
-        registerMsg += "\"services\":" + String(serviceCount);
+        registerMsg += "\"services\":" + String(displayState.serviceCount);
         registerMsg += "}";
         
         monitorClient.sendTXT(registerMsg);
@@ -278,17 +314,17 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               
               // Reset alternating service
               if (config.useCallingAt) {
-                currentAlternatingService = 1;
+                displayState.currentAlternatingService = 1;
               } else if (!config.showStationName) {
-                currentAlternatingService = 3;
+                displayState.currentAlternatingService = 3;
               } else {
-                currentAlternatingService = 2;
+                displayState.currentAlternatingService = 2;
               }
               
               // Clear data and force refresh
-              serviceCount = 0;
-              lastSuccessfulFetch = 0;
-              lastFetchAttempt = 0;
+              displayState.serviceCount = 0;
+              fetchStateData.lastSuccess = 0;
+              fetchStateData.lastAttempt = 0;
             }
             else if (strcmp(command, "otaUpdate") == 0) {
               Serial.println("📦 OTA update from monitoring server");
@@ -339,7 +375,7 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 }
 
 void sendMonitorHeartbeat() {
-  if (!monitorConnected) return;
+  if (!monitoringState.connected) return;
   
   String heartbeat = "{";
   heartbeat += "\"type\":\"heartbeat\",";
@@ -348,11 +384,11 @@ void sendMonitorHeartbeat() {
   heartbeat += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
   heartbeat += "\"firmwareVersion\":\"" + config.firmwareVersion + "\",";
   heartbeat += "\"stationCode\":\"" + String(config.stationCode) + "\",";
-  heartbeat += "\"stationName\":\"" + String(stationName) + "\",";
+  heartbeat += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
   heartbeat += "\"rssi\":" + String(WiFi.RSSI()) + ",";
   heartbeat += "\"uptime\":" + String(millis() / 1000) + ",";
   heartbeat += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
-  heartbeat += "\"services\":" + String(serviceCount);
+  heartbeat += "\"services\":" + String(displayState.serviceCount);
   heartbeat += "}";
   
   monitorClient.sendTXT(heartbeat);
@@ -361,27 +397,27 @@ void sendMonitorHeartbeat() {
 // ============ END MONITORING Functions ============
 
 void addClient(uint8_t num) {
-  if (clientCount < 10) {
-    connectedClients[clientCount++] = num;
-    Serial.printf("✅ Client #%u added (total: %u)\n", num, clientCount);
+  if (wsClients.count < 10) {
+    wsClients.clients[wsClients.count++] = num;
+    Serial.printf("✅ Client #%u added (total: %u)\n", num, wsClients.count);
   }
 }
 
 void removeClient(uint8_t num) {
-  for (int i = 0; i < clientCount; i++) {
-    if (connectedClients[i] == num) {
-      for (int j = i; j < clientCount - 1; j++) {
-        connectedClients[j] = connectedClients[j + 1];
+  for (int i = 0; i < wsClients.count; i++) {
+    if (wsClients.clients[i] == num) {
+      for (int j = i; j < wsClients.count - 1; j++) {
+        wsClients.clients[j] = wsClients.clients[j + 1];
       }
-      clientCount--;
-      Serial.printf("❌ Client #%u removed (total: %u)\n", num, clientCount);
+      wsClients.count--;
+      Serial.printf("❌ Client #%u removed (total: %u)\n", num, wsClients.count);
       break;
     }
   }
 }
 
 void broadcastStatus(const char* message, const char* level = "info") {
-  if (clientCount == 0) return;
+  if (wsClients.count == 0) return;
   
   String json = "{";
   json += "\"type\":\"status\",";
@@ -395,47 +431,69 @@ void broadcastStatus(const char* message, const char* level = "info") {
 }
 
 void broadcastTrainUpdate() {
-  if (clientCount == 0) return;
-  
-  String json = "{";
+  if (wsClients.count == 0) return;
+
+  // Pre-allocate buffer to reduce fragmentation (estimate ~1KB for 6 services)
+  String json;
+  json.reserve(1024);
+
+  json = "{";
   json += "\"type\":\"train_update\",";
-  json += "\"timestamp\":" + String(millis()) + ",";
-  json += "\"station\":\"" + String(stationName) + "\",";
-  json += "\"stationCode\":\"" + String(config.stationCode) + "\",";
-  json += "\"services\":" + String(serviceCount) + ",";
-  json += "\"trains\":[";
-  
-  for (int i = 0; i < serviceCount && i < 6; i++) {
+  json += "\"timestamp\":";
+  json += millis();
+  json += ",\"station\":\"";
+  json += displayState.stationName;
+  json += "\",\"stationCode\":\"";
+  json += config.stationCode;
+  json += "\",\"services\":";
+  json += displayState.serviceCount;
+  json += ",\"trains\":[";
+
+  for (int i = 0; i < displayState.serviceCount && i < 6; i++) {
     if (i > 0) json += ",";
-    json += "{";
-    json += "\"std\":\"" + String(services[i].std) + "\",";
-    json += "\"etd\":\"" + String(services[i].etd) + "\",";
-    json += "\"destination\":\"" + String(services[i].destination) + "\"";
-    if (config.useCallingAt && i == 0 && strlen(services[i].callingPoints) > 0) {
-      json += ",\"callingAt\":\"" + String(services[i].callingPoints) + "\"";
+    json += "{\"std\":\"";
+    json += displayState.services[i].std;
+    json += "\",\"etd\":\"";
+    json += displayState.services[i].etd;
+    json += "\",\"destination\":\"";
+    json += displayState.services[i].destination;
+    json += "\"";
+    if (config.useCallingAt && i == 0 && strlen(displayState.services[i].callingPoints) > 0) {
+      json += ",\"callingAt\":\"";
+      json += displayState.services[i].callingPoints;
+      json += "\"";
     }
     json += "}";
   }
-  
+
   json += "]}";
-  
+
   webSocket.broadcastTXT(json);
-  Serial.println("📡 Broadcast train update to " + String(clientCount) + " clients");
+  Serial.println("📡 Broadcast train update to " + String(wsClients.count) + " clients");
 }
 
 void broadcastMetrics() {
-  if (clientCount == 0) return;
-  
-  String json = "{";
-  json += "\"type\":\"metrics\",";
-  json += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
-  json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
-  json += "\"uptime\":" + String(millis() / 1000) + ",";
-  json += "\"services\":" + String(serviceCount) + ",";
-  json += "\"station\":\"" + String(stationName) + "\",";
-  json += "\"lastUpdate\":" + String(lastSuccessfulFetch / 1000);
+  if (wsClients.count == 0) return;
+
+  // Pre-allocate small buffer
+  String json;
+  json.reserve(256);
+
+  json = "{\"type\":\"metrics\",";
+  json += "\"freeHeap\":";
+  json += ESP.getFreeHeap();
+  json += ",\"rssi\":";
+  json += WiFi.RSSI();
+  json += ",\"uptime\":";
+  json += millis() / 1000;
+  json += ",\"services\":";
+  json += displayState.serviceCount;
+  json += ",\"station\":\"";
+  json += displayState.stationName;
+  json += "\",\"lastUpdate\":";
+  json += fetchStateData.lastSuccess / 1000;
   json += "}";
-  
+
   webSocket.broadcastTXT(json);
 }
 
@@ -443,8 +501,8 @@ void sendCurrentState(uint8_t num) {
   String json = "{";
   json += "\"type\":\"state\",";
   json += "\"station\":\"" + String(config.stationCode) + "\",";
-  json += "\"stationName\":\"" + String(stationName) + "\",";
-  json += "\"services\":" + String(serviceCount) + ",";
+  json += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
+  json += "\"services\":" + String(displayState.serviceCount) + ",";
   json += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
   json += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
   json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
@@ -461,9 +519,9 @@ void handleWebSocketCommand(uint8_t num, char* payload) {
     sendCurrentState(num);
   }
   else if (cmd.indexOf("\"command\":\"refresh\"") >= 0) {
-    if (fetchState == FETCH_IDLE) {
-      lastSuccessfulFetch = 0;
-      lastFetchAttempt = 0;
+    if (fetchStateData.state == FETCH_IDLE) {
+      fetchStateData.lastSuccess = 0;
+      fetchStateData.lastAttempt = 0;
       broadcastStatus("Manual refresh triggered", "info");
     } else {
       broadcastStatus("Fetch already in progress", "warning");
@@ -505,46 +563,61 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 }
 
 void broadcastDisplaySnapshot() {
-  if (clientCount == 0) return;
-  
-  String json = "{";
-  json += "\"type\":\"display_snapshot\",";
-  json += "\"timestamp\":" + String(millis()) + ",";
-  json += "\"stationName\":\"" + String(stationName) + "\",";
-  json += "\"mode\":\"" + String(config.useCallingAt ? "calling_at" : "normal") + "\",";
-  json += "\"serviceCount\":" + String(serviceCount) + ",";
-  json += "\"services\":[";
-  
+  if (wsClients.count == 0) return;
+
+  // Pre-allocate buffer (~1KB with calling points)
+  String json;
+  json.reserve(1024);
+
+  json = "{\"type\":\"display_snapshot\",";
+  json += "\"timestamp\":";
+  json += millis();
+  json += ",\"displayState.stationName\":\"";
+  json += displayState.stationName;
+  json += "\",\"mode\":\"";
+  json += config.useCallingAt ? "calling_at" : "normal";
+  json += "\",\"displayState.serviceCount\":";
+  json += displayState.serviceCount;
+  json += ",\"services\":[";
+
   // Send up to 3 services for the preview
-  for (int i = 0; i < min(serviceCount, 3); i++) {
+  for (int i = 0; i < min(displayState.serviceCount, 3); i++) {
     if (i > 0) json += ",";
-    json += "{";
-    json += "\"std\":\"" + String(services[i].std) + "\",";
-    json += "\"etd\":\"" + String(services[i].etd) + "\",";
-    json += "\"destination\":\"" + String(services[i].destination) + "\"";
-    json += "}";
+    json += "{\"std\":\"";
+    json += displayState.services[i].std;
+    json += "\",\"etd\":\"";
+    json += displayState.services[i].etd;
+    json += "\",\"destination\":\"";
+    json += displayState.services[i].destination;
+    json += "\"}";
   }
-  
+
   json += "],";
-  
+
   // Include calling points if in calling at mode
-  if (config.useCallingAt && serviceCount > 0 && strlen(services[0].callingPoints) > 0) {
-    json += "\"callingPoints\":\"" + String(services[0].callingPoints) + "\",";
+  if (config.useCallingAt && displayState.serviceCount > 0 && strlen(displayState.services[0].callingPoints) > 0) {
+    json += "\"callingPoints\":\"";
+    json += displayState.services[0].callingPoints;
+    json += "\",";
   }
-  
+
   // Current time
   time_t now = time(nullptr);
   if (now > 100000) {
     struct tm* timeInfo = localtime(&now);
     char timeString[9];
     strftime(timeString, sizeof(timeString), "%H:%M:%S", timeInfo);
-    json += "\"time\":\"" + String(timeString) + "\",";
+    json += "\"time\":\"";
+    json += timeString;
+    json += "\",";
   }
-  
-  json += "\"alternatingService\":" + String(currentAlternatingService) + ",";
-  json += "\"isAnimating\":" + String(isAnimating ? "true" : "false");
+
+  json += "\"alternatingService\":";
+  json += displayState.currentAlternatingService;
+  json += ",\"displayState.isAnimating\":";
+  json += displayState.isAnimating ? "true" : "false";
   json += "}";
-  
+
   webSocket.broadcastTXT(json);
 }
 
@@ -566,18 +639,18 @@ void displayProgress(const char* step, int currentStep, int totalSteps, int prog
   
   String percentText = String(progress) + "%";
   int percentWidth = u8g2.getUTF8Width(percentText.c_str());
-  u8g2.setCursor(256 - percentWidth - 5, 12);
+  u8g2.setCursor(Display::WIDTH -percentWidth - 5, 12);
   u8g2.print(percentText);
   
   u8g2.setCursor(5, 28);
   u8g2.print(step);
-  
-  int segments = 10;
-  int segmentWidth = 22;
-  int segmentHeight = 16;
-  int spacing = 2;
-  int startX = 5;
-  int startY = 36;
+
+  int segments = Display::PROGRESS_SEGMENTS;
+  int segmentWidth = Display::PROGRESS_SEGMENT_WIDTH;
+  int segmentHeight = Display::PROGRESS_SEGMENT_HEIGHT;
+  int spacing = Display::PROGRESS_SPACING;
+  int startX = Display::PROGRESS_START_X;
+  int startY = Display::PROGRESS_START_Y;
   
   int filledSegments = (progress * segments) / 100;
   
@@ -599,7 +672,7 @@ void displayWelcomeScreen() {
   
   String welcome = "Welcome!";
   int width = u8g2.getUTF8Width(welcome.c_str());
-  u8g2.setCursor((256 - width) / 2, 16);
+  u8g2.setCursor((Display::WIDTH -width) / 2, 16);
   u8g2.print(welcome);
   
   u8g2.setFont(u8g2_font_t0_11_tf);
@@ -618,12 +691,12 @@ void displayAPScreen() {
   
   // Header bar
   u8g2.setDrawColor(1);
-  u8g2.drawBox(0, 0, 256, 18);
+  u8g2.drawBox(0, 0, Display::WIDTH,18);
   u8g2.setDrawColor(0);
   u8g2.setFont(u8g2_font_helvB10_tr);
   const char *title = "SETUP MODE";
   int titleWidth = u8g2.getUTF8Width(title);
-  u8g2.setCursor((256 - titleWidth) / 2, 13);
+  u8g2.setCursor((Display::WIDTH -titleWidth) / 2, 13);
   u8g2.print(title);
 
   // WiFi icon in header
@@ -665,7 +738,7 @@ void displayAPScreen() {
   IPAddress ip = WiFi.softAPIP();
   String url = ip.toString();
   int urlWidth = u8g2.getUTF8Width(url.c_str());
-  u8g2.setCursor((256 - urlWidth) / 2, cardY + 9);
+  u8g2.setCursor((Display::WIDTH -urlWidth) / 2, cardY + 9);
   u8g2.print(url);
 
   u8g2.sendBuffer();
@@ -696,7 +769,7 @@ void displayReadyScreen(const IPAddress& ip) {
   u8g2.clearBuffer();
   
   // Draw decorative border
-  u8g2.drawFrame(0, 0, 256, 64);
+  u8g2.drawFrame(0, 0, Display::WIDTH,64);
   u8g2.drawFrame(2, 2, 252, 60);
   
   // Status indicator with checkmark and READY text
@@ -715,14 +788,14 @@ void displayReadyScreen(const IPAddress& ip) {
   u8g2.setFont(u8g2_font_helvB14_tr);
   String ipStr = ip.toString();
   int ipWidth = u8g2.getUTF8Width(ipStr.c_str());
-  u8g2.setCursor((256 - ipWidth) / 2, 45);
+  u8g2.setCursor((Display::WIDTH -ipWidth) / 2, 45);
   u8g2.print(ipStr);
   
   // Instructions
   u8g2.setFont(u8g2_font_t0_11_tf);
   String instruction = "Open browser to configure";
   int instrWidth = u8g2.getUTF8Width(instruction.c_str());
-  u8g2.setCursor((256 - instrWidth) / 2, 59);
+  u8g2.setCursor((Display::WIDTH -instrWidth) / 2, 59);
   u8g2.print(instruction);
   
   u8g2.sendBuffer();
@@ -772,12 +845,13 @@ bool checkFirstBoot() {
   return false;
 }
 
-String formatETD(String etd) {
-  if (etd.length() == 5 && etd.indexOf(":") != -1) {
-    return "Exp " + etd;
-  }
-  return etd;
-}
+// Note: formatETD is now defined in helpers.h
+// String formatETD(String etd) {
+//   if (etd.length() == 5 && etd.indexOf(":") != -1) {
+//     return "Exp " + etd;
+//   }
+//   return etd;
+// }
 
 String fitTextToWidth(String text, int maxWidth) {
   if (u8g2.getUTF8Width(text.c_str()) <= maxWidth) {
@@ -825,7 +899,7 @@ bool initializeWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
-    apMode = false;
+    systemFlags.apMode = false;
     return true;
   } else {
     Serial.println("\n❌ WiFi Connection Failed");
@@ -844,15 +918,15 @@ void startAccessPoint() {
   Serial.println("SSID: TrainBoard_AP");
   Serial.println("Pass: config123");
   Serial.println("IP: " + ip.toString());
-  apMode = true;
+  systemFlags.apMode = true;
   setupWebServer();
 }
 
 void initializeTimeSync() {
   Serial.println("🕒 Syncing time with NTP...");
-  configTime(0, 0, "pool.ntp.org");
+  configTime(0, 0, Data::NTP_SERVER);
   unsigned long startTime = millis();
-  while (!time(nullptr) && millis() - startTime < 10000) {
+  while (!time(nullptr) && millis() - startTime < Net::NTP_SYNC_TIMEOUT) {
     delay(500);
     Serial.print(".");
   }
@@ -959,9 +1033,9 @@ bool asyncFetchStart() {
                     "Content-Length: " + String(soapRequest.length()) + "\r\n"
                     "Connection: close\r\n\r\n" + soapRequest);
 
-  fetchStartTime = millis();
-  fetchBuffer = "";
-  fetchState = FETCH_WAITING;
+  fetchStateData.startTime = millis();
+  fetchStateData.buffer = "";
+  fetchStateData.state = FETCH_WAITING;
   displayStatus("Fetch");
   
   // One more display update after sending request
@@ -973,15 +1047,15 @@ bool asyncFetchStart() {
 }
 
 void handleFetchStateMachine() {
-  switch (fetchState) {
+  switch (fetchStateData.state) {
     case FETCH_WAITING:
       if (fetchClient.connected() || fetchClient.available()) {
-        fetchState = FETCH_READING;
-      } else if (millis() - fetchStartTime > 8000) {
+        fetchStateData.state = FETCH_READING;
+      } else if (millis() - fetchStateData.startTime > 8000) {
         fetchClient.stop();
         Serial.println("❌ Timeout WAITING");
         displayStatus("TIMEOUT");
-        fetchState = FETCH_FAIL;
+        fetchStateData.state = FETCH_FAIL;
       }
       break;
 
@@ -997,7 +1071,7 @@ void handleFetchStateMachine() {
           uint8_t buffer[512];
           int bytesRead = fetchClient.read(buffer, sizeof(buffer));
           if (bytesRead > 0) {
-            fetchBuffer.concat((const char*)buffer, bytesRead);
+            fetchStateData.buffer.concat((const char*)buffer, bytesRead);
           }
           
           // Update display every 200ms while reading to keep clock and animations alive
@@ -1012,50 +1086,50 @@ void handleFetchStateMachine() {
         // Check if done - connection closed and no more data
         if (!fetchClient.connected() && !fetchClient.available()) {
           fetchClient.stop();  // Ensure clean disconnect
-          if (fetchBuffer.length() > 100) {  // Valid response is always >100 bytes
-            Serial.println("✅ Fetched: " + String(fetchBuffer.length()) + " bytes in " + String(millis() - fetchStartTime) + "ms");
-            fetchState = FETCH_DONE;
+          if (fetchStateData.buffer.length() > 100) {  // Valid response is always >100 bytes
+            Serial.println("✅ Fetched: " + String(fetchStateData.buffer.length()) + " bytes in " + String(millis() - fetchStateData.startTime) + "ms");
+            fetchStateData.state = FETCH_DONE;
           } else {
-            Serial.println("❌ Invalid response size: " + String(fetchBuffer.length()) + " bytes");
-            fetchState = FETCH_FAIL;
+            Serial.println("❌ Invalid response size: " + String(fetchStateData.buffer.length()) + " bytes");
+            fetchStateData.state = FETCH_FAIL;
           }
         }
         
         // Timeout for reading - API server can be slow with large responses
-        if (millis() - fetchStartTime > 15000) {
+        if (millis() - fetchStateData.startTime > 15000) {
           fetchClient.stop();
-          if (fetchBuffer.length() > 100) {
+          if (fetchStateData.buffer.length() > 100) {
             // Got data but took too long - still use it
-            Serial.println("⚠️ Slow fetch (" + String(fetchBuffer.length()) + " bytes) - using anyway");
-            fetchState = FETCH_DONE;
+            Serial.println("⚠️ Slow fetch (" + String(fetchStateData.buffer.length()) + " bytes) - using anyway");
+            fetchStateData.state = FETCH_DONE;
           } else {
             Serial.println("❌ Timeout READING");
             displayStatus("TIMEOUT");
-            fetchState = FETCH_FAIL;
+            fetchStateData.state = FETCH_FAIL;
           }
         }
       }
       break;
 
     case FETCH_DONE:
-      if (parseAndDisplayResponse(fetchBuffer)) {
+      if (parseAndDisplayResponse(fetchStateData.buffer)) {
         displayStatus("OK");
-        lastSuccessfulFetch = millis();  
+        fetchStateData.lastSuccess = millis();  
         lastDataUpdate = millis();
         Serial.println("✅ Parse successful");
       } else {
         displayStatus("ERR");
         Serial.println("❌ Parse failed");
       }
-      fetchBuffer = "";
-      fetchState = FETCH_IDLE;
+      fetchStateData.buffer = "";
+      fetchStateData.state = FETCH_IDLE;
       break;
 
     case FETCH_FAIL:
       displayStatus("FAIL");
       fetchClient.stop();
-      fetchBuffer = "";
-      fetchState = FETCH_IDLE;
+      fetchStateData.buffer = "";
+      fetchStateData.state = FETCH_IDLE;
       lastDataUpdate = millis();
       broadcastStatus("Failed to fetch train data", "error");
       break;
@@ -1099,32 +1173,20 @@ bool parseAndDisplayResponse(String response) {
   if (station == "") station = extractTagValue(response, "locationName", "lt5");
   
   if (station.length() > 0) {
-    station.toCharArray(stationName, sizeof(stationName));
+    station.toCharArray(displayState.stationName, sizeof(displayState.stationName));
     Serial.println("📍 " + station);
   }
 
   int servicesStart = response.indexOf("<lt5:trainServices>");
   if (servicesStart == -1) servicesStart = response.indexOf("<lt4:trainServices>");
-
+  
   if (servicesStart == -1) {
-    // Check if this is a valid response with no services, or an actual error
-    if (response.indexOf("GetStationBoardResult") != -1) {
-      // Valid response, just no trains scheduled
-      Serial.println("ℹ️ No trains scheduled at this station");
-      Serial.println("✅ 0 services");
-
-      // Skip to the end to update global state properly
-      // newServiceCount is already 0 from initialization
-      goto update_globals;
-    }
-
-    // Not a valid station board response - this is an error
     Serial.println("❌ No services tag found");
     Serial.println("🔍 Debug: Showing first 1000 chars of response:");
     Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     Serial.println(response.substring(0, min(1000, (int)response.length())));
     Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
+    
     // Check for specific error messages
     if (response.indexOf("<faultstring>") != -1) {
       String faultMsg = extractTagValue(response, "faultstring", "");
@@ -1133,7 +1195,7 @@ bool parseAndDisplayResponse(String response) {
     if (response.indexOf("nrcc:") != -1) {
       Serial.println("⚠️ Response contains nrcc namespace - message field present");
     }
-
+    
     return false;
   }
 
@@ -1182,10 +1244,10 @@ bool parseAndDisplayResponse(String response) {
     destination = decodeHTMLEntities(destination);
 
     if (std != "" && destination != "") {
-      std.toCharArray(services[newServiceCount].std, sizeof(services[newServiceCount].std));
-      etd.toCharArray(services[newServiceCount].etd, sizeof(services[newServiceCount].etd));
-      destination.toCharArray(services[newServiceCount].destination, sizeof(services[newServiceCount].destination));
-      services[newServiceCount].callingPoints[0] = '\0';
+      std.toCharArray(displayState.services[newServiceCount].std, sizeof(displayState.services[newServiceCount].std));
+      etd.toCharArray(displayState.services[newServiceCount].etd, sizeof(displayState.services[newServiceCount].etd));
+      destination.toCharArray(displayState.services[newServiceCount].destination, sizeof(displayState.services[newServiceCount].destination));
+      displayState.services[newServiceCount].callingPoints[0] = '\0';
       
       Serial.println("🚂 " + String(newServiceCount + 1) + ": " + std + " → " + destination);
       
@@ -1247,18 +1309,18 @@ bool parseAndDisplayResponse(String response) {
                 }
                 
                 if (callingPoints != "" && callingPoints.length() < 500) {
-                  callingPoints.toCharArray(services[newServiceCount].callingPoints, 500);
+                  callingPoints.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
                   Serial.println("  ✅ Stored calling points");
                 } else if (callingPoints == "") {
                   String fallback = "No further stops available";
-                  fallback.toCharArray(services[newServiceCount].callingPoints, 500);
+                  fallback.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
                 }
               }
             }
           }
         } else {
           String fallback = "No further stops available";
-          fallback.toCharArray(services[newServiceCount].callingPoints, 500);
+          fallback.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
         }
       }
       
@@ -1277,26 +1339,21 @@ bool parseAndDisplayResponse(String response) {
 
   Serial.println("✅ " + String(newServiceCount) + " services");
 
-update_globals:
-  // Only update serviceCount after parsing is complete
+  // Only update displayState.serviceCount after parsing is complete
   // This ensures old data stays visible during parsing
-  serviceCount = newServiceCount;
+  displayState.serviceCount = newServiceCount;
+  displayState.markDirty();  // Mark display dirty when data updates
 
-  if (serviceCount > 0) {
-    fetchingNewStation = false;  // Clear loading flag - we have data now
+  if (displayState.serviceCount > 0) {
+    displayState.fetchingNewStation = false;  // Clear loading flag - we have data now
     broadcastTrainUpdate();  // Sends full train data to clients
     broadcastStatus("Train data updated", "success");
-  } else {
-    // No services found - clear loading flag and broadcast empty state
-    fetchingNewStation = false;
-    broadcastTrainUpdate();
-    broadcastStatus("No trains scheduled", "info");
   }
 
-  return true;  // Return success whether we have services or not
+  return displayState.serviceCount > 0;
 }
 
-// Animation - using WORKING logic from original
+// Animation - smooth easing-based animation
 void handleAlternatingService(unsigned long currentTime) {
   // Don't animate if no extra services configured
   if (config.extraServices == 0) {
@@ -1304,12 +1361,11 @@ void handleAlternatingService(unsigned long currentTime) {
   }
 
   int textHeight = u8g2.getAscent() - u8g2.getDescent();
-  const int scrollStep = 2;
   const int maxOffset = textHeight;
 
   // When station name is hidden, we shift all service indices by 1
   int serviceOffset = config.showStationName ? 0 : 1;
-  
+
   int minServicesForAlt, maxServiceIndex, startIndex;
   if (config.useCallingAt) {
     // Calling At mode: need at least 2 services on bottom line to rotate
@@ -1322,27 +1378,45 @@ void handleAlternatingService(unsigned long currentTime) {
     maxServiceIndex = config.extraServices + 1 + serviceOffset;
     startIndex = 2 + serviceOffset;
   }
-  
+
   unsigned long rotationInterval = config.rotationSpeed * 1000UL;  // Use config setting
-  
-  if (currentTime - lastRotation >= rotationInterval && serviceCount >= minServicesForAlt && !isAnimating) {
-    isAnimating = true;
-    animationOffset = 0;
-    lastRotation = currentTime;
+
+  // Start new animation if it's time
+  if (currentTime - displayState.lastRotation >= rotationInterval &&
+      displayState.serviceCount >= minServicesForAlt &&
+      !displayState.isAnimating) {
+    displayState.isAnimating = true;
+    displayState.animationOffset = 0;
+    displayState.animationStartTime = currentTime;
+    displayState.lastRotation = currentTime;
+    displayState.markDirty();  // Mark display dirty when animation starts
   }
 
-  if (isAnimating) {
-    animationOffset += scrollStep;
-    if (animationOffset >= maxOffset) {
-      isAnimating = false;
-      
-      currentAlternatingService++;
+  // Update animation with smooth easing
+  if (displayState.isAnimating) {
+    unsigned long elapsed = currentTime - displayState.animationStartTime;
+
+    // Calculate progress (0.0 to 1.0) based on animation duration
+    if (elapsed >= Timing::SERVICE_ANIMATION_DURATION) {
+      // Animation complete
+      displayState.isAnimating = false;
+      displayState.animationOffset = maxOffset;  // Ensure we end exactly at maxOffset
+
+      // Move to next service
+      displayState.currentAlternatingService++;
       int maxIndex = (config.useCallingAt ? config.extraServices + 1 : config.extraServices + 2) + serviceOffset;
-      if (currentAlternatingService > maxIndex) {
-        currentAlternatingService = startIndex;
+      if (displayState.currentAlternatingService > maxIndex) {
+        displayState.currentAlternatingService = startIndex;
       }
-      
-      animationOffset = 0;
+
+      displayState.animationOffset = 0;
+      displayState.markDirty();
+    } else {
+      // Animation in progress - apply smooth easing
+      float progress = (float)elapsed / (float)Timing::SERVICE_ANIMATION_DURATION;
+      float eased = easeInOutCubic(progress);  // Very smooth start and end
+      displayState.animationOffset = (int)(eased * maxOffset + 0.5f);  // Round to nearest pixel
+      displayState.markDirty();  // Mark dirty during animation
     }
   }
 }
@@ -1366,376 +1440,92 @@ void updateDisplay() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_t0_11_tf);
 
-  // Only show station name if enabled
+  // 1. Display station name OR first service at top
   if (config.showStationName) {
-    String displayName = stationName;
-    int nameWidth = u8g2.getUTF8Width(displayName.c_str());
-    
-    if (nameWidth > 250) {
-      while (u8g2.getUTF8Width(displayName.c_str()) > 250 && displayName.length() > 3) {
-        displayName.remove(displayName.length() - 1);
-      }
-      displayName += "...";
-      nameWidth = u8g2.getUTF8Width(displayName.c_str());
-    }
-    
-    u8g2.setCursor((256 - nameWidth) / 2, 12);
-    u8g2.print(displayName);
-  }
-  // When station name is hidden, show an extra service at the top
-  else if (serviceCount > 0) {
-    const int ETD_RIGHT_X = 251;
-    int yPosTop = config.yPosTop;
-    String leftSide = "1st " + String(services[0].std) + " ";
-    String rightSide = formatETD(String(services[0].etd));
-    
-    int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-    int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-    int availableWidth = 256 - leftWidth - rightWidth - 10;
-    
-    String destination = fitTextToWidth(String(services[0].destination), availableWidth);
-    
-    u8g2.setCursor(1, yPosTop);
-    u8g2.print(leftSide + destination);
-    u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPosTop);
-    u8g2.print(rightSide);
+    displayStationName(displayState.stationName);
+  } else if (displayState.serviceCount > 0) {
+    displayServiceLine(displayState.services[0], "1st ", config.yPosTop, u8g2);
   }
 
-  // Display message when no services available
-  if (serviceCount == 0) {
-    u8g2.setFont(u8g2_font_helvB10_tr);
-    String msg = fetchingNewStation ? "Loading station data..." : "No trains scheduled";
-    int msgWidth = u8g2.getUTF8Width(msg.c_str());
-    u8g2.setCursor((256 - msgWidth) / 2, 35);
-    u8g2.print(msg);
+  // 2. Handle no services case
+  if (displayState.serviceCount == 0) {
+    displayNoServicesMessage(displayState.fetchingNewStation);
   }
-  else if (config.useCallingAt && serviceCount > 0) {
-    const int ETD_RIGHT_X = 251;  // Fixed position for right-aligned ETD
-    
-    // Calling points are always for services[0] (the first service)
-    // When station name is shown: display services[0] at yPos1st with calling points at yPos2nd
-    // When station name is hidden: services[0] is already shown at top, just show calling points at yPos1st
-    
+  // 3. Handle calling at mode
+  else if (config.useCallingAt && displayState.serviceCount > 0) {
+    int serviceOffset = getServiceOffset(config.showStationName);
+
+    // Show first service if station name is visible
     if (config.showStationName) {
-      // Display services[0] with "1st" label at yPos1st
-      int yPos = config.yPos1st;
-      String leftSide = "1st " + String(services[0].std) + " ";
-      String rightSide = formatETD(String(services[0].etd));
-
-      int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-      int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-      int availableWidth = 256 - leftWidth - rightWidth - 10;
-
-      String destination = fitTextToWidth(String(services[0].destination), availableWidth);
-
-      u8g2.setCursor(1, yPos);
-      u8g2.print(leftSide + destination);
-      u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
-      u8g2.print(rightSide);
-      
-      // Display calling points at yPos2nd
-      if (strlen(services[0].callingPoints) > 0) {
-        String label = "Calling at: ";
-        int labelWidth = u8g2.getUTF8Width(label.c_str());
-        
-        String callingText = String(services[0].callingPoints);
-        String loopingText = callingText + " * " + callingText;
-        
-        int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
-        int availableSpace = 256 - labelWidth - 5;
-
-        bool needsScroll = fullTextWidth > availableSpace;
-
-        if (needsScroll) {
-          unsigned long currentTime = millis();
-          if (currentTime - lastCallingAtScroll > config.scrollSpeed) {
-            callingAtScrollOffset++;
-            lastCallingAtScroll = currentTime;
-          }
-
-          if (callingAtScrollOffset > fullTextWidth + 15) {
-            callingAtScrollOffset = 0;
-          }
-
-          u8g2.setCursor(1, config.yPos2nd);
-          u8g2.print(label);
-
-          u8g2.setClipWindow(labelWidth + 2, 0, 255, 63);
-          u8g2.setCursor(labelWidth + 2 - callingAtScrollOffset, config.yPos2nd);
-          u8g2.print(loopingText);
-          u8g2.setMaxClipWindow();
-        } else {
-          u8g2.setCursor(1, config.yPos2nd);
-          u8g2.print(label);
-          u8g2.print(callingText);
-          callingAtScrollOffset = 0;
-        }
-      } else {
-        // Show loading message when calling points aren't available yet
-        u8g2.setCursor(1, config.yPos2nd);
-        u8g2.print("Calling at: Loading stops...");
-        callingAtScrollOffset = 0;
-      }
+      displayServiceLine(displayState.services[0], "1st ", config.yPos1st, u8g2);
+      // Show calling points at yPos2nd
+      displayCallingPoints(displayState.services[0].callingPoints, config.yPos2nd,
+                          displayState.callingAtScrollOffset, displayState.lastCallingAtScroll);
     } else {
-      // Station name is hidden, services[0] is already displayed at top
-      // Just show calling points at yPos1st
-      if (strlen(services[0].callingPoints) > 0) {
-        String label = "Calling at: ";
-        int labelWidth = u8g2.getUTF8Width(label.c_str());
-        
-        String callingText = String(services[0].callingPoints);
-        String loopingText = callingText + " * " + callingText;
-        
-        int fullTextWidth = u8g2.getUTF8Width(callingText.c_str());
-        int availableSpace = 256 - labelWidth - 5;
-
-        bool needsScroll = fullTextWidth > availableSpace;
-
-        if (needsScroll) {
-          unsigned long currentTime = millis();
-          if (currentTime - lastCallingAtScroll > config.scrollSpeed) {
-            callingAtScrollOffset++;
-            lastCallingAtScroll = currentTime;
-          }
-
-          if (callingAtScrollOffset > fullTextWidth + 15) {
-            callingAtScrollOffset = 0;
-          }
-
-          u8g2.setCursor(1, config.yPos1st);
-          u8g2.print(label);
-
-          u8g2.setClipWindow(labelWidth + 2, 0, 255, 63);
-          u8g2.setCursor(labelWidth + 2 - callingAtScrollOffset, config.yPos1st);
-          u8g2.print(loopingText);
-          u8g2.setMaxClipWindow();
-        } else {
-          u8g2.setCursor(1, config.yPos1st);
-          u8g2.print(label);
-          u8g2.print(callingText);
-          callingAtScrollOffset = 0;
-        }
-      } else {
-        // Show loading message when calling points aren't available yet
-        u8g2.setCursor(1, config.yPos1st);
-        u8g2.print("Calling at: Loading stops...");
-        callingAtScrollOffset = 0;
-      }
-      
-      // Display services[1] with "2nd" label at yPos2nd
-      if (serviceCount > 1) {
-        int yPos = config.yPos2nd;
-        String leftSide = "2nd " + String(services[1].std) + " ";
-        String rightSide = formatETD(String(services[1].etd));
-
-        int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-        int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-        int availableWidth = 256 - leftWidth - rightWidth - 10;
-
-        String destination = fitTextToWidth(String(services[1].destination), availableWidth);
-
-        u8g2.setCursor(1, yPos);
-        u8g2.print(leftSide + destination);
-        u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
-        u8g2.print(rightSide);
+      // Station name hidden: first service already shown at top
+      // Show calling points at yPos1st
+      displayCallingPoints(displayState.services[0].callingPoints, config.yPos1st,
+                          displayState.callingAtScrollOffset, displayState.lastCallingAtScroll);
+      // Show second service at yPos2nd if available
+      if (displayState.serviceCount > 1) {
+        displayServiceLine(displayState.services[1], "2nd ", config.yPos2nd, u8g2);
       }
     }
 
-    // Calculate serviceOffset for alternating services
-    // When station name is hidden, we've shown services[0] and services[1], so start alternating from services[2]
-    // When station name is shown, we've shown services[0], so start alternating from services[1]
-    int serviceOffset = config.showStationName ? 0 : 1;
+    // Display alternating services on bottom line if enough services
+    int minServices = getMinServicesForAlternating(config.useCallingAt, config.extraServices, config.showStationName);
+    int startIndex = getAlternatingStartIndex(config.useCallingAt, config.showStationName);
+    int maxIndex = getAlternatingMaxIndex(config.useCallingAt, config.extraServices, config.showStationName);
 
-    int minServices = 2 + config.extraServices + serviceOffset;
-    if (serviceCount >= 2 + serviceOffset) {
-      int baselineY = config.yPosAlt;
-      int ascent = u8g2.getAscent();
-      int descent = u8g2.getDescent();
-      int textHeight = ascent - descent;
+    if (displayState.serviceCount >= 2 + serviceOffset) {
+      int indexA = displayState.currentAlternatingService;
+      int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      int indexA = currentAlternatingService;
-      int indexB;
-      
-      // Calculate next index in rotation
-      indexB = indexA + 1;
-      int maxIndex = config.extraServices + 1 + serviceOffset;
-      if (indexB > maxIndex) indexB = 1 + serviceOffset;
+      String labelA = getServiceLabel(indexA, serviceOffset);
+      String labelB = getServiceLabel(indexB, serviceOffset);
 
-      // Build service labels dynamically based on position
-      String labelA = "";
-      if (indexA == 1 + serviceOffset) labelA = serviceOffset == 0 ? "2nd " : "3rd ";
-      else if (indexA == 2 + serviceOffset) labelA = serviceOffset == 0 ? "3rd " : "4th ";
-      else if (indexA == 3 + serviceOffset) labelA = serviceOffset == 0 ? "4th " : "5th ";
-      else if (indexA == 4 + serviceOffset) labelA = serviceOffset == 0 ? "5th " : "6th ";
-      else labelA = serviceOffset == 0 ? "6th " : "7th ";
-      
-      labelA += String(services[indexA].std) + " ";
-      String rightA = formatETD(String(services[indexA].etd));
-
-      int leftAWidth = u8g2.getUTF8Width(labelA.c_str());
-      int rightAWidth = u8g2.getUTF8Width(rightA.c_str());
-      int availA = 256 - leftAWidth - rightAWidth - 10;
-
-      String destA = fitTextToWidth(String(services[indexA].destination), availA);
-
-      u8g2.setClipWindow(0, baselineY - ascent, 255, baselineY - descent);
-
-      if (isAnimating && serviceCount >= minServices) {
-        int offsetY = animationOffset;
-
-        u8g2.setCursor(1, baselineY - offsetY);
-        u8g2.print(labelA + destA);
-        u8g2.setCursor(ETD_RIGHT_X - rightAWidth, baselineY - offsetY);
-        u8g2.print(rightA);
-
-        String labelB = "";
-        if (indexB == 1 + serviceOffset) labelB = serviceOffset == 0 ? "2nd " : "3rd ";
-        else if (indexB == 2 + serviceOffset) labelB = serviceOffset == 0 ? "3rd " : "4th ";
-        else if (indexB == 3 + serviceOffset) labelB = serviceOffset == 0 ? "4th " : "5th ";
-        else if (indexB == 4 + serviceOffset) labelB = serviceOffset == 0 ? "5th " : "6th ";
-        else labelB = serviceOffset == 0 ? "6th " : "7th ";
-        
-        labelB += String(services[indexB].std) + " ";
-        String rightB = formatETD(String(services[indexB].etd));
-
-        int leftBWidth = u8g2.getUTF8Width(labelB.c_str());
-        int rightBWidth = u8g2.getUTF8Width(rightB.c_str());
-        int availB = 256 - leftBWidth - rightBWidth - 10;
-
-        String destB = fitTextToWidth(String(services[indexB].destination), availB);
-
-        u8g2.setCursor(1, baselineY + textHeight - offsetY);
-        u8g2.print(labelB + destB);
-        u8g2.setCursor(ETD_RIGHT_X - rightBWidth, baselineY + textHeight - offsetY);
-        u8g2.print(rightB);
-      } else {
-        u8g2.setCursor(1, baselineY);
-        u8g2.print(labelA + destA);
-        u8g2.setCursor(ETD_RIGHT_X - rightAWidth, baselineY);
-        u8g2.print(rightA);
-      }
-
-      u8g2.setMaxClipWindow();
+      displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
+                                labelA.c_str(), labelB.c_str(), config.yPosAlt,
+                                displayState.animationOffset,
+                                displayState.isAnimating && displayState.serviceCount >= minServices);
     }
+  }
+  // 4. Handle standard mode (no calling at)
+  else {
+    int serviceOffset = getServiceOffset(config.showStationName);
 
-  } else {
-    const int ETD_RIGHT_X = 251;  // Fixed position for right-aligned ETD
-    
-    // When station name is hidden, we show services[0] at top, so shift indices by 1
-    int serviceOffset = config.showStationName ? 0 : 1;
-    
-    for (int i = 0; i < min(serviceCount - serviceOffset, 2); i++) {
+    // Display first 2 services in fixed positions
+    for (int i = 0; i < min(displayState.serviceCount - serviceOffset, 2); i++) {
       int serviceIdx = i + serviceOffset;
-      if (serviceIdx >= serviceCount) break;
-      
+      if (serviceIdx >= displayState.serviceCount) break;
+
       int yPos = (i == 0) ? config.yPos1st : config.yPos2nd;
-      
-      String label = "";
-      if (serviceOffset == 0) {
-        label = (i == 0 ? "1st " : "2nd ");
-      } else {
-        label = (i == 0 ? "2nd " : "3rd ");
-      }
-      
-      String leftSide = label + String(services[serviceIdx].std) + " ";
-      String rightSide = formatETD(String(services[serviceIdx].etd));
+      String label = getServiceLabel(i, serviceOffset);
 
-      int leftWidth = u8g2.getUTF8Width(leftSide.c_str());
-      int rightWidth = u8g2.getUTF8Width(rightSide.c_str());
-      int availableWidth = 256 - leftWidth - rightWidth - 10;
-
-      String destination = fitTextToWidth(String(services[serviceIdx].destination), availableWidth);
-
-      u8g2.setCursor(1, yPos);
-      u8g2.print(leftSide + destination);
-      u8g2.setCursor(ETD_RIGHT_X - rightWidth, yPos);
-      u8g2.print(rightSide);
+      displayServiceLine(displayState.services[serviceIdx], label.c_str(), yPos, u8g2);
     }
 
-    int minServices = 3 + config.extraServices + serviceOffset;
-    if (serviceCount >= 3 + serviceOffset) {
-      int baselineY = config.yPosAlt;
-      int ascent = u8g2.getAscent();
-      int descent = u8g2.getDescent();
-      int textHeight = ascent - descent;
+    // Display alternating services on bottom line if enough services
+    int minServices = getMinServicesForAlternating(config.useCallingAt, config.extraServices, config.showStationName);
+    int startIndex = getAlternatingStartIndex(config.useCallingAt, config.showStationName);
+    int maxIndex = getAlternatingMaxIndex(config.useCallingAt, config.extraServices, config.showStationName);
 
-      int indexA = currentAlternatingService;
-      int indexB;
-      
-      // Calculate next index in rotation
-      indexB = indexA + 1;
-      int maxIndex = config.extraServices + 2 + serviceOffset;
-      if (indexB > maxIndex) indexB = 2 + serviceOffset;
+    if (displayState.serviceCount >= 3 + serviceOffset) {
+      int indexA = displayState.currentAlternatingService;
+      int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      // Build service labels dynamically
-      String labelA = "";
-      if (indexA == 2 + serviceOffset) labelA = serviceOffset == 0 ? "3rd " : "4th ";
-      else if (indexA == 3 + serviceOffset) labelA = serviceOffset == 0 ? "4th " : "5th ";
-      else if (indexA == 4 + serviceOffset) labelA = serviceOffset == 0 ? "5th " : "6th ";
-      else if (indexA == 5 + serviceOffset) labelA = serviceOffset == 0 ? "6th " : "7th ";
-      else labelA = serviceOffset == 0 ? "7th " : "8th ";
-      
-      labelA += String(services[indexA].std) + " ";
-      String rightA = formatETD(String(services[indexA].etd));
+      String labelA = getServiceLabel(indexA, serviceOffset);
+      String labelB = getServiceLabel(indexB, serviceOffset);
 
-      int leftAWidth = u8g2.getUTF8Width(labelA.c_str());
-      int rightAWidth = u8g2.getUTF8Width(rightA.c_str());
-      int availA = 256 - leftAWidth - rightAWidth - 10;
-
-      String destA = fitTextToWidth(String(services[indexA].destination), availA);
-
-      u8g2.setClipWindow(0, baselineY - ascent, 255, baselineY - descent);
-
-      if (isAnimating && serviceCount >= minServices) {
-        int offsetY = animationOffset;
-
-        u8g2.setCursor(1, baselineY - offsetY);
-        u8g2.print(labelA + destA);
-        u8g2.setCursor(ETD_RIGHT_X - rightAWidth, baselineY - offsetY);
-        u8g2.print(rightA);
-
-        String labelB = "";
-        if (indexB == 2 + serviceOffset) labelB = serviceOffset == 0 ? "3rd " : "4th ";
-        else if (indexB == 3 + serviceOffset) labelB = serviceOffset == 0 ? "4th " : "5th ";
-        else if (indexB == 4 + serviceOffset) labelB = serviceOffset == 0 ? "5th " : "6th ";
-        else if (indexB == 5 + serviceOffset) labelB = serviceOffset == 0 ? "6th " : "7th ";
-        else labelB = serviceOffset == 0 ? "7th " : "8th ";
-        
-        labelB += String(services[indexB].std) + " ";
-        String rightB = formatETD(String(services[indexB].etd));
-
-        int leftBWidth = u8g2.getUTF8Width(labelB.c_str());
-        int rightBWidth = u8g2.getUTF8Width(rightB.c_str());
-        int availB = 256 - leftBWidth - rightBWidth - 10;
-
-        String destB = fitTextToWidth(String(services[indexB].destination), availB);
-
-        u8g2.setCursor(1, baselineY + textHeight - offsetY);
-        u8g2.print(labelB + destB);
-        u8g2.setCursor(ETD_RIGHT_X - rightBWidth, baselineY + textHeight - offsetY);
-        u8g2.print(rightB);
-      } else {
-        u8g2.setCursor(1, baselineY);
-        u8g2.print(labelA + destA);
-        u8g2.setCursor(ETD_RIGHT_X - rightAWidth, baselineY);
-        u8g2.print(rightA);
-      }
-
-      u8g2.setMaxClipWindow();
+      displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
+                                labelA.c_str(), labelB.c_str(), config.yPosAlt,
+                                displayState.animationOffset,
+                                displayState.isAnimating && displayState.serviceCount >= minServices);
     }
   }
 
-  // CRITICAL: Clock display - this was missing in refactored version!
-  time_t now = time(nullptr);
-  if (now > 100000) {
-    struct tm* timeInfo = localtime(&now);
-    char timeString[9];
-    strftime(timeString, sizeof(timeString), "%H:%M:%S", timeInfo);
-    u8g2.setFont(u8g2_font_t0_11_tf);
-    int width = u8g2.getUTF8Width(timeString);
-    u8g2.setCursor((256 - width) / 2, 64);
-    u8g2.print(timeString);
-  }
+  // 5. Display clock at bottom
+  displayClock();
 
   u8g2.sendBuffer();
 }
@@ -1747,7 +1537,7 @@ void setupWebServer() {
     
     html.replace("{SSID}", String(config.wifiSSID));
     html.replace("{STATION}", String(config.stationCode));
-    html.replace("{STATION_NAME}", String(stationName));
+    html.replace("{STATION_NAME}", String(displayState.stationName));
     html.replace("{INTERVAL}", String(config.refreshInterval));
     html.replace("{MODE_SEL_0}", config.useCallingAt ? "" : " selected");
     html.replace("{MODE_SEL_1}", config.useCallingAt ? " selected" : "");
@@ -1771,42 +1561,92 @@ void setupWebServer() {
   });
 
   server.on("/save", HTTP_POST, []() {
+    Serial.println("📝 /save endpoint called");
+
+    // Validate SSID
     if (server.hasArg("ssid")) {
-      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
-      config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
+      String ssid = server.arg("ssid");
+      Serial.printf("  Validating SSID: '%s'\n", ssid.c_str());
+      ValidationResult result = validateSSID(ssid);
+      if (!result.valid) {
+        Serial.printf("  ❌ SSID validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid SSID: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ SSID valid");
+      safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
     }
+
+    // Validate password
     if (server.hasArg("password") && !server.arg("password").isEmpty()) {
-      strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
-      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
+      String password = server.arg("password");
+      Serial.println("  Validating password (hidden)");
+      ValidationResult result = validatePassword(password);
+      if (!result.valid) {
+        Serial.printf("  ❌ Password validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid password: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ Password valid");
+      safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
     }
+
+    // Validate station code
     if (server.hasArg("station")) {
-      String station = server.arg("station");
-      station.trim();  // Remove any whitespace
-      station.toUpperCase();
-      // Extract only the 3-letter code if longer string provided
-      if (station.length() >= 3) {
-        station = station.substring(0, 3);
+      String station = sanitizeStationCode(server.arg("station"));
+      Serial.printf("  Validating station code: '%s'\n", station.c_str());
+      ValidationResult result = validateStationCode(station);
+      if (!result.valid) {
+        Serial.printf("  ❌ Station code validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid station code: " + result.message);
+        return;
       }
-      // Only apply if we have exactly 3 characters
-      if (station.length() == 3) {
-        strncpy(config.stationCode, station.c_str(), sizeof(config.stationCode) - 1);
-        config.stationCode[3] = '\0';  // Ensure null termination
-      }
+      Serial.println("  ✅ Station code valid");
+      safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
     }
-    if (server.hasArg("interval")) config.refreshInterval = server.arg("interval").toInt();
+
+    // Validate refresh interval
+    if (server.hasArg("interval")) {
+      int interval = server.arg("interval").toInt();
+      ValidationResult result = validateRange(interval, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL, "Refresh interval");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.refreshInterval = interval;
+    }
+
     if (server.hasArg("mode")) config.useCallingAt = (server.arg("mode") == "1");
     if (server.hasArg("showstation")) config.showStationName = (server.arg("showstation") == "1");
+
+    // Validate extra services
     if (server.hasArg("extra")) {
-      config.extraServices = server.arg("extra").toInt();
-      if (config.extraServices < 0) config.extraServices = 0;
-      if (config.extraServices > 4) config.extraServices = 4;
+      int extra = server.arg("extra").toInt();
+      config.extraServices = constrainToRange(extra, 0, Data::MAX_EXTRA_SERVICES);
     }
-    if (server.hasArg("scrollspeed")) config.scrollSpeed = server.arg("scrollspeed").toInt();
+
+    // Validate scroll speed
+    if (server.hasArg("scrollspeed")) {
+      int speed = server.arg("scrollspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED, "Scroll speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.scrollSpeed = speed;
+    }
+
+    // Validate rotation speed
     if (server.hasArg("rotationspeed")) {
-      config.rotationSpeed = server.arg("rotationspeed").toInt();
-      if (config.rotationSpeed < 5) config.rotationSpeed = 5;
-      if (config.rotationSpeed > 60) config.rotationSpeed = 60;
+      int speed = server.arg("rotationspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED, "Rotation speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.rotationSpeed = speed;
     }
+
     if (server.hasArg("ytop")) config.yPosTop = server.arg("ytop").toInt();
     if (server.hasArg("y1")) config.yPos1st = server.arg("y1").toInt();
     if (server.hasArg("y2")) config.yPos2nd = server.arg("y2").toInt();
@@ -1823,48 +1663,92 @@ void setupWebServer() {
   });
 
   server.on("/apply", HTTP_POST, []() {
+    Serial.println("⚙️  /apply endpoint called");
+
     String oldSSID = String(config.wifiSSID);
     String oldPassword = String(config.wifiPassword);
     String oldStation = String(config.stationCode);
     bool oldCallingAt = config.useCallingAt;
     int oldExtraServices = config.extraServices;
-    
+
+    // Validate SSID
     if (server.hasArg("ssid")) {
-      strncpy(config.wifiSSID, server.arg("ssid").c_str(), sizeof(config.wifiSSID) - 1);
-      config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
+      String ssid = server.arg("ssid");
+      Serial.printf("  Validating SSID: '%s'\n", ssid.c_str());
+      ValidationResult result = validateSSID(ssid);
+      if (!result.valid) {
+        Serial.printf("  ❌ SSID validation failed: %s\n", result.message.c_str());
+        server.send(400, "text/plain", "Invalid SSID: " + result.message);
+        return;
+      }
+      Serial.println("  ✅ SSID valid");
+      safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
     }
+
+    // Validate password
     if (server.hasArg("password") && !server.arg("password").isEmpty()) {
-      strncpy(config.wifiPassword, server.arg("password").c_str(), sizeof(config.wifiPassword) - 1);
-      config.wifiPassword[sizeof(config.wifiPassword) - 1] = '\0';
+      String password = server.arg("password");
+      ValidationResult result = validatePassword(password);
+      if (!result.valid) {
+        server.send(400, "text/plain", "Invalid password: " + result.message);
+        return;
+      }
+      safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
     }
+
+    // Validate station code
     if (server.hasArg("station")) {
-      String station = server.arg("station");
-      station.trim();  // Remove any whitespace
-      station.toUpperCase();
-      // Extract only the 3-letter code if longer string provided
-      if (station.length() >= 3) {
-        station = station.substring(0, 3);
+      String station = sanitizeStationCode(server.arg("station"));
+      ValidationResult result = validateStationCode(station);
+      if (!result.valid) {
+        server.send(400, "text/plain", "Invalid station code: " + result.message);
+        return;
       }
-      // Only apply if we have exactly 3 characters
-      if (station.length() == 3) {
-        strncpy(config.stationCode, station.c_str(), sizeof(config.stationCode) - 1);
-        config.stationCode[3] = '\0';  // Ensure null termination
-      }
+      safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
     }
-    if (server.hasArg("interval")) config.refreshInterval = server.arg("interval").toInt();
+
+    // Validate refresh interval
+    if (server.hasArg("interval")) {
+      int interval = server.arg("interval").toInt();
+      ValidationResult result = validateRange(interval, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL, "Refresh interval");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.refreshInterval = interval;
+    }
+
     if (server.hasArg("mode")) config.useCallingAt = (server.arg("mode") == "1");
     if (server.hasArg("showstation")) config.showStationName = (server.arg("showstation") == "1");
+
+    // Validate extra services
     if (server.hasArg("extra")) {
-      config.extraServices = server.arg("extra").toInt();
-      if (config.extraServices < 0) config.extraServices = 0;
-      if (config.extraServices > 4) config.extraServices = 4;
+      int extra = server.arg("extra").toInt();
+      config.extraServices = constrainToRange(extra, 0, Data::MAX_EXTRA_SERVICES);
     }
-    if (server.hasArg("scrollspeed")) config.scrollSpeed = server.arg("scrollspeed").toInt();
+
+    // Validate scroll speed
+    if (server.hasArg("scrollspeed")) {
+      int speed = server.arg("scrollspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED, "Scroll speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.scrollSpeed = speed;
+    }
+
+    // Validate rotation speed
     if (server.hasArg("rotationspeed")) {
-      config.rotationSpeed = server.arg("rotationspeed").toInt();
-      if (config.rotationSpeed < 5) config.rotationSpeed = 5;
-      if (config.rotationSpeed > 60) config.rotationSpeed = 60;
+      int speed = server.arg("rotationspeed").toInt();
+      ValidationResult result = validateRange(speed, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED, "Rotation speed");
+      if (!result.valid) {
+        server.send(400, "text/plain", result.message);
+        return;
+      }
+      config.rotationSpeed = speed;
     }
+
     if (server.hasArg("ytop")) config.yPosTop = server.arg("ytop").toInt();
     if (server.hasArg("y1")) config.yPos1st = server.arg("y1").toInt();
     if (server.hasArg("y2")) config.yPos2nd = server.arg("y2").toInt();
@@ -1873,16 +1757,16 @@ void setupWebServer() {
     // Initialize rotation index based on display mode
     if (config.useCallingAt) {
       if (!config.showStationName) {
-        currentAlternatingService = 2;  // Calling at mode, station hidden: start from service[2]
+        displayState.currentAlternatingService = 2;  // Calling at mode, station hidden: start from service[2]
       } else {
-        currentAlternatingService = 1;  // Calling at mode, station shown: start from service[1]
+        displayState.currentAlternatingService = 1;  // Calling at mode, station shown: start from service[1]
       }
     } else if (!config.showStationName) {
-      currentAlternatingService = 3;  // Standard mode, station hidden: start from service[3]
+      displayState.currentAlternatingService = 3;  // Standard mode, station hidden: start from service[3]
     } else {
-      currentAlternatingService = 2;  // Standard mode, station shown: start from service[2]
+      displayState.currentAlternatingService = 2;  // Standard mode, station shown: start from service[2]
     }
-    callingAtScrollOffset = 0;
+    displayState.callingAtScrollOffset = 0;
     
     config.save();
     
@@ -1895,15 +1779,15 @@ void setupWebServer() {
     // The display will show "Loading stops..." until data arrives
     if (switchedToCallingAt) {
       for (int i = 0; i < 6; i++) {
-        services[i].callingPoints[0] = '\0';
+        displayState.services[i].callingPoints[0] = '\0';
       }
       // Force immediate fetch to get calling points
-      if (fetchState != FETCH_IDLE) {
+      if (fetchStateData.state != FETCH_IDLE) {
         fetchClient.stop();
-        fetchState = FETCH_IDLE;
+        fetchStateData.state = FETCH_IDLE;
       }
-      lastSuccessfulFetch = 0;
-      lastFetchAttempt = 0;
+      fetchStateData.lastSuccess = 0;
+      fetchStateData.lastAttempt = 0;
     }
 
     // Notify WebSocket clients immediately
@@ -1920,16 +1804,16 @@ void setupWebServer() {
     
     // Force immediate data fetch when station changes OR when switching to calling at
     if (stationChanged || switchedToCallingAt) {
-      serviceCount = 0;
-      fetchingNewStation = true;  // Mark that we're loading new station data
+      displayState.serviceCount = 0;
+      displayState.fetchingNewStation = true;  // Mark that we're loading new station data
       
-      if (fetchState != FETCH_IDLE) {
+      if (fetchStateData.state != FETCH_IDLE) {
         fetchClient.stop();
-        fetchState = FETCH_IDLE;
+        fetchStateData.state = FETCH_IDLE;
       }
       
-      lastSuccessfulFetch = 0;
-      lastFetchAttempt = 0;
+      fetchStateData.lastSuccess = 0;
+      fetchStateData.lastAttempt = 0;
       
       if (stationChanged) {
         Serial.println("🔄 Station changed to " + String(config.stationCode) + " - fetching immediately");
@@ -1982,8 +1866,8 @@ void setupWebServer() {
   server.on("/api/status", HTTP_GET, []() {
     String json = "{";
     json += "\"station\":\"" + String(config.stationCode) + "\",";
-    json += "\"stationName\":\"" + String(stationName) + "\",";
-    json += "\"services\":" + String(serviceCount) + ",";
+    json += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
+    json += "\"services\":" + String(displayState.serviceCount) + ",";
     json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
     json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
     json += "\"uptime\":" + String(millis() / 1000) + ",";
@@ -1993,7 +1877,7 @@ void setupWebServer() {
     json += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
     json += "\"extraServices\":" + String(config.extraServices) + ",";
     json += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
-    json += "\"lastUpdate\":" + String(lastSuccessfulFetch / 1000);
+    json += "\"lastUpdate\":" + String(fetchStateData.lastSuccess / 1000);
     json += "}";
     server.send(200, "application/json", json);
   });
@@ -2020,12 +1904,12 @@ void setup() {
   displayProgress("Initializing storage...", 1, 5, 0);
   if (!SPIFFS.begin(true)) {
     Serial.println("❌ SPIFFS Mount Failed");
-    systemError = true;
+    systemFlags.systemError = true;
     return;
   }
   
   // Check for first boot
-  firstBoot = checkFirstBoot();
+  systemFlags.firstBoot = checkFirstBoot();
   
   // Load or create configuration
   displayProgress("Loading configuration...", 2, 5, 20);
@@ -2039,7 +1923,7 @@ void setup() {
   }
   
   // If first boot, show welcome screen and start AP mode
-  if (firstBoot) {
+  if (systemFlags.firstBoot) {
     displayWelcomeScreen();
     startAccessPoint();
     displayAPScreen();
@@ -2066,7 +1950,7 @@ void setup() {
   // Setup fetch client once for better performance
   fetchClient.setInsecure();
   fetchClient.setTimeout(8000);  // Reduced from 15s to 8s for faster failure detection
-  fetchBuffer.reserve(16384);  // Pre-allocate buffer
+  fetchStateData.buffer.reserve(16384);  // Pre-allocate buffer
   
   // Setup OTA
   setupOTA();
@@ -2084,10 +1968,10 @@ void setup() {
   Serial.println("📊 Free heap: " + String(ESP.getFreeHeap()) + " bytes");
   
   // Connect to monitoring server
-  if (monitoringEnabled && !apMode) {
+  if (monitoringState.enabled && !systemFlags.apMode) {
     Serial.println("🔌 Connecting to monitoring server...");
-    Serial.println("   Host: " + monitorServerHost + ":" + String(monitorServerPort));
-    monitorClient.begin(monitorServerHost, monitorServerPort, "/ws");
+    Serial.println("   Host: " + monitoringState.serverHost + ":" + String(monitoringState.serverPort));
+    monitorClient.begin(monitoringState.serverHost, monitoringState.serverPort, "/ws");
     monitorClient.onEvent(monitorWebSocketEvent);
     monitorClient.setReconnectInterval(5000);
     delay(500);
@@ -2102,14 +1986,14 @@ void loop() {
   
   ArduinoOTA.handle();
 
-  if (systemError) {
+  if (systemFlags.systemError) {
     handleSystemError();
     return;
   }
 
-  if (apMode) {
+  if (systemFlags.apMode) {
     static unsigned long lastAPUpdate = 0;
-    if (millis() - lastAPUpdate > 30000) {
+    if (millis() - lastAPUpdate > Timing::AP_DISPLAY_UPDATE) {
       displayAPScreen();
       lastAPUpdate = millis();
     }
@@ -2120,24 +2004,24 @@ void loop() {
   unsigned long currentTime = millis();
 
   // Fetch with regular intervals - ← FIXED: Proper indentation
-  if (fetchState == FETCH_IDLE) {
-    unsigned long timeSinceLastSuccess = currentTime - lastSuccessfulFetch;
-    unsigned long timeSinceLastAttempt = currentTime - lastFetchAttempt;
+  if (fetchStateData.state == FETCH_IDLE) {
+    unsigned long timeSinceLastSuccess = currentTime - fetchStateData.lastSuccess;
+    unsigned long timeSinceLastAttempt = currentTime - fetchStateData.lastAttempt;
     
     bool shouldFetch = (timeSinceLastSuccess >= config.refreshInterval * 1000UL);
-    bool enoughTimeSinceAttempt = (timeSinceLastAttempt >= 30000UL);
-    bool forceFetch = (lastFetchAttempt == 0 && lastSuccessfulFetch == 0);
+    bool enoughTimeSinceAttempt = (timeSinceLastAttempt >= Net::MIN_FETCH_RETRY_INTERVAL);
+    bool forceFetch = (fetchStateData.lastAttempt == 0 && fetchStateData.lastSuccess == 0);
     
     if ((shouldFetch && enoughTimeSinceAttempt) || forceFetch) {
       if (WiFi.status() == WL_CONNECTED) {
-        lastFetchAttempt = currentTime;
+        fetchStateData.lastAttempt = currentTime;
         if (!asyncFetchStart()) {
           displayStatus("ERR");
         }
       } else {
         Serial.println("❌ WiFi disconnected");
         displayStatus("OFF");
-        lastFetchAttempt = currentTime;
+        fetchStateData.lastAttempt = currentTime;
         if (!initializeWiFi()) startAccessPoint();
       }
     }
@@ -2145,16 +2029,34 @@ void loop() {
 
   handleFetchStateMachine();
   handleAlternatingService(currentTime);
-  updateDisplay();  // CRITICAL: Called every loop for smooth animations and clock updates!
+
+  // Smart display update - only redraw when needed
+  // Always update for: animations, scrolling text, or clock updates (every second)
+  static unsigned long lastClockUpdate = 0;
+  bool clockNeedsUpdate = (currentTime - lastClockUpdate >= 1000);
+
+  // Check if calling points need scrolling
+  bool callingPointsScrolling = config.useCallingAt && displayState.serviceCount > 0 &&
+                                 strlen(displayState.services[0].callingPoints) > 0 &&
+                                 (currentTime - displayState.lastCallingAtScroll >= config.scrollSpeed);
+
+  if (displayState.dirty || displayState.isAnimating || clockNeedsUpdate || callingPointsScrolling) {
+    updateDisplay();
+    displayState.clearDirty();
+
+    if (clockNeedsUpdate) {
+      lastClockUpdate = currentTime;
+    }
+  }
   
   // Handle monitoring server connection
-  if (monitoringEnabled) {
+  if (monitoringState.enabled) {
     // Throttle monitoring loop to prevent blocking on reconnection attempts
     static unsigned long lastMonitorLoop = 0;
     
     // Skip monitoring loop for 2 seconds after disconnect to prevent immediate 
     // reconnection blocking the display
-    bool recentlyDisconnected = (currentTime - lastMonitorDisconnect < 2000);
+    bool recentlyDisconnected = (currentTime - monitoringState.lastDisconnect < 2000);
     
     // Only call loop() every 500ms to reduce blocking impact, and not right after disconnect
     if (!recentlyDisconnected && currentTime - lastMonitorLoop > 500) {
@@ -2163,23 +2065,23 @@ void loop() {
     }
     
     // Send heartbeat to monitoring server (only if connected)
-    if (monitorConnected && currentTime - lastMonitorHeartbeat >= MONITOR_HEARTBEAT_INTERVAL) {
+    if (monitoringState.connected && currentTime - monitoringState.lastHeartbeat >= Timing::MONITOR_HEARTBEAT_INTERVAL) {
       sendMonitorHeartbeat();
-      lastMonitorHeartbeat = currentTime;
+      monitoringState.lastHeartbeat = currentTime;
     }
   }
   
   // Broadcast metrics periodically
-  if (currentTime - lastMetricsBroadcast >= 10000) {  // Every 10 seconds
+  if (currentTime - wsClients.lastMetricsBroadcast >= Timing::METRICS_BROADCAST_INTERVAL) {
     broadcastMetrics();
-    lastMetricsBroadcast = currentTime;
+    wsClients.lastMetricsBroadcast = currentTime;
   }
 
   // Broadcast display snapshot for live preview
-  if (currentTime - lastDisplaySnapshot >= 2000) {  // Every 2 seconds
+  if (currentTime - displayState.lastSnapshot >= Timing::SNAPSHOT_BROADCAST_INTERVAL) {
     broadcastDisplaySnapshot();
-    lastDisplaySnapshot = currentTime;
+    displayState.lastSnapshot = currentTime;
   }
-  
-  delay(20);
+
+  delay(Timing::LOOP_DELAY);
 }

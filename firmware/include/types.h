@@ -49,7 +49,7 @@ struct FetchStateData {
     startTime(0),
     lastAttempt(0),
     lastSuccess(0) {
-    buffer.reserve(Network::FETCH_BUFFER_SIZE);
+    buffer.reserve(Net::FETCH_BUFFER_SIZE);
   }
 
   void reset() {
@@ -71,23 +71,27 @@ struct DisplayState {
 
   bool isAnimating;
   int animationOffset;
+  unsigned long animationStartTime;  // Track when animation started for easing
   int callingAtScrollOffset;
   unsigned long lastCallingAtScroll;
   unsigned long lastRotation;
   unsigned long lastSnapshot;
 
   bool fetchingNewStation;
+  bool dirty;  // Flag to indicate display needs update
 
   DisplayState() :
     serviceCount(0),
     currentAlternatingService(2),
     isAnimating(false),
     animationOffset(0),
+    animationStartTime(0),
     callingAtScrollOffset(0),
     lastCallingAtScroll(0),
     lastRotation(0),
     lastSnapshot(0),
-    fetchingNewStation(false) {
+    fetchingNewStation(false),
+    dirty(true) {  // Start dirty to force initial draw
     strncpy(stationName, "Station", sizeof(stationName) - 1);
     stationName[sizeof(stationName) - 1] = '\0';
   }
@@ -95,12 +99,22 @@ struct DisplayState {
   void clearServices() {
     serviceCount = 0;
     fetchingNewStation = true;
+    dirty = true;
   }
 
   void resetAnimation() {
     isAnimating = false;
     animationOffset = 0;
     callingAtScrollOffset = 0;
+    dirty = true;
+  }
+
+  void markDirty() {
+    dirty = true;
+  }
+
+  void clearDirty() {
+    dirty = false;
   }
 };
 
@@ -147,7 +161,7 @@ struct MonitoringState {
 
   MonitoringState() :
     serverHost("192.168.0.75"),
-    serverPort(Network::MONITOR_PORT),
+    serverPort(Net::MONITOR_PORT),
     enabled(true),
     connected(false),
     lastHeartbeat(0),

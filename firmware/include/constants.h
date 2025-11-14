@@ -32,7 +32,8 @@ namespace Display {
 }
 
 // ============ Network Constants ============
-namespace Network {
+// Note: Named 'Net' to avoid conflict with ESP32's Network object
+namespace Net {
   // Timeouts (milliseconds)
   const unsigned long WIFI_CONNECT_TIMEOUT = 30000;     // 30 seconds
   const unsigned long API_CONNECT_TIMEOUT = 8000;       // 8 seconds
@@ -98,6 +99,9 @@ namespace Timing {
   const unsigned long MONITOR_HEARTBEAT_INTERVAL = 30000; // 30 seconds
   const unsigned long MONITOR_LOOP_THROTTLE = 500;        // milliseconds
   const unsigned long MONITOR_DISCONNECT_DELAY = 2000;    // milliseconds
+
+  // Animation timing
+  const unsigned long SERVICE_ANIMATION_DURATION = 500;   // milliseconds for smooth scroll
 
   // Delays
   const unsigned long SPLASH_SCREEN_DELAY = 3000;
