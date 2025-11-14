@@ -2082,6 +2082,17 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       background: #d0d0d0;
     }
 
+    .btn-outline {
+      background: white;
+      border: 2px solid #667eea;
+      color: #667eea;
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: #667eea;
+      color: white;
+    }
+
     .btn:disabled {
       opacity: 0.6;
       cursor: not-allowed;
@@ -2379,6 +2390,15 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
             <span class="help-text">Leave blank if network has no password</span>
           </div>
 
+          <div class="info-box" id="wifiTestResult" style="display: none; margin-top: 20px;">
+            <p id="wifiTestMessage"></p>
+          </div>
+
+          <button type="button" class="btn btn-outline" onclick="testWiFiConnection()" id="testWifiBtn" style="width: 100%; margin-top: 10px; margin-bottom: 10px;">
+            <span id="testWifiBtnText">🔌 Test Connection</span>
+            <span id="testWifiBtnSpinner" style="display: none;">Testing...</span>
+          </button>
+
           <div class="button-group">
             <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
             <button class="btn btn-primary" onclick="nextStep()" id="wifiNextBtn">Next →</button>
@@ -2409,6 +2429,15 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
             </div>
             <span class="help-text">Enter a 3-letter station code (e.g., PAD) or search by name</span>
           </div>
+
+          <div class="info-box" id="stationValidResult" style="display: none; margin-top: 20px;">
+            <p id="stationValidMessage"></p>
+          </div>
+
+          <button type="button" class="btn btn-outline" onclick="validateStationCode()" id="validateStationBtn" style="width: 100%; margin-top: 10px; margin-bottom: 10px;">
+            <span id="validateStationBtnText">✓ Validate Station</span>
+            <span id="validateStationBtnSpinner" style="display: none;">Validating...</span>
+          </button>
 
           <div class="button-group">
             <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
@@ -2446,6 +2475,18 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
             <label for="interval">Refresh Interval (seconds)</label>
             <input type="number" id="interval" value="60" min="30" max="600">
             <span class="help-text">How often to fetch new train data (recommended: 60-120)</span>
+          </div>
+
+          <div style="margin-top: 30px;">
+            <h3 style="color: #667eea; font-size: 18px; margin-bottom: 15px;">🖥️ Display Preview</h3>
+            <div id="displayPreview" style="background: #000; color: #fff; padding: 20px; border-radius: 8px; font-family: 'Courier New', monospace; min-height: 180px; border: 3px solid #333;">
+              <div style="text-align: center; color: #666; padding: 40px 0; font-size: 14px;">
+                Configure your settings above to see a preview
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline" onclick="updatePreview()" id="previewBtn" style="width: 100%; margin-top: 15px;">
+              <span id="previewBtnText">🔄 Update Preview</span>
+            </button>
           </div>
 
           <div class="button-group">
@@ -2778,6 +2819,190 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
 
       document.getElementById('summaryContent').innerHTML = summary;
       nextStep();
+    }
+
+    // Test WiFi connection
+    function testWiFiConnection() {
+      const ssid = document.getElementById('ssid').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!ssid) {
+        showError('wifiError', 'Please enter a WiFi network name');
+        return;
+      }
+
+      const btn = document.getElementById('testWifiBtn');
+      const btnText = document.getElementById('testWifiBtnText');
+      const btnSpinner = document.getElementById('testWifiBtnSpinner');
+      const resultBox = document.getElementById('wifiTestResult');
+      const resultMsg = document.getElementById('wifiTestMessage');
+
+      btn.disabled = true;
+      btnText.style.display = 'none';
+      btnSpinner.style.display = 'inline';
+      resultBox.style.display = 'none';
+
+      const formData = new URLSearchParams();
+      formData.append('ssid', ssid);
+      formData.append('password', password);
+
+      fetch('/test-wifi', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        resultBox.style.display = 'block';
+        if (data.success) {
+          resultBox.style.background = '#d4edda';
+          resultBox.style.borderColor = '#28a745';
+          resultMsg.style.color = '#155724';
+          resultMsg.innerHTML = `<strong>✓ Connection Successful!</strong><br>Signal strength: ${data.rssi} dBm (${data.quality})`;
+        } else {
+          resultBox.style.background = '#f8d7da';
+          resultBox.style.borderColor = '#dc3545';
+          resultMsg.style.color = '#721c24';
+          resultMsg.innerHTML = `<strong>✗ Connection Failed</strong><br>${escapeHtml(data.message)}`;
+        }
+      })
+      .catch(error => {
+        console.error('Test error:', error);
+        resultBox.style.display = 'block';
+        resultBox.style.background = '#f8d7da';
+        resultBox.style.borderColor = '#dc3545';
+        resultMsg.style.color = '#721c24';
+        resultMsg.innerHTML = '<strong>✗ Test Failed</strong><br>Could not connect to device';
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        btnSpinner.style.display = 'none';
+      });
+    }
+
+    // Validate station code
+    function validateStationCode() {
+      const station = document.getElementById('station').value.trim().toUpperCase();
+
+      if (!station || station.length !== 3) {
+        alert('Please enter a valid 3-letter station code');
+        return;
+      }
+
+      const btn = document.getElementById('validateStationBtn');
+      const btnText = document.getElementById('validateStationBtnText');
+      const btnSpinner = document.getElementById('validateStationBtnSpinner');
+      const resultBox = document.getElementById('stationValidResult');
+      const resultMsg = document.getElementById('stationValidMessage');
+
+      btn.disabled = true;
+      btnText.style.display = 'none';
+      btnSpinner.style.display = 'inline';
+      resultBox.style.display = 'none';
+
+      fetch('/validate-station?code=' + encodeURIComponent(station))
+        .then(response => response.json())
+        .then(data => {
+          resultBox.style.display = 'block';
+          if (data.valid) {
+            resultBox.style.background = '#d4edda';
+            resultBox.style.borderColor = '#28a745';
+            resultMsg.style.color = '#155724';
+            resultMsg.innerHTML = `<strong>✓ Valid Station!</strong><br>${escapeHtml(data.name)}<br>Services: ${data.serviceCount || 'Unknown'}`;
+          } else {
+            resultBox.style.background = '#f8d7da';
+            resultBox.style.borderColor = '#dc3545';
+            resultMsg.style.color = '#721c24';
+            resultMsg.innerHTML = `<strong>✗ Invalid Station</strong><br>${escapeHtml(data.message || 'Station code not found')}`;
+          }
+        })
+        .catch(error => {
+          console.error('Validation error:', error);
+          resultBox.style.display = 'block';
+          resultBox.style.background = '#fff3cd';
+          resultBox.style.borderColor = '#ffc107';
+          resultMsg.style.color = '#856404';
+          resultMsg.innerHTML = '<strong>⚠ Validation Unavailable</strong><br>Could not verify station code, but you can still continue';
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          btnSpinner.style.display = 'none';
+        });
+    }
+
+    // Update display preview
+    function updatePreview() {
+      const station = document.getElementById('station').value.trim().toUpperCase();
+      const mode = document.getElementById('mode').value;
+      const extra = document.getElementById('extra').value;
+
+      if (!station || station.length !== 3) {
+        alert('Please select a station first');
+        return;
+      }
+
+      const preview = document.getElementById('displayPreview');
+      const isCallingAt = mode === '1';
+
+      // Create mock preview
+      let html = '<div style="font-size: 13px; line-height: 1.6;">';
+
+      // Station name
+      html += '<div style="text-align: center; font-weight: bold; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; font-size: 15px;">';
+      html += escapeHtml(station);
+      html += '</div>';
+
+      // Mock services
+      const mockServices = [
+        { time: '14:30', dest: 'Reading', etd: 'On time' },
+        { time: '14:45', dest: 'Oxford', etd: 'On time' },
+        { time: '15:00', dest: 'Bristol TM', etd: 'Exp 15:05' }
+      ];
+
+      if (isCallingAt) {
+        // Show first service with calling points
+        html += '<div style="margin-bottom: 10px; padding: 8px; background: #111; border-radius: 4px;">';
+        html += `<div style="display: flex; justify-content: space-between; margin-bottom: 5px;">`;
+        html += `<span><strong>1st</strong> ${mockServices[0].time} ${mockServices[0].dest}</span>`;
+        html += `<span style="color: #ffa500; font-weight: bold;">${mockServices[0].etd}</span>`;
+        html += `</div>`;
+        html += `<div style="font-size: 10px; color: #ccc; margin-top: 5px;">`;
+        html += `<strong>Calling at:</strong> Slough, Maidenhead, Twyford`;
+        html += `</div></div>`;
+      } else {
+        // Standard mode - show two services
+        for (let i = 0; i < 2; i++) {
+          html += '<div style="margin-bottom: 8px; padding: 8px; background: #111; border-radius: 4px;">';
+          html += `<div style="display: flex; justify-content: space-between;">`;
+          html += `<span><strong>${i === 0 ? '1st' : '2nd'}</strong> ${mockServices[i].time} ${mockServices[i].dest}</span>`;
+          html += `<span style="color: #ffa500; font-weight: bold;">${mockServices[i].etd}</span>`;
+          html += `</div></div>`;
+        }
+      }
+
+      // Extra services
+      if (extra > 0) {
+        html += '<div style="margin-top: 8px; padding: 8px; background: #0a0a0a; border-radius: 4px; border-left: 3px solid #667eea;">';
+        html += `<div style="display: flex; justify-content: space-between;">`;
+        html += `<span><strong>3rd</strong> ${mockServices[2].time} ${mockServices[2].dest}</span>`;
+        html += `<span style="color: #ffa500; font-weight: bold;">${mockServices[2].etd}</span>`;
+        html += `</div>`;
+        if (extra > 1) {
+          html += `<div style="margin-top: 5px; font-size: 10px; color: #888; font-style: italic;">↻ Rotates with ${extra - 1} more</div>`;
+        }
+        html += '</div>';
+      }
+
+      // Current time
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      html += '<div style="text-align: center; margin-top: 12px; padding-top: 8px; border-top: 1px solid #333; font-size: 11px; color: #999;">';
+      html += timeStr;
+      html += '</div>';
+
+      html += '</div>';
+      preview.innerHTML = html;
     }
 
     // Complete setup and submit

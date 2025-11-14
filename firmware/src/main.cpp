@@ -1973,6 +1973,172 @@ void setupWebServer() {
     ESP.restart();
   });
 
+  server.on("/test-wifi", HTTP_POST, []() {
+    Serial.println("🔌 WiFi connection test endpoint called");
+
+    if (!server.hasArg("ssid")) {
+      server.send(400, "application/json", "{\"success\":false,\"message\":\"SSID required\"}");
+      return;
+    }
+
+    String ssid = server.arg("ssid");
+    String password = server.hasArg("password") ? server.arg("password") : "";
+
+    Serial.printf("  Testing connection to: %s\n", ssid.c_str());
+
+    // Disconnect from current WiFi
+    WiFi.disconnect();
+    delay(100);
+
+    // Try to connect to the specified network
+    WiFi.begin(ssid.c_str(), password.c_str());
+
+    // Wait up to 10 seconds for connection
+    unsigned long startTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
+      delay(500);
+      Serial.print(".");
+    }
+
+    String json = "{";
+    if (WiFi.status() == WL_CONNECTED) {
+      int rssi = WiFi.RSSI();
+      String quality = rssi > -50 ? "Excellent" : rssi > -60 ? "Good" : rssi > -70 ? "Fair" : "Weak";
+
+      Serial.println("\n  ✅ Test connection successful!");
+      Serial.printf("  RSSI: %d dBm (%s)\n", rssi, quality.c_str());
+
+      json += "\"success\":true,";
+      json += "\"rssi\":" + String(rssi) + ",";
+      json += "\"quality\":\"" + quality + "\"";
+
+      // Disconnect from test network
+      WiFi.disconnect();
+      delay(100);
+
+      // Reconnect to original network if configured
+      if (strlen(config.wifiSSID) > 0) {
+        Serial.println("  Reconnecting to original network...");
+        WiFi.begin(config.wifiSSID, config.wifiPassword);
+      }
+    } else {
+      Serial.println("\n  ❌ Test connection failed");
+
+      json += "\"success\":false,";
+      json += "\"message\":\"Could not connect to network. Check SSID and password.\"";
+
+      // Try to reconnect to original network
+      if (strlen(config.wifiSSID) > 0) {
+        Serial.println("  Reconnecting to original network...");
+        WiFi.begin(config.wifiSSID, config.wifiPassword);
+      }
+    }
+    json += "}";
+
+    server.send(200, "application/json", json);
+  });
+
+  server.on("/validate-station", HTTP_GET, []() {
+    Serial.println("🚉 Station validation endpoint called");
+
+    if (!server.hasArg("code")) {
+      server.send(400, "application/json", "{\"valid\":false,\"message\":\"Station code required\"}");
+      return;
+    }
+
+    String stationCode = server.arg("code");
+    stationCode.toUpperCase();
+    Serial.printf("  Validating station: %s\n", stationCode.c_str());
+
+    // Basic validation
+    if (stationCode.length() != 3) {
+      server.send(200, "application/json", "{\"valid\":false,\"message\":\"Station code must be 3 letters\"}");
+      return;
+    }
+
+    // Try to fetch service data from National Rail to validate
+    WiFiClientSecure client;
+    client.setInsecure();
+
+    if (!client.connect("lite.realtime.nationalrail.co.uk", 443)) {
+      Serial.println("  ⚠️  Could not connect to National Rail API");
+      server.send(200, "application/json", "{\"valid\":true,\"message\":\"Could not verify, but format is valid\"}");
+      return;
+    }
+
+    // Build minimal SOAP request to check if station exists
+    String soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
+    soapRequest += "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:typ=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\" xmlns:ldb=\"http://thalesgroup.com/RTTI/2017-10-01/ldb/\">";
+    soapRequest += "<soap:Header><typ:AccessToken><typ:TokenValue>";
+    soapRequest += NR_API_KEY;
+    soapRequest += "</typ:TokenValue></typ:AccessToken></soap:Header>";
+    soapRequest += "<soap:Body><ldb:GetDepBoardWithDetailsRequest>";
+    soapRequest += "<ldb:numRows>1</ldb:numRows>";
+    soapRequest += "<ldb:crs>" + stationCode + "</ldb:crs>";
+    soapRequest += "</ldb:GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
+
+    client.println("POST /OpenLDBWS/ldb11.asmx HTTP/1.1");
+    client.println("Host: lite.realtime.nationalrail.co.uk");
+    client.println("Content-Type: text/xml; charset=utf-8");
+    client.println("SOAPAction: \"http://thalesgroup.com/RTTI/2017-10-01/ldb/GetDepBoardWithDetails\"");
+    client.print("Content-Length: ");
+    client.println(soapRequest.length());
+    client.println();
+    client.print(soapRequest);
+
+    // Wait for response
+    unsigned long timeout = millis();
+    while (!client.available() && millis() - timeout < 5000) {
+      delay(10);
+    }
+
+    String response = "";
+    bool foundStationName = false;
+    String stationName = "";
+    int serviceCount = 0;
+
+    while (client.available()) {
+      String line = client.readStringUntil('\n');
+      response += line;
+
+      // Check for error
+      if (line.indexOf("faultcode") >= 0 || line.indexOf("Invalid CRS") >= 0) {
+        Serial.println("  ❌ Invalid station code");
+        client.stop();
+        server.send(200, "application/json", "{\"valid\":false,\"message\":\"Station code not found in National Rail database\"}");
+        return;
+      }
+
+      // Extract station name
+      if (line.indexOf("<lt4:locationName>") >= 0) {
+        int start = line.indexOf("<lt4:locationName>") + 18;
+        int end = line.indexOf("</lt4:locationName>");
+        if (end > start) {
+          stationName = line.substring(start, end);
+          foundStationName = true;
+        }
+      }
+
+      // Count services
+      if (line.indexOf("<lt7:service>") >= 0) {
+        serviceCount++;
+      }
+    }
+
+    client.stop();
+
+    if (foundStationName) {
+      Serial.printf("  ✅ Valid station: %s\n", stationName.c_str());
+      Serial.printf("  Services available: %d\n", serviceCount);
+
+      String json = "{\"valid\":true,\"name\":\"" + stationName + "\",\"serviceCount\":" + String(serviceCount) + "}";
+      server.send(200, "application/json", json);
+    } else {
+      Serial.println("  ⚠️  Could not verify station");
+      server.send(200, "application/json", "{\"valid\":true,\"message\":\"Could not verify with API, but format is valid\"}");
+    }
+  });
+
   server.on("/scan", HTTP_GET, []() {
     String json = "{\"networks\":[";
     int n = WiFi.scanNetworks();
