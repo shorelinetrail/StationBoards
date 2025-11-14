@@ -27,6 +27,7 @@
 #include "types.h"             // Data structures to organize globals
 #include "helpers.h"           // Validation and utility functions
 #include "display_functions.h" // Display component functions
+#include "service_provider.h"  // Service provider abstraction
 
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
@@ -42,10 +43,10 @@ WebSocketsServer webSocket = WebSocketsServer(81);
 // ---------------- Configuration ----------------
 Config config;
 
-// ---------------- API Settings ----------------
-const char* apiHost = "lite.realtime.nationalrail.co.uk";
-const char* apiPath = "/OpenLDBWS/ldb9.asmx";
-const char* apiToken = "73ee3834-af35-4f22-9b8b-480b70571c39";
+// ---------------- Service Provider ----------------
+ServiceProvider* serviceProvider = nullptr;
+NationalRailProvider nationalRailProvider;
+TflUndergroundProvider tflUndergroundProvider;
 
 // ---------------- Data ----------------
 // Note: ServiceData is now defined in types.h
@@ -989,7 +990,7 @@ void setupOTA() {
   Serial.println("✅ OTA Ready");
 }
 
-// Data Fetching - using the WORKING logic from original
+// Data Fetching - using service provider abstraction
 bool asyncFetchStart() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected");
@@ -997,73 +998,61 @@ bool asyncFetchStart() {
     return false;
   }
 
-  Serial.println("📡 Fetching: " + String(config.stationCode));
-  
+  if (!serviceProvider) {
+    Serial.println("❌ Service provider not initialized");
+    displayStatus("ERROR");
+    return false;
+  }
+
+  Serial.println("📡 Fetching from " + String(serviceProvider->getProviderName()) + ": " + String(config.stationCode));
+
   // Update display before blocking operations
   unsigned long currentTime = millis();
   handleAlternatingService(currentTime);
   updateDisplay();
 
   // Connect with periodic display updates
-  Serial.println("🔌 Connecting to API...");
+  Serial.println("🔌 Connecting to " + String(serviceProvider->getApiHost()) + "...");
   unsigned long connectStart = millis();
-  
+
   // Non-blocking connect attempt with display updates
-  if (!fetchClient.connect(apiHost, 443)) {
+  if (!fetchClient.connect(serviceProvider->getApiHost(), serviceProvider->getApiPort())) {
     Serial.println("❌ API connection failed");
     displayStatus("FAIL");
     return false;
   }
-  
+
   Serial.println("✅ Connected (" + String(millis() - connectStart) + "ms)");
-  
+
   // Update display after connection
   currentTime = millis();
   handleAlternatingService(currentTime);
   updateDisplay();
 
-  broadcastStatus("Fetching train data...", "info");
+  broadcastStatus("Fetching data...", "info");
 
-  // Always fetch maximum services so we have data available when settings change
-  // Maximum useful services: 1 or 2 base + 4 extra = 5 or 6 total  
-  // Fetch 8 to have buffer for any configuration
-  int numRows = 8;
-  
-  // Build SOAP request more efficiently
-  String soapRequest;
-  soapRequest.reserve(512);  // Pre-allocate to avoid reallocations
-  soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
-  soapRequest += "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">";
-  soapRequest += "<soap:Header><AccessToken xmlns=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\">";
-  soapRequest += "<TokenValue>" + String(apiToken) + "</TokenValue></AccessToken></soap:Header>";
-  
-  if (config.useCallingAt) {
-    soapRequest += "<soap:Body><GetDepBoardWithDetailsRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
-    soapRequest += "<numRows>" + String(numRows) + "</numRows><crs>" + String(config.stationCode) + "</crs>";
-    soapRequest += "</GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
-  } else {
-    soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
-    soapRequest += "<numRows>" + String(numRows) + "</numRows><crs>" + String(config.stationCode) + "</crs>";
-    soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
+  // Build request using service provider
+  String request;
+  if (!serviceProvider->buildRequest(config.stationCode, request)) {
+    Serial.println("❌ Failed to build request");
+    fetchClient.stop();
+    displayStatus("ERROR");
+    return false;
   }
-  
-  // Use Connection: close - API server doesn't support keep-alive properly
-  fetchClient.print("POST " + String(apiPath) + " HTTP/1.1\r\n"
-                    "Host: " + String(apiHost) + "\r\n"
-                    "Content-Type: text/xml\r\n"
-                    "Content-Length: " + String(soapRequest.length()) + "\r\n"
-                    "Connection: close\r\n\r\n" + soapRequest);
+
+  // Send request
+  fetchClient.print(request);
 
   fetchStateData.startTime = millis();
   fetchStateData.buffer = "";
   fetchStateData.state = FETCH_WAITING;
   displayStatus("Fetch");
-  
+
   // One more display update after sending request
   currentTime = millis();
   handleAlternatingService(currentTime);
   updateDisplay();
-  
+
   return true;
 }
 
@@ -1162,213 +1151,35 @@ void handleFetchStateMachine() {
 
 // Parse function - using the WORKING logic from original
 bool parseAndDisplayResponse(String response) {
-  // Use temporary counter during parsing to avoid showing partial data
+  if (!serviceProvider) {
+    Serial.println("❌ Service provider not initialized");
+    return false;
+  }
+
+  // Parse using service provider
   int newServiceCount = 0;
+  bool success = serviceProvider->parseResponse(
+    response,
+    displayState.services,
+    newServiceCount,
+    displayState.stationName,
+    sizeof(displayState.stationName),
+    config.useCallingAt
+  );
 
-  Serial.println("📊 Processing (" + String(response.length()) + " bytes)");
-  
-  // Check if response seems too short
-  if (response.length() < 500) {
-    Serial.println("⚠️ Response seems unusually short!");
-    Serial.println("🔍 Full response:");
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    Serial.println(response);
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  }
-  
-  // DEBUG: Uncomment the next 3 lines to see the full response
-  // Serial.println("🔍 Full response:");
-  // Serial.println(response);
-  // Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-  if (response.indexOf("soap:Fault") != -1) {
-    Serial.println("❌ SOAP Fault detected");
-    String faultMsg = extractTagValue(response, "faultstring", "");
-    if (faultMsg.length() > 0) {
-      Serial.println("   Message: " + faultMsg);
-    }
+  if (!success) {
+    Serial.println("❌ Failed to parse response from " + String(serviceProvider->getProviderName()));
     return false;
   }
 
-  String station = extractTagValue(response, "locationName", "lt4");
-  if (station == "") station = extractTagValue(response, "locationName", "lt5");
-  
-  if (station.length() > 0) {
-    station.toCharArray(displayState.stationName, sizeof(displayState.stationName));
-    Serial.println("📍 " + station);
-  }
-
-  int servicesStart = response.indexOf("<lt5:trainServices>");
-  if (servicesStart == -1) servicesStart = response.indexOf("<lt4:trainServices>");
-  
-  if (servicesStart == -1) {
-    Serial.println("❌ No services tag found");
-    Serial.println("🔍 Debug: Showing first 1000 chars of response:");
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    Serial.println(response.substring(0, min(1000, (int)response.length())));
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
-    // Check for specific error messages
-    if (response.indexOf("<faultstring>") != -1) {
-      String faultMsg = extractTagValue(response, "faultstring", "");
-      Serial.println("❌ SOAP Fault: " + faultMsg);
-    }
-    if (response.indexOf("nrcc:") != -1) {
-      Serial.println("⚠️ Response contains nrcc namespace - message field present");
-    }
-    
-    return false;
-  }
-
-  int servicesEnd = response.indexOf("</lt5:trainServices>", servicesStart);
-  if (servicesEnd == -1) servicesEnd = response.indexOf("</lt4:trainServices>", servicesStart);
-  if (servicesEnd == -1) servicesEnd = response.length();
-
-  String trainServices = response.substring(servicesStart, servicesEnd);
-  
-  String serviceTag = "<lt5:service>";
-  String serviceEndTag = "</lt5:service>";
-  
-  int pos = 0;
-  // Always parse maximum services (up to 8) so data is available when settings change
-  int maxServices = 8;
-
-  while (newServiceCount < maxServices) {
-    int serviceStart = trainServices.indexOf(serviceTag, pos);
-    if (serviceStart == -1) break;
-    
-    int serviceEnd = trainServices.indexOf(serviceEndTag, serviceStart);
-    if (serviceEnd == -1) {
-      int nextServiceStart = trainServices.indexOf(serviceTag, serviceStart + 1);
-      if (nextServiceStart != -1) {
-        serviceEnd = nextServiceStart;
-      } else {
-        serviceEnd = trainServices.length();
-      }
-    } else {
-      serviceEnd += serviceEndTag.length();
-    }
-
-    String block = trainServices.substring(serviceStart, serviceEnd);
-
-    String std = extractTagValue(block, "std", "lt4");
-    if (std == "") std = extractTagValue(block, "std", "lt5");
-
-    String etd = extractTagValue(block, "etd", "lt4");
-    if (etd == "") etd = extractTagValue(block, "etd", "lt5");
-
-    String destBlock = extractTagValue(block, "destination", "lt5");
-    if (destBlock == "") destBlock = extractTagValue(block, "destination", "lt4");
-
-    String destination = extractTagValue(destBlock, "locationName", "lt4");
-    if (destination == "") destination = extractTagValue(destBlock, "locationName", "lt5");
-    destination = decodeHTMLEntities(destination);
-
-    if (std != "" && destination != "") {
-      std.toCharArray(displayState.services[newServiceCount].std, sizeof(displayState.services[newServiceCount].std));
-      etd.toCharArray(displayState.services[newServiceCount].etd, sizeof(displayState.services[newServiceCount].etd));
-      destination.toCharArray(displayState.services[newServiceCount].destination, sizeof(displayState.services[newServiceCount].destination));
-      displayState.services[newServiceCount].callingPoints[0] = '\0';
-      
-      Serial.println("🚂 " + String(newServiceCount + 1) + ": " + std + " → " + destination);
-      
-      if (config.useCallingAt && newServiceCount == 0) {
-        int cpListIdx = block.indexOf("<lt5:subsequentCallingPoints>");
-        if (cpListIdx == -1) cpListIdx = block.indexOf("<lt4:subsequentCallingPoints>");
-        
-        if (cpListIdx != -1) {
-          int cpListEndIdx = block.indexOf("</lt5:subsequentCallingPoints>", cpListIdx);
-          if (cpListEndIdx == -1) cpListEndIdx = block.indexOf("</lt4:subsequentCallingPoints>", cpListIdx);
-          
-          if (cpListEndIdx != -1) {
-            String cpSection = block.substring(cpListIdx, cpListEndIdx);
-            
-            int cpListStart = cpSection.indexOf("<lt4:callingPointList>");
-            if (cpListStart == -1) cpListStart = cpSection.indexOf("<lt5:callingPointList>");
-            
-            if (cpListStart != -1) {
-              int cpListEnd = cpSection.indexOf("</lt4:callingPointList>", cpListStart);
-              if (cpListEnd == -1) cpListEnd = cpSection.indexOf("</lt5:callingPointList>", cpListStart);
-              
-              if (cpListEnd != -1) {
-                String cpList = cpSection.substring(cpListStart, cpListEnd);
-                
-                String cpTag = "<lt4:callingPoint>";
-                String cpEndTag = "</lt4:callingPoint>";
-                
-                if (cpList.indexOf(cpTag) == -1) {
-                  cpTag = "<lt5:callingPoint>";
-                  cpEndTag = "</lt5:callingPoint>";
-                }
-                
-                String callingPoints = "";
-                int cpPos = 0;
-                
-                while ((cpPos = cpList.indexOf(cpTag, cpPos)) != -1) {
-                  int cpEnd = cpList.indexOf(cpEndTag, cpPos);
-                  if (cpEnd == -1) break;
-                  
-                  String cpBlock = cpList.substring(cpPos, cpEnd);
-                  
-                  String cpName = extractTagValue(cpBlock, "locationName", "lt4");
-                  if (cpName == "") cpName = extractTagValue(cpBlock, "locationName", "lt5");
-                  cpName = decodeHTMLEntities(cpName);
-                  
-                  String cpTime = extractTagValue(cpBlock, "st", "lt4");
-                  if (cpTime == "") cpTime = extractTagValue(cpBlock, "st", "lt5");
-                  
-                  if (cpName != "") {
-                    if (callingPoints != "") callingPoints += ", ";
-                    callingPoints += cpName;
-                    if (cpTime != "") callingPoints += " (" + cpTime + ")";
-                  }
-                  
-                  cpPos = cpEnd;
-                  
-                  // Allow other tasks to run during long calling points lists
-                  yield();
-                }
-                
-                if (callingPoints != "" && callingPoints.length() < 500) {
-                  callingPoints.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
-                  Serial.println("  ✅ Stored calling points");
-                } else if (callingPoints == "") {
-                  String fallback = "No further stops available";
-                  fallback.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
-                }
-              }
-            }
-          }
-        } else {
-          String fallback = "No further stops available";
-          fallback.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
-        }
-      }
-      
-      newServiceCount++;
-      
-      // Keep display alive during parsing - update clock and animations with OLD data
-      // This prevents the display from freezing during long parsing operations
-      unsigned long currentTime = millis();
-      handleAlternatingService(currentTime);
-      updateDisplay();
-      yield();
-    }
-    
-    pos = serviceEnd;
-  }
-
-  Serial.println("✅ " + String(newServiceCount) + " services");
-
-  // Only update displayState.serviceCount after parsing is complete
-  // This ensures old data stays visible during parsing
+  // Update display state
   displayState.serviceCount = newServiceCount;
-  displayState.markDirty();  // Mark display dirty when data updates
+  displayState.markDirty();
 
   if (displayState.serviceCount > 0) {
-    displayState.fetchingNewStation = false;  // Clear loading flag - we have data now
-    broadcastTrainUpdate();  // Sends full train data to clients
-    broadcastStatus("Train data updated", "success");
+    displayState.fetchingNewStation = false;
+    broadcastTrainUpdate();
+    broadcastStatus("Data updated", "success");
   }
 
   return displayState.serviceCount > 0;
@@ -1573,6 +1384,9 @@ void setupWebServer() {
     String html = FPSTR(CONFIG_PAGE_TEMPLATE);
 
     html.replace("{SSID}", String(config.wifiSSID));
+    html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
+    html.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
+    html.replace("{TFL_API_KEY}", String(config.tflApiKey));
     html.replace("{STATION}", String(config.stationCode));
     html.replace("{STATION_NAME}", String(displayState.stationName));
     html.replace("{INTERVAL}", String(config.refreshInterval));
@@ -1599,6 +1413,33 @@ void setupWebServer() {
 
   server.on("/save", HTTP_POST, []() {
     Serial.println("📝 /save endpoint called");
+
+    // Handle service type
+    if (server.hasArg("serviceType")) {
+      int serviceType = server.arg("serviceType").toInt();
+      config.serviceType = serviceType;
+      Serial.printf("  Service Type: %d\n", serviceType);
+
+      // Reinitialize service provider if type changed
+      if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        serviceProvider = &tflUndergroundProvider;
+        Serial.println("  🚇 Switched to TFL Underground provider");
+      } else {
+        serviceProvider = &nationalRailProvider;
+        Serial.println("  🚂 Switched to National Rail provider");
+      }
+    }
+
+    // Handle TFL API key
+    if (server.hasArg("tflApiKey")) {
+      String apiKey = server.arg("tflApiKey");
+      safeStrCopy(config.tflApiKey, apiKey, sizeof(config.tflApiKey));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setApiKey(apiKey);
+        Serial.println("  🔑 TFL API key updated");
+      }
+    }
 
     // Validate SSID
     if (server.hasArg("ssid")) {
@@ -1707,6 +1548,33 @@ void setupWebServer() {
     String oldStation = String(config.stationCode);
     bool oldCallingAt = config.useCallingAt;
     int oldExtraServices = config.extraServices;
+
+    // Handle service type
+    if (server.hasArg("serviceType")) {
+      int serviceType = server.arg("serviceType").toInt();
+      config.serviceType = serviceType;
+      Serial.printf("  Service Type: %d\n", serviceType);
+
+      // Reinitialize service provider if type changed
+      if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        serviceProvider = &tflUndergroundProvider;
+        Serial.println("  🚇 Switched to TFL Underground provider");
+      } else {
+        serviceProvider = &nationalRailProvider;
+        Serial.println("  🚂 Switched to National Rail provider");
+      }
+    }
+
+    // Handle TFL API key
+    if (server.hasArg("tflApiKey")) {
+      String apiKey = server.arg("tflApiKey");
+      safeStrCopy(config.tflApiKey, apiKey, sizeof(config.tflApiKey));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setApiKey(apiKey);
+        Serial.println("  🔑 TFL API key updated");
+      }
+    }
 
     // Validate SSID
     if (server.hasArg("ssid")) {
@@ -2270,7 +2138,17 @@ void setup() {
   // Load or create configuration
   displayProgress("Loading configuration...", 2, 5, 20);
   config.load();
-  
+
+  // Initialize service provider based on config
+  if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+    tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+    serviceProvider = &tflUndergroundProvider;
+    Serial.println("🚇 Using TFL Underground provider");
+  } else {
+    serviceProvider = &nationalRailProvider;
+    Serial.println("🚂 Using National Rail provider");
+  }
+
   // Ensure device ID is set
   if (config.deviceId.length() == 0 || config.deviceId == "") {
     config.deviceId = generateDeviceId();

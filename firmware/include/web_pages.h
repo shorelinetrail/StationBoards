@@ -741,9 +741,27 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <h2>🚉 Station Configuration</h2>
 
         <div class="form-group">
+          <label for="serviceType">Transport Service</label>
+          <select id="serviceType" name="serviceType" aria-describedby="servicetype-help">
+            <option value="0"{SERVICE_SEL_0}>National Rail</option>
+            <option value="1"{SERVICE_SEL_1}>TFL Underground</option>
+          </select>
+          <span class="help-text" id="servicetype-help">Select which transport service to display</span>
+        </div>
+
+        <div class="form-group" id="tflApiKeyGroup" style="display:none;">
+          <label for="tflApiKey">
+            TFL API Key
+            <span class="info-tooltip" title="Optional but recommended. Get from https://api.tfl.gov.uk" aria-label="Information: TFL API key">?</span>
+          </label>
+          <input type="password" id="tflApiKey" name="tflApiKey" value="{TFL_API_KEY}" placeholder="Enter TFL API key" aria-describedby="tflkey-help">
+          <span class="help-text" id="tflkey-help">Free API key from <a href="https://api.tfl.gov.uk" target="_blank">api.tfl.gov.uk</a></span>
+        </div>
+
+        <div class="form-group">
           <label for="station">
-            Station Code (CRS)
-            <span class="info-tooltip" title="Three-letter National Rail station code" aria-label="Information: Three-letter National Rail station code">?</span>
+            <span id="stationLabel">Station Code (CRS)</span>
+            <span class="info-tooltip" id="stationTooltip" title="Three-letter National Rail station code" aria-label="Information: Three-letter National Rail station code">?</span>
           </label>
           <div class="preset-stations">
             <button type="button" class="preset-btn" data-station="PAD" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
@@ -1516,6 +1534,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     const autoApplySettings = (stationCodeOverride) => {
       const formData = new URLSearchParams();
       const stationValue = stationCodeOverride || document.getElementById('station').value;
+      formData.append('serviceType', document.getElementById('serviceType').value);
+      formData.append('tflApiKey', document.getElementById('tflApiKey').value);
       formData.append('station', stationValue);
       formData.append('interval', document.getElementById('interval').value);
       formData.append('mode', document.getElementById('mode').value);
@@ -1559,6 +1579,33 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       setupStationAutocomplete();
       setupValidation();
       setupForms();
+
+      // Service type selection handler
+      const serviceTypeSelect = document.getElementById("serviceType");
+      const tflApiKeyGroup = document.getElementById("tflApiKeyGroup");
+      const stationLabel = document.getElementById("stationLabel");
+      const stationTooltip = document.getElementById("stationTooltip");
+
+      const updateServiceTypeUI = () => {
+        const isUnderground = serviceTypeSelect.value === "1";
+        tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+
+        if (isUnderground) {
+          stationLabel.textContent = "TFL Station ID (NaPTAN)";
+          stationTooltip.title = "TFL Station NaPTAN ID (e.g., 940GZZLUPAC for Paddington)";
+        } else {
+          stationLabel.textContent = "Station Code (CRS)";
+          stationTooltip.title = "Three-letter National Rail station code";
+        }
+      };
+
+      serviceTypeSelect.addEventListener("change", () => {
+        updateServiceTypeUI();
+        autoApplySettings();
+      });
+
+      // Initialize UI on load
+      updateServiceTypeUI();
 
       // Update current station display
       const stationInput = document.getElementById("station");
