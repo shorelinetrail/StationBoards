@@ -11,7 +11,6 @@
 #include <WebSocketsServer.h>
 #include <WebSocketsClient.h>
 #include <HTTPUpdate.h>
-#include <ESPmDNS.h>
 #include "config.h"
 #include "web_pages.h"
 
@@ -28,6 +27,7 @@
 #include "types.h"             // Data structures to organize globals
 #include "helpers.h"           // Validation and utility functions
 #include "display_functions.h" // Display component functions
+#include "service_provider.h"  // Service provider abstraction
 
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
@@ -43,10 +43,10 @@ WebSocketsServer webSocket = WebSocketsServer(81);
 // ---------------- Configuration ----------------
 Config config;
 
-// ---------------- API Settings ----------------
-const char* apiHost = "lite.realtime.nationalrail.co.uk";
-const char* apiPath = "/OpenLDBWS/ldb9.asmx";
-const char* apiToken = "73ee3834-af35-4f22-9b8b-480b70571c39";
+// ---------------- Service Provider ----------------
+ServiceProvider* serviceProvider = nullptr;
+NationalRailProvider nationalRailProvider;
+TflUndergroundProvider tflUndergroundProvider;
 
 // ---------------- Data ----------------
 // Note: ServiceData is now defined in types.h
@@ -832,38 +832,17 @@ String generateDeviceId() {
 }
 
 bool checkFirstBoot() {
-  // Check if config.json exists
   if (!SPIFFS.exists("/config.json")) {
-    Serial.println("🆕 First boot detected - no config.json");
-    // Create the firstboot flag so web interface knows to show wizard
-    File flagFile = SPIFFS.open("/firstboot.flag", "w");
-    if (flagFile) {
-      flagFile.println("1");
-      flagFile.close();
-      Serial.println("✅ Created firstboot.flag for wizard");
-    }
+    Serial.println("🆕 First boot detected");
     return true;
   }
-
-  // Check if WiFi is configured (even if config.json exists)
-  if (strlen(config.wifiSSID) == 0) {
-    Serial.println("🆕 First boot detected - WiFi not configured");
-    // Create the firstboot flag so web interface knows to show wizard
-    File flagFile = SPIFFS.open("/firstboot.flag", "w");
-    if (flagFile) {
-      flagFile.println("1");
-      flagFile.close();
-      Serial.println("✅ Created firstboot.flag for wizard");
-    }
-    return true;
-  }
-
+  
   if (SPIFFS.exists("/firstboot.flag")) {
     Serial.println("🆕 First boot flag found");
-    // Don't remove the flag here - let the wizard complete endpoint remove it
+    SPIFFS.remove("/firstboot.flag");
     return true;
   }
-
+  
   return false;
 }
 
@@ -990,7 +969,7 @@ void setupOTA() {
   Serial.println("✅ OTA Ready");
 }
 
-// Data Fetching - using the WORKING logic from original
+// Data Fetching - using service provider abstraction
 bool asyncFetchStart() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected");
@@ -998,73 +977,61 @@ bool asyncFetchStart() {
     return false;
   }
 
-  Serial.println("📡 Fetching: " + String(config.stationCode));
-  
+  if (!serviceProvider) {
+    Serial.println("❌ Service provider not initialized");
+    displayStatus("ERROR");
+    return false;
+  }
+
+  Serial.println("📡 Fetching from " + String(serviceProvider->getProviderName()) + ": " + String(config.stationCode));
+
   // Update display before blocking operations
   unsigned long currentTime = millis();
   handleAlternatingService(currentTime);
   updateDisplay();
 
   // Connect with periodic display updates
-  Serial.println("🔌 Connecting to API...");
+  Serial.println("🔌 Connecting to " + String(serviceProvider->getApiHost()) + "...");
   unsigned long connectStart = millis();
-  
+
   // Non-blocking connect attempt with display updates
-  if (!fetchClient.connect(apiHost, 443)) {
+  if (!fetchClient.connect(serviceProvider->getApiHost(), serviceProvider->getApiPort())) {
     Serial.println("❌ API connection failed");
     displayStatus("FAIL");
     return false;
   }
-  
+
   Serial.println("✅ Connected (" + String(millis() - connectStart) + "ms)");
-  
+
   // Update display after connection
   currentTime = millis();
   handleAlternatingService(currentTime);
   updateDisplay();
 
-  broadcastStatus("Fetching train data...", "info");
+  broadcastStatus("Fetching data...", "info");
 
-  // Always fetch maximum services so we have data available when settings change
-  // Maximum useful services: 1 or 2 base + 4 extra = 5 or 6 total  
-  // Fetch 8 to have buffer for any configuration
-  int numRows = 8;
-  
-  // Build SOAP request more efficiently
-  String soapRequest;
-  soapRequest.reserve(512);  // Pre-allocate to avoid reallocations
-  soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
-  soapRequest += "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">";
-  soapRequest += "<soap:Header><AccessToken xmlns=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\">";
-  soapRequest += "<TokenValue>" + String(apiToken) + "</TokenValue></AccessToken></soap:Header>";
-  
-  if (config.useCallingAt) {
-    soapRequest += "<soap:Body><GetDepBoardWithDetailsRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
-    soapRequest += "<numRows>" + String(numRows) + "</numRows><crs>" + String(config.stationCode) + "</crs>";
-    soapRequest += "</GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
-  } else {
-    soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
-    soapRequest += "<numRows>" + String(numRows) + "</numRows><crs>" + String(config.stationCode) + "</crs>";
-    soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
+  // Build request using service provider
+  String request;
+  if (!serviceProvider->buildRequest(config.stationCode, request)) {
+    Serial.println("❌ Failed to build request");
+    fetchClient.stop();
+    displayStatus("ERROR");
+    return false;
   }
-  
-  // Use Connection: close - API server doesn't support keep-alive properly
-  fetchClient.print("POST " + String(apiPath) + " HTTP/1.1\r\n"
-                    "Host: " + String(apiHost) + "\r\n"
-                    "Content-Type: text/xml\r\n"
-                    "Content-Length: " + String(soapRequest.length()) + "\r\n"
-                    "Connection: close\r\n\r\n" + soapRequest);
+
+  // Send request
+  fetchClient.print(request);
 
   fetchStateData.startTime = millis();
   fetchStateData.buffer = "";
   fetchStateData.state = FETCH_WAITING;
   displayStatus("Fetch");
-  
+
   // One more display update after sending request
   currentTime = millis();
   handleAlternatingService(currentTime);
   updateDisplay();
-  
+
   return true;
 }
 
@@ -1163,213 +1130,35 @@ void handleFetchStateMachine() {
 
 // Parse function - using the WORKING logic from original
 bool parseAndDisplayResponse(String response) {
-  // Use temporary counter during parsing to avoid showing partial data
+  if (!serviceProvider) {
+    Serial.println("❌ Service provider not initialized");
+    return false;
+  }
+
+  // Parse using service provider
   int newServiceCount = 0;
+  bool success = serviceProvider->parseResponse(
+    response,
+    displayState.services,
+    newServiceCount,
+    displayState.stationName,
+    sizeof(displayState.stationName),
+    config.useCallingAt
+  );
 
-  Serial.println("📊 Processing (" + String(response.length()) + " bytes)");
-  
-  // Check if response seems too short
-  if (response.length() < 500) {
-    Serial.println("⚠️ Response seems unusually short!");
-    Serial.println("🔍 Full response:");
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    Serial.println(response);
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  }
-  
-  // DEBUG: Uncomment the next 3 lines to see the full response
-  // Serial.println("🔍 Full response:");
-  // Serial.println(response);
-  // Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-  if (response.indexOf("soap:Fault") != -1) {
-    Serial.println("❌ SOAP Fault detected");
-    String faultMsg = extractTagValue(response, "faultstring", "");
-    if (faultMsg.length() > 0) {
-      Serial.println("   Message: " + faultMsg);
-    }
+  if (!success) {
+    Serial.println("❌ Failed to parse response from " + String(serviceProvider->getProviderName()));
     return false;
   }
 
-  String station = extractTagValue(response, "locationName", "lt4");
-  if (station == "") station = extractTagValue(response, "locationName", "lt5");
-  
-  if (station.length() > 0) {
-    station.toCharArray(displayState.stationName, sizeof(displayState.stationName));
-    Serial.println("📍 " + station);
-  }
-
-  int servicesStart = response.indexOf("<lt5:trainServices>");
-  if (servicesStart == -1) servicesStart = response.indexOf("<lt4:trainServices>");
-  
-  if (servicesStart == -1) {
-    Serial.println("❌ No services tag found");
-    Serial.println("🔍 Debug: Showing first 1000 chars of response:");
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    Serial.println(response.substring(0, min(1000, (int)response.length())));
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
-    // Check for specific error messages
-    if (response.indexOf("<faultstring>") != -1) {
-      String faultMsg = extractTagValue(response, "faultstring", "");
-      Serial.println("❌ SOAP Fault: " + faultMsg);
-    }
-    if (response.indexOf("nrcc:") != -1) {
-      Serial.println("⚠️ Response contains nrcc namespace - message field present");
-    }
-    
-    return false;
-  }
-
-  int servicesEnd = response.indexOf("</lt5:trainServices>", servicesStart);
-  if (servicesEnd == -1) servicesEnd = response.indexOf("</lt4:trainServices>", servicesStart);
-  if (servicesEnd == -1) servicesEnd = response.length();
-
-  String trainServices = response.substring(servicesStart, servicesEnd);
-  
-  String serviceTag = "<lt5:service>";
-  String serviceEndTag = "</lt5:service>";
-  
-  int pos = 0;
-  // Always parse maximum services (up to 8) so data is available when settings change
-  int maxServices = 8;
-
-  while (newServiceCount < maxServices) {
-    int serviceStart = trainServices.indexOf(serviceTag, pos);
-    if (serviceStart == -1) break;
-    
-    int serviceEnd = trainServices.indexOf(serviceEndTag, serviceStart);
-    if (serviceEnd == -1) {
-      int nextServiceStart = trainServices.indexOf(serviceTag, serviceStart + 1);
-      if (nextServiceStart != -1) {
-        serviceEnd = nextServiceStart;
-      } else {
-        serviceEnd = trainServices.length();
-      }
-    } else {
-      serviceEnd += serviceEndTag.length();
-    }
-
-    String block = trainServices.substring(serviceStart, serviceEnd);
-
-    String std = extractTagValue(block, "std", "lt4");
-    if (std == "") std = extractTagValue(block, "std", "lt5");
-
-    String etd = extractTagValue(block, "etd", "lt4");
-    if (etd == "") etd = extractTagValue(block, "etd", "lt5");
-
-    String destBlock = extractTagValue(block, "destination", "lt5");
-    if (destBlock == "") destBlock = extractTagValue(block, "destination", "lt4");
-
-    String destination = extractTagValue(destBlock, "locationName", "lt4");
-    if (destination == "") destination = extractTagValue(destBlock, "locationName", "lt5");
-    destination = decodeHTMLEntities(destination);
-
-    if (std != "" && destination != "") {
-      std.toCharArray(displayState.services[newServiceCount].std, sizeof(displayState.services[newServiceCount].std));
-      etd.toCharArray(displayState.services[newServiceCount].etd, sizeof(displayState.services[newServiceCount].etd));
-      destination.toCharArray(displayState.services[newServiceCount].destination, sizeof(displayState.services[newServiceCount].destination));
-      displayState.services[newServiceCount].callingPoints[0] = '\0';
-      
-      Serial.println("🚂 " + String(newServiceCount + 1) + ": " + std + " → " + destination);
-      
-      if (config.useCallingAt && newServiceCount == 0) {
-        int cpListIdx = block.indexOf("<lt5:subsequentCallingPoints>");
-        if (cpListIdx == -1) cpListIdx = block.indexOf("<lt4:subsequentCallingPoints>");
-        
-        if (cpListIdx != -1) {
-          int cpListEndIdx = block.indexOf("</lt5:subsequentCallingPoints>", cpListIdx);
-          if (cpListEndIdx == -1) cpListEndIdx = block.indexOf("</lt4:subsequentCallingPoints>", cpListIdx);
-          
-          if (cpListEndIdx != -1) {
-            String cpSection = block.substring(cpListIdx, cpListEndIdx);
-            
-            int cpListStart = cpSection.indexOf("<lt4:callingPointList>");
-            if (cpListStart == -1) cpListStart = cpSection.indexOf("<lt5:callingPointList>");
-            
-            if (cpListStart != -1) {
-              int cpListEnd = cpSection.indexOf("</lt4:callingPointList>", cpListStart);
-              if (cpListEnd == -1) cpListEnd = cpSection.indexOf("</lt5:callingPointList>", cpListStart);
-              
-              if (cpListEnd != -1) {
-                String cpList = cpSection.substring(cpListStart, cpListEnd);
-                
-                String cpTag = "<lt4:callingPoint>";
-                String cpEndTag = "</lt4:callingPoint>";
-                
-                if (cpList.indexOf(cpTag) == -1) {
-                  cpTag = "<lt5:callingPoint>";
-                  cpEndTag = "</lt5:callingPoint>";
-                }
-                
-                String callingPoints = "";
-                int cpPos = 0;
-                
-                while ((cpPos = cpList.indexOf(cpTag, cpPos)) != -1) {
-                  int cpEnd = cpList.indexOf(cpEndTag, cpPos);
-                  if (cpEnd == -1) break;
-                  
-                  String cpBlock = cpList.substring(cpPos, cpEnd);
-                  
-                  String cpName = extractTagValue(cpBlock, "locationName", "lt4");
-                  if (cpName == "") cpName = extractTagValue(cpBlock, "locationName", "lt5");
-                  cpName = decodeHTMLEntities(cpName);
-                  
-                  String cpTime = extractTagValue(cpBlock, "st", "lt4");
-                  if (cpTime == "") cpTime = extractTagValue(cpBlock, "st", "lt5");
-                  
-                  if (cpName != "") {
-                    if (callingPoints != "") callingPoints += ", ";
-                    callingPoints += cpName;
-                    if (cpTime != "") callingPoints += " (" + cpTime + ")";
-                  }
-                  
-                  cpPos = cpEnd;
-                  
-                  // Allow other tasks to run during long calling points lists
-                  yield();
-                }
-                
-                if (callingPoints != "" && callingPoints.length() < 500) {
-                  callingPoints.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
-                  Serial.println("  ✅ Stored calling points");
-                } else if (callingPoints == "") {
-                  String fallback = "No further stops available";
-                  fallback.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
-                }
-              }
-            }
-          }
-        } else {
-          String fallback = "No further stops available";
-          fallback.toCharArray(displayState.services[newServiceCount].callingPoints, 500);
-        }
-      }
-      
-      newServiceCount++;
-      
-      // Keep display alive during parsing - update clock and animations with OLD data
-      // This prevents the display from freezing during long parsing operations
-      unsigned long currentTime = millis();
-      handleAlternatingService(currentTime);
-      updateDisplay();
-      yield();
-    }
-    
-    pos = serviceEnd;
-  }
-
-  Serial.println("✅ " + String(newServiceCount) + " services");
-
-  // Only update displayState.serviceCount after parsing is complete
-  // This ensures old data stays visible during parsing
+  // Update display state
   displayState.serviceCount = newServiceCount;
-  displayState.markDirty();  // Mark display dirty when data updates
+  displayState.markDirty();
 
   if (displayState.serviceCount > 0) {
-    displayState.fetchingNewStation = false;  // Clear loading flag - we have data now
-    broadcastTrainUpdate();  // Sends full train data to clients
-    broadcastStatus("Train data updated", "success");
+    displayState.fetchingNewStation = false;
+    broadcastTrainUpdate();
+    broadcastStatus("Data updated", "success");
   }
 
   return displayState.serviceCount > 0;
@@ -1555,25 +1344,12 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
-    Serial.println("📄 Root endpoint accessed");
-    Serial.print("   Checking for firstboot.flag... ");
-
-    // Check if first boot flag exists - if so, serve setup wizard
-    bool flagExists = SPIFFS.exists("/firstboot.flag");
-    Serial.println(flagExists ? "FOUND" : "NOT FOUND");
-
-    if (flagExists) {
-      Serial.println("🧙 First boot detected - serving setup wizard");
-      String html = FPSTR(SETUP_WIZARD_PAGE);
-      server.send(200, "text/html", html);
-      return;
-    }
-
-    Serial.println("📋 Serving normal config page");
-    // Normal config page
     String html = FPSTR(CONFIG_PAGE_TEMPLATE);
-
+    
     html.replace("{SSID}", String(config.wifiSSID));
+    html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
+    html.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
+    html.replace("{TFL_API_KEY}", String(config.tflApiKey));
     html.replace("{STATION}", String(config.stationCode));
     html.replace("{STATION_NAME}", String(displayState.stationName));
     html.replace("{INTERVAL}", String(config.refreshInterval));
@@ -1594,12 +1370,39 @@ void setupWebServer() {
     html.replace("{Y3}", String(config.yPosAlt));
     html.replace("{IP}", WiFi.localIP().toString());
     html.replace("{DEVICE_ID}", config.deviceId);
-
+    
     server.send(200, "text/html", html);
   });
 
   server.on("/save", HTTP_POST, []() {
     Serial.println("📝 /save endpoint called");
+
+    // Handle service type
+    if (server.hasArg("serviceType")) {
+      int serviceType = server.arg("serviceType").toInt();
+      config.serviceType = serviceType;
+      Serial.printf("  Service Type: %d\n", serviceType);
+
+      // Reinitialize service provider if type changed
+      if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        serviceProvider = &tflUndergroundProvider;
+        Serial.println("  🚇 Switched to TFL Underground provider");
+      } else {
+        serviceProvider = &nationalRailProvider;
+        Serial.println("  🚂 Switched to National Rail provider");
+      }
+    }
+
+    // Handle TFL API key
+    if (server.hasArg("tflApiKey")) {
+      String apiKey = server.arg("tflApiKey");
+      safeStrCopy(config.tflApiKey, apiKey, sizeof(config.tflApiKey));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setApiKey(apiKey);
+        Serial.println("  🔑 TFL API key updated");
+      }
+    }
 
     // Validate SSID
     if (server.hasArg("ssid")) {
@@ -1708,6 +1511,33 @@ void setupWebServer() {
     String oldStation = String(config.stationCode);
     bool oldCallingAt = config.useCallingAt;
     int oldExtraServices = config.extraServices;
+
+    // Handle service type
+    if (server.hasArg("serviceType")) {
+      int serviceType = server.arg("serviceType").toInt();
+      config.serviceType = serviceType;
+      Serial.printf("  Service Type: %d\n", serviceType);
+
+      // Reinitialize service provider if type changed
+      if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        serviceProvider = &tflUndergroundProvider;
+        Serial.println("  🚇 Switched to TFL Underground provider");
+      } else {
+        serviceProvider = &nationalRailProvider;
+        Serial.println("  🚂 Switched to National Rail provider");
+      }
+    }
+
+    // Handle TFL API key
+    if (server.hasArg("tflApiKey")) {
+      String apiKey = server.arg("tflApiKey");
+      safeStrCopy(config.tflApiKey, apiKey, sizeof(config.tflApiKey));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setApiKey(apiKey);
+        Serial.println("  🔑 TFL API key updated");
+      }
+    }
 
     // Validate SSID
     if (server.hasArg("ssid")) {
@@ -1867,314 +1697,20 @@ void setupWebServer() {
     if (SPIFFS.exists("/config.json")) {
       SPIFFS.remove("/config.json");
     }
-
+    
     File flagFile = SPIFFS.open("/firstboot.flag", "w");
     if (flagFile) {
       flagFile.println("1");
       flagFile.close();
     }
-
+    
     broadcastStatus("Factory reset initiated", "warning");
-
+    
     String html = FPSTR(RESET_SUCCESS_PAGE);
     server.send(200, "text/html", html);
-
+    
     delay(2000);
     ESP.restart();
-  });
-
-  server.on("/wizard-complete", HTTP_POST, []() {
-    Serial.println("🧙 Setup wizard completion endpoint called");
-
-    // Validate and save all settings
-    bool allValid = true;
-
-    // Validate SSID
-    if (server.hasArg("ssid")) {
-      String ssid = server.arg("ssid");
-      Serial.printf("  Validating SSID: '%s'\n", ssid.c_str());
-      ValidationResult result = validateSSID(ssid);
-      if (!result.valid) {
-        Serial.printf("  ❌ SSID validation failed: %s\n", result.message.c_str());
-        server.send(400, "text/plain", "Invalid SSID: " + result.message);
-        return;
-      }
-      Serial.println("  ✅ SSID valid");
-      safeStrCopy(config.wifiSSID, ssid, sizeof(config.wifiSSID));
-    }
-
-    // Validate and save password if provided
-    if (server.hasArg("password") && server.arg("password").length() > 0) {
-      String password = server.arg("password");
-      ValidationResult result = validatePassword(password);
-      if (!result.valid) {
-        Serial.printf("  ❌ Password validation failed: %s\n", result.message.c_str());
-        server.send(400, "text/plain", "Invalid password: " + result.message);
-        return;
-      }
-      Serial.println("  ✅ Password valid");
-      safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
-    } else {
-      // No password - clear it
-      config.wifiPassword[0] = '\0';
-    }
-
-    // Validate station code
-    if (server.hasArg("station")) {
-      String station = sanitizeStationCode(server.arg("station"));
-      ValidationResult result = validateStationCode(station);
-      if (!result.valid) {
-        Serial.printf("  ❌ Station code validation failed: %s\n", result.message.c_str());
-        server.send(400, "text/plain", "Invalid station code: " + result.message);
-        return;
-      }
-      Serial.println("  ✅ Station code valid");
-      safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
-    }
-
-    // Save display mode
-    if (server.hasArg("mode")) {
-      config.useCallingAt = (server.arg("mode") == "1");
-    }
-
-    // Save show station name setting
-    if (server.hasArg("showstation")) {
-      config.showStationName = (server.arg("showstation") == "1");
-    }
-
-    // Save extra services
-    if (server.hasArg("extra")) {
-      int extra = server.arg("extra").toInt();
-      if (extra >= 0 && extra <= 4) {
-        config.extraServices = extra;
-      }
-    }
-
-    // Validate and save refresh interval
-    if (server.hasArg("interval")) {
-      int interval = server.arg("interval").toInt();
-      ValidationResult result = validateRange(interval, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL, "Refresh interval");
-      if (!result.valid) {
-        server.send(400, "text/plain", result.message);
-        return;
-      }
-      config.refreshInterval = interval;
-    }
-
-    // Save scroll speed
-    if (server.hasArg("scrollspeed")) {
-      int speed = server.arg("scrollspeed").toInt();
-      ValidationResult result = validateRange(speed, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED, "Scroll speed");
-      if (!result.valid) {
-        server.send(400, "text/plain", result.message);
-        return;
-      }
-      config.scrollSpeed = speed;
-    }
-
-    // Save rotation speed
-    if (server.hasArg("rotationspeed")) {
-      int speed = server.arg("rotationspeed").toInt();
-      ValidationResult result = validateRange(speed, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED, "Rotation speed");
-      if (!result.valid) {
-        server.send(400, "text/plain", result.message);
-        return;
-      }
-      config.rotationSpeed = speed;
-    }
-
-    // Save configuration
-    if (!config.save()) {
-      Serial.println("❌ Failed to save configuration");
-      server.send(500, "text/plain", "Failed to save configuration");
-      return;
-    }
-
-    Serial.println("✅ Wizard configuration saved successfully");
-
-    // Remove first boot flag
-    if (SPIFFS.exists("/firstboot.flag")) {
-      SPIFFS.remove("/firstboot.flag");
-      Serial.println("✅ First boot flag removed");
-    }
-
-    // Send success response
-    server.send(200, "text/plain", "Setup complete");
-
-    // Restart device after a short delay
-    Serial.println("🔄 Restarting device with new configuration...");
-    delay(2000);
-    ESP.restart();
-  });
-
-  server.on("/test-wifi", HTTP_POST, []() {
-    Serial.println("🔌 WiFi connection test endpoint called");
-
-    if (!server.hasArg("ssid")) {
-      server.send(400, "application/json", "{\"success\":false,\"message\":\"SSID required\"}");
-      return;
-    }
-
-    String ssid = server.arg("ssid");
-    String password = server.hasArg("password") ? server.arg("password") : "";
-
-    Serial.printf("  Testing connection to: %s\n", ssid.c_str());
-
-    // Disconnect from current WiFi
-    WiFi.disconnect();
-    delay(100);
-
-    // Try to connect to the specified network
-    WiFi.begin(ssid.c_str(), password.c_str());
-
-    // Wait up to 10 seconds for connection
-    unsigned long startTime = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
-      delay(500);
-      Serial.print(".");
-    }
-
-    String json = "{";
-    if (WiFi.status() == WL_CONNECTED) {
-      int rssi = WiFi.RSSI();
-      String quality = rssi > -50 ? "Excellent" : rssi > -60 ? "Good" : rssi > -70 ? "Fair" : "Weak";
-
-      Serial.println("\n  ✅ Test connection successful!");
-      Serial.printf("  RSSI: %d dBm (%s)\n", rssi, quality.c_str());
-
-      json += "\"success\":true,";
-      json += "\"rssi\":" + String(rssi) + ",";
-      json += "\"quality\":\"" + quality + "\"";
-
-      // Disconnect from test network
-      WiFi.disconnect();
-      delay(100);
-
-      // Reconnect to original network if configured
-      if (strlen(config.wifiSSID) > 0) {
-        Serial.println("  Reconnecting to original network...");
-        WiFi.begin(config.wifiSSID, config.wifiPassword);
-      }
-    } else {
-      Serial.println("\n  ❌ Test connection failed");
-
-      json += "\"success\":false,";
-      json += "\"message\":\"Could not connect to network. Check SSID and password.\"";
-
-      // Try to reconnect to original network
-      if (strlen(config.wifiSSID) > 0) {
-        Serial.println("  Reconnecting to original network...");
-        WiFi.begin(config.wifiSSID, config.wifiPassword);
-      }
-    }
-    json += "}";
-
-    server.send(200, "application/json", json);
-  });
-
-  server.on("/validate-station", HTTP_GET, []() {
-    Serial.println("🚉 Station validation endpoint called");
-
-    if (!server.hasArg("code")) {
-      server.send(400, "application/json", "{\"valid\":false,\"message\":\"Station code required\"}");
-      return;
-    }
-
-    String stationCode = server.arg("code");
-    stationCode.toUpperCase();
-    Serial.printf("  Validating station: %s\n", stationCode.c_str());
-
-    // Basic validation
-    if (stationCode.length() != 3) {
-      server.send(200, "application/json", "{\"valid\":false,\"message\":\"Station code must be 3 letters\"}");
-      return;
-    }
-
-    // Try to fetch service data from National Rail to validate
-    WiFiClientSecure client;
-    client.setInsecure();
-    client.setTimeout(5000);  // 5 second timeout
-
-    Serial.println("  Attempting to connect to National Rail API...");
-    if (!client.connect("lite.realtime.nationalrail.co.uk", 443)) {
-      Serial.println("  ⚠️  Could not connect to National Rail API");
-      server.send(200, "application/json", "{\"valid\":true,\"warning\":true,\"message\":\"Could not verify with API, but format is valid\"}");
-      return;
-    }
-
-    Serial.println("  ✅ Connected to National Rail API");
-
-    // Build minimal SOAP request to check if station exists
-    String soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
-    soapRequest += "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:typ=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\" xmlns:ldb=\"http://thalesgroup.com/RTTI/2017-10-01/ldb/\">";
-    soapRequest += "<soap:Header><typ:AccessToken><typ:TokenValue>";
-    soapRequest += String(apiToken);
-    soapRequest += "</typ:TokenValue></typ:AccessToken></soap:Header>";
-    soapRequest += "<soap:Body><ldb:GetDepBoardWithDetailsRequest>";
-    soapRequest += "<ldb:numRows>1</ldb:numRows>";
-    soapRequest += "<ldb:crs>" + stationCode + "</ldb:crs>";
-    soapRequest += "</ldb:GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
-
-    client.println("POST /OpenLDBWS/ldb11.asmx HTTP/1.1");
-    client.println("Host: lite.realtime.nationalrail.co.uk");
-    client.println("Content-Type: text/xml; charset=utf-8");
-    client.println("SOAPAction: \"http://thalesgroup.com/RTTI/2017-10-01/ldb/GetDepBoardWithDetails\"");
-    client.print("Content-Length: ");
-    client.println(soapRequest.length());
-    client.println();
-    client.print(soapRequest);
-
-    // Wait for response
-    unsigned long timeout = millis();
-    while (!client.available() && millis() - timeout < 5000) {
-      delay(10);
-    }
-
-    String response = "";
-    bool foundStationName = false;
-    String stationName = "";
-    int serviceCount = 0;
-
-    while (client.available()) {
-      String line = client.readStringUntil('\n');
-      response += line;
-
-      // Check for error
-      if (line.indexOf("faultcode") >= 0 || line.indexOf("Invalid CRS") >= 0) {
-        Serial.println("  ❌ Invalid station code");
-        client.stop();
-        server.send(200, "application/json", "{\"valid\":false,\"message\":\"Station code not found in National Rail database\"}");
-        return;
-      }
-
-      // Extract station name
-      if (line.indexOf("<lt4:locationName>") >= 0) {
-        int start = line.indexOf("<lt4:locationName>") + 18;
-        int end = line.indexOf("</lt4:locationName>");
-        if (end > start) {
-          stationName = line.substring(start, end);
-          foundStationName = true;
-        }
-      }
-
-      // Count services
-      if (line.indexOf("<lt7:service>") >= 0) {
-        serviceCount++;
-      }
-    }
-
-    client.stop();
-
-    if (foundStationName) {
-      Serial.printf("  ✅ Valid station: %s\n", stationName.c_str());
-      Serial.printf("  Services available: %d\n", serviceCount);
-
-      String json = "{\"valid\":true,\"name\":\"" + stationName + "\",\"serviceCount\":" + String(serviceCount) + "}";
-      server.send(200, "application/json", json);
-    } else {
-      Serial.println("  ⚠️  Could not parse station data from API");
-      server.send(200, "application/json", "{\"valid\":true,\"warning\":true,\"message\":\"Could not verify with API, but format is valid\"}");
-    }
   });
 
   server.on("/scan", HTTP_GET, []() {
@@ -2214,31 +1750,6 @@ void setupWebServer() {
     server.send(200, "application/json", json);
   });
 
-  server.on("/debug/files", HTTP_GET, []() {
-    Serial.println("🔍 Debug: Listing SPIFFS files");
-    String html = "<html><body><h1>SPIFFS Debug</h1>";
-    html += "<h2>Files:</h2><ul>";
-
-    File root = SPIFFS.open("/");
-    File file = root.openNextFile();
-    while (file) {
-      html += "<li>" + String(file.name()) + " (" + String(file.size()) + " bytes)</li>";
-      Serial.println("  📄 " + String(file.name()) + " (" + String(file.size()) + " bytes)");
-      file = root.openNextFile();
-    }
-    html += "</ul>";
-
-    html += "<h2>Flag States:</h2><ul>";
-    html += "<li>firstboot.flag exists: " + String(SPIFFS.exists("/firstboot.flag") ? "YES" : "NO") + "</li>";
-    html += "<li>config.json exists: " + String(SPIFFS.exists("/config.json") ? "YES" : "NO") + "</li>";
-    html += "<li>systemFlags.firstBoot: " + String(systemFlags.firstBoot ? "true" : "false") + "</li>";
-    html += "</ul>";
-
-    html += "<p><a href='/'>Go to home</a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
-
   server.begin();
   Serial.println("✅ HTTP server started on port 80");
   
@@ -2264,14 +1775,24 @@ void setup() {
     systemFlags.systemError = true;
     return;
   }
-
-  // Load or create configuration (must load BEFORE checking first boot)
+  
+  // Check for first boot
+  systemFlags.firstBoot = checkFirstBoot();
+  
+  // Load or create configuration
   displayProgress("Loading configuration...", 2, 5, 20);
   config.load();
 
-  // Check for first boot (after config is loaded so we can check WiFi settings)
-  systemFlags.firstBoot = checkFirstBoot();
-  
+  // Initialize service provider based on config
+  if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+    tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+    serviceProvider = &tflUndergroundProvider;
+    Serial.println("🚇 Using TFL Underground provider");
+  } else {
+    serviceProvider = &nationalRailProvider;
+    Serial.println("🚂 Using National Rail provider");
+  }
+
   // Ensure device ID is set
   if (config.deviceId.length() == 0 || config.deviceId == "") {
     config.deviceId = generateDeviceId();
@@ -2303,20 +1824,12 @@ void setup() {
   // Setup web server and WebSocket
   displayProgress("Starting services...", 5, 5, 80);
   setupWebServer();
-
-  // Setup mDNS
-  if (MDNS.begin("stationboard")) {
-    Serial.println("✅ mDNS responder started: stationboard.local");
-    MDNS.addService("http", "tcp", 80);
-  } else {
-    Serial.println("⚠️  Error setting up mDNS responder");
-  }
-
+  
   // Setup fetch client once for better performance
   fetchClient.setInsecure();
   fetchClient.setTimeout(8000);  // Reduced from 15s to 8s for faster failure detection
   fetchStateData.buffer.reserve(16384);  // Pre-allocate buffer
-
+  
   // Setup OTA
   setupOTA();
 
@@ -2329,7 +1842,6 @@ void setup() {
 
   Serial.println("\n✅ Setup complete!");
   Serial.println("📍 IP: " + WiFi.localIP().toString());
-  Serial.println("🌐 Access via: http://stationboard.local");
   Serial.println("🌐 WebSocket ready on port 81");
   Serial.println("📊 Free heap: " + String(ESP.getFreeHeap()) + " bytes");
   

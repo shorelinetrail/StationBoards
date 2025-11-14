@@ -7,12 +7,22 @@
 
 class Config {
 public:
+  // Service Type
+  enum ServiceType {
+    SERVICE_NATIONAL_RAIL = 0,
+    SERVICE_TFL_UNDERGROUND = 1
+  };
+
   // WiFi Settings
   char wifiSSID[64] = "";
   char wifiPassword[64] = "";
-  
+
+  // Service Settings
+  int serviceType = SERVICE_NATIONAL_RAIL;
+  char tflApiKey[128] = "";  // TFL API key (optional but recommended)
+
   // Station Settings
-  char stationCode[4] = "PAD";
+  char stationCode[16] = "PAD";  // Increased size for TFL NaPTAN IDs
   
   // Display Settings
   bool useCallingAt = false;
@@ -75,6 +85,17 @@ public:
       wifiPassword[0] = '\0';
     }
 
+    // Load Service Settings
+    serviceType = doc["serviceType"] | SERVICE_NATIONAL_RAIL;
+    if (doc.containsKey("tflApiKey")) {
+      String key = doc["tflApiKey"].as<String>();
+      key.trim();
+      strncpy(tflApiKey, key.c_str(), sizeof(tflApiKey) - 1);
+      tflApiKey[sizeof(tflApiKey) - 1] = '\0';
+    } else {
+      tflApiKey[0] = '\0';
+    }
+
     // Load Station
     if (doc.containsKey("stationCode")) {
       String station = doc["stationCode"].as<String>();
@@ -119,11 +140,15 @@ public:
   
   bool save() {
     StaticJsonDocument<1024> doc;
-    
+
     // Save WiFi
     doc["wifiSSID"] = wifiSSID;
     doc["wifiPassword"] = wifiPassword;
-    
+
+    // Save Service Settings
+    doc["serviceType"] = serviceType;
+    doc["tflApiKey"] = tflApiKey;
+
     // Save Station
     doc["stationCode"] = stationCode;
     
