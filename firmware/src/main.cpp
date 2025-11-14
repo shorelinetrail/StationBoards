@@ -1908,6 +1908,11 @@ void setupWebServer() {
       config.useCallingAt = (server.arg("mode") == "1");
     }
 
+    // Save show station name setting
+    if (server.hasArg("showstation")) {
+      config.showStationName = (server.arg("showstation") == "1");
+    }
+
     // Save extra services
     if (server.hasArg("extra")) {
       int extra = server.arg("extra").toInt();

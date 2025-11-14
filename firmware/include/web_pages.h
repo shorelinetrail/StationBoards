@@ -2350,7 +2350,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
             <p>
               <strong>What you'll need:</strong><br>
               • Your WiFi network name and password<br>
-              • The station code you want to display (e.g., PAD for Paddington)<br>
+              • The station you want to display departures for<br>
               • About 2 minutes of your time
             </p>
           </div>
@@ -2422,12 +2422,12 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
           </div>
 
           <div class="form-group">
-            <label for="station">Station Code or Name</label>
+            <label for="station">Station</label>
             <div class="autocomplete-wrapper">
               <input type="text" id="station" placeholder="Type to search..." required>
               <div id="stationAutocomplete" class="autocomplete-results"></div>
             </div>
-            <span class="help-text">Enter a 3-letter station code (e.g., PAD) or search by name</span>
+            <span class="help-text">Start typing to search for your station</span>
           </div>
 
           <div class="info-box" id="stationValidResult" style="display: none; margin-top: 20px;">
@@ -2461,20 +2461,24 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
           </div>
 
           <div class="form-group">
+            <label for="showstation">Show Station Name</label>
+            <select id="showstation">
+              <option value="1">Show station name at top</option>
+              <option value="0">Hide station name (adds extra service line)</option>
+            </select>
+            <span class="help-text">Hiding the station name adds an extra service at the top for more trains</span>
+          </div>
+
+          <div class="form-group">
             <label for="extra">Extra Services</label>
             <select id="extra">
               <option value="0">No extra services</option>
               <option value="1">1 extra service (rotating)</option>
               <option value="2">2 extra services (rotating)</option>
               <option value="3">3 extra services (rotating)</option>
+              <option value="4">4 extra services (rotating)</option>
             </select>
             <span class="help-text">Additional trains shown on the bottom line</span>
-          </div>
-
-          <div class="form-group">
-            <label for="interval">Refresh Interval (seconds)</label>
-            <input type="number" id="interval" value="60" min="30" max="600">
-            <span class="help-text">How often to fetch new train data (recommended: 60-120)</span>
           </div>
 
           <div style="margin-top: 30px;">
@@ -2791,8 +2795,8 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       const ssid = document.getElementById('ssid').value;
       const station = document.getElementById('station').value;
       const mode = document.getElementById('mode').options[document.getElementById('mode').selectedIndex].text;
+      const showstation = document.getElementById('showstation').options[document.getElementById('showstation').selectedIndex].text;
       const extra = document.getElementById('extra').value;
-      const interval = document.getElementById('interval').value;
 
       const summary = `
         <div class="summary-item">
@@ -2800,7 +2804,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
           <span class="summary-value">${escapeHtml(ssid)}</span>
         </div>
         <div class="summary-item">
-          <span class="summary-label">Station Code:</span>
+          <span class="summary-label">Station:</span>
           <span class="summary-value">${escapeHtml(station)}</span>
         </div>
         <div class="summary-item">
@@ -2808,12 +2812,12 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
           <span class="summary-value">${escapeHtml(mode)}</span>
         </div>
         <div class="summary-item">
-          <span class="summary-label">Extra Services:</span>
-          <span class="summary-value">${escapeHtml(extra)}</span>
+          <span class="summary-label">Station Name:</span>
+          <span class="summary-value">${escapeHtml(showstation)}</span>
         </div>
         <div class="summary-item">
-          <span class="summary-label">Refresh Interval:</span>
-          <span class="summary-value">${escapeHtml(interval)} seconds</span>
+          <span class="summary-label">Extra Services:</span>
+          <span class="summary-value">${escapeHtml(extra)}</span>
         </div>
       `;
 
@@ -2935,6 +2939,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
     function updatePreview() {
       const station = document.getElementById('station').value.trim().toUpperCase();
       const mode = document.getElementById('mode').value;
+      const showstation = document.getElementById('showstation').value;
       const extra = document.getElementById('extra').value;
 
       if (!station || station.length !== 3) {
@@ -2948,10 +2953,12 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       // Create mock preview
       let html = '<div style="font-size: 13px; line-height: 1.6;">';
 
-      // Station name
-      html += '<div style="text-align: center; font-weight: bold; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; font-size: 15px;">';
-      html += escapeHtml(station);
-      html += '</div>';
+      // Station name (only if showstation is '1')
+      if (showstation === '1') {
+        html += '<div style="text-align: center; font-weight: bold; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; font-size: 15px;">';
+        html += escapeHtml(station);
+        html += '</div>';
+      }
 
       // Mock services
       const mockServices = [
@@ -3018,8 +3025,9 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       formData.append('password', document.getElementById('password').value);
       formData.append('station', document.getElementById('station').value);
       formData.append('mode', document.getElementById('mode').value);
+      formData.append('showstation', document.getElementById('showstation').value);
       formData.append('extra', document.getElementById('extra').value);
-      formData.append('interval', document.getElementById('interval').value);
+      formData.append('interval', '60');  // Default
       formData.append('scrollspeed', '50');  // Default
       formData.append('rotationspeed', '15');  // Default
 
