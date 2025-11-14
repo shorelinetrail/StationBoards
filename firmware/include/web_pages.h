@@ -2246,6 +2246,13 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       border-color: #667eea;
     }
 
+    .preset-btn.selected {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+
     .completion-icon {
       font-size: 80px;
       text-align: center;
@@ -2409,7 +2416,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
         <div class="step" id="step-2">
           <h2>Choose Your Station 🚉</h2>
           <p class="step-description">
-            Select the station you want to display departures for.
+            Select one of the popular stations below, or skip to configure it later.
           </p>
 
           <div class="preset-stations">
@@ -2421,19 +2428,17 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
             <button type="button" class="preset-btn" onclick="selectStation('LST', 'Liverpool St')">LST<br><small>Liverpool St</small></button>
           </div>
 
-          <div class="form-group">
-            <label for="station">Station</label>
-            <div class="autocomplete-wrapper">
-              <input type="text" id="station" placeholder="Type to search..." required>
-              <div id="stationAutocomplete" class="autocomplete-results"></div>
-            </div>
-            <span class="help-text">Start typing to search for your station</span>
+          <input type="hidden" id="station" value="">
+
+          <div id="selectedStationDisplay" style="display: none; margin-top: 20px; padding: 15px; background: #e7f3ff; border-left: 4px solid #667eea; border-radius: 6px;">
+            <p style="margin: 0; color: #004085; font-weight: 600;">
+              ✓ Selected: <span id="selectedStationName"></span>
+            </p>
           </div>
 
           <div class="info-box" style="margin-top: 20px;">
             <p style="margin: 0;">
-              <strong>ℹ️ Note:</strong> Station validation is not available during initial setup.
-              Your station will be validated once connected to WiFi.
+              <strong>ℹ️ Note:</strong> You can change your station or select any other UK station from the web interface after setup is complete.
             </p>
           </div>
 
@@ -2598,13 +2603,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
         hideError('wifiError');
       }
 
-      if (currentStep === 2) {
-        const station = document.getElementById('station').value.trim();
-        if (!station || station.length < 3) {
-          alert('Please select or enter a valid station code');
-          return;
-        }
-      }
+      // Station is optional - no validation needed for step 2
 
       if (currentStep >= totalSteps) return;
 
@@ -2785,7 +2784,24 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
     // Select a station
     function selectStation(code, name) {
       document.getElementById('station').value = code;
-      document.getElementById('stationAutocomplete').classList.remove('show');
+
+      // Remove selected class from all buttons
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+
+      // Add selected class to clicked button (find by text content)
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        if (btn.textContent.includes(code)) {
+          btn.classList.add('selected');
+        }
+      });
+
+      // Show selected station display
+      const display = document.getElementById('selectedStationDisplay');
+      const nameEl = document.getElementById('selectedStationName');
+      nameEl.textContent = `${code} - ${name}`;
+      display.style.display = 'block';
     }
 
     // Show summary before completion
@@ -2803,7 +2819,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
         </div>
         <div class="summary-item">
           <span class="summary-label">Station:</span>
-          <span class="summary-value">${escapeHtml(station)}</span>
+          <span class="summary-value">${station ? escapeHtml(station) : '<em style="color: #999;">Will be configured from web interface</em>'}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Display Mode:</span>
@@ -3027,9 +3043,11 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       hideError('completeError');
 
       const formData = new URLSearchParams();
+      const selectedStation = document.getElementById('station').value;
+
       formData.append('ssid', document.getElementById('ssid').value);
       formData.append('password', document.getElementById('password').value);
-      formData.append('station', document.getElementById('station').value);
+      formData.append('station', selectedStation || 'PAD');  // Default to PAD if not selected
       formData.append('mode', document.getElementById('mode').value);
       formData.append('showstation', document.getElementById('showstation').value);
       formData.append('extra', document.getElementById('extra').value);
@@ -3068,8 +3086,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', () => {
       updateProgress();
-      loadStationData();
-      setupStationAutocomplete();
+      // Station autocomplete not needed - using preset buttons only
     });
   </script>
 </body>
