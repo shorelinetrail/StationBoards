@@ -2786,10 +2786,16 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
           <p class="loading-text">This may take 15-20 seconds</p>
 
           <div class="info-box" style="margin-top: 30px;">
-            <p style="text-align: center;">
-              After restart, reconnect to your WiFi network and visit the device's new IP address
-              to access the full configuration interface.
+            <p style="text-align: center; margin-bottom: 15px;">
+              <strong>Next Steps:</strong>
             </p>
+            <ol style="text-align: left; margin: 0 auto; max-width: 400px; line-height: 1.8;">
+              <li>Reconnect your device to your WiFi network (<strong id="finalSSID2"></strong>)</li>
+              <li>Open your browser and visit:<br>
+                  <strong style="color: #667eea; font-size: 16px;">http://stationboard.local</strong>
+              </li>
+              <li>Or check the OLED display for the IP address</li>
+            </ol>
           </div>
         </div>
       </div>
@@ -3309,17 +3315,16 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
         if (!response.ok) throw new Error('Setup failed');
 
         // Show completion screen
+        const ssidName = document.getElementById('ssid').value;
         document.getElementById('step-' + currentStep).classList.remove('active');
         document.getElementById('step-5').classList.add('active');
-        document.getElementById('finalSSID').textContent = document.getElementById('ssid').value;
+        document.getElementById('finalSSID').textContent = ssidName;
+        document.getElementById('finalSSID2').textContent = ssidName;
 
         // Update progress to 100%
         document.getElementById('progressFill').style.width = '100%';
 
-        // After 15 seconds, try to redirect
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 15000);
+        // No redirect - user needs to reconnect to their WiFi first
       })
       .catch(error => {
         console.error('Setup error:', error);
