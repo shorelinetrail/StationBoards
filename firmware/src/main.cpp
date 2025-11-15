@@ -2208,13 +2208,13 @@ void setup() {
     systemFlags.systemError = true;
     return;
   }
-  
-  // Check for first boot
-  systemFlags.firstBoot = checkFirstBoot();
-  
-  // Load or create configuration
+
+  // Load configuration FIRST (before checking first boot)
   displayProgress("Loading configuration...", 2, 5, 20);
   config.load();
+
+  // Check for first boot (after config is loaded so WiFi check works correctly)
+  systemFlags.firstBoot = checkFirstBoot();
 
   // Initialize service provider based on config
   if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
