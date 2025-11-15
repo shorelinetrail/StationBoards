@@ -1272,11 +1272,14 @@ void updateDisplay() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_t0_11_tf);
 
+  bool isTFL = (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
+
   // 1. Display station name OR first service at top
   if (config.showStationName) {
     displayStationName(displayState.stationName);
   } else if (displayState.serviceCount > 0) {
-    displayServiceLine(displayState.services[0], "1st ", config.yPosTop, u8g2);
+    String label = getServiceLabel(0, 0, isTFL);
+    displayServiceLine(displayState.services[0], label.c_str(), config.yPosTop, u8g2);
   }
 
   // 2. Handle no services case
@@ -1289,7 +1292,8 @@ void updateDisplay() {
 
     // Show first service if station name is visible
     if (config.showStationName) {
-      displayServiceLine(displayState.services[0], "1st ", config.yPos1st, u8g2);
+      String label = getServiceLabel(0, 0, isTFL);
+      displayServiceLine(displayState.services[0], label.c_str(), config.yPos1st, u8g2);
       // Show calling points at yPos2nd
       displayCallingPoints(displayState.services[0].callingPoints, config.yPos2nd,
                           displayState.callingAtScrollOffset, displayState.lastCallingAtScroll);
@@ -1300,7 +1304,8 @@ void updateDisplay() {
                           displayState.callingAtScrollOffset, displayState.lastCallingAtScroll);
       // Show second service at yPos2nd if available
       if (displayState.serviceCount > 1) {
-        displayServiceLine(displayState.services[1], "2nd ", config.yPos2nd, u8g2);
+        String label = getServiceLabel(1, 0, isTFL);
+        displayServiceLine(displayState.services[1], label.c_str(), config.yPos2nd, u8g2);
       }
     }
 
@@ -1313,8 +1318,8 @@ void updateDisplay() {
       int indexA = displayState.currentAlternatingService;
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      String labelA = getServiceLabel(indexA, serviceOffset);
-      String labelB = getServiceLabel(indexB, serviceOffset);
+      String labelA = getServiceLabel(indexA, serviceOffset, isTFL);
+      String labelB = getServiceLabel(indexB, serviceOffset, isTFL);
 
       displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
                                 labelA.c_str(), labelB.c_str(), config.yPosAlt,
@@ -1332,7 +1337,7 @@ void updateDisplay() {
       if (serviceIdx >= displayState.serviceCount) break;
 
       int yPos = (i == 0) ? config.yPos1st : config.yPos2nd;
-      String label = getServiceLabel(i, serviceOffset);
+      String label = getServiceLabel(i, serviceOffset, isTFL);
 
       displayServiceLine(displayState.services[serviceIdx], label.c_str(), yPos, u8g2);
     }
@@ -1346,8 +1351,8 @@ void updateDisplay() {
       int indexA = displayState.currentAlternatingService;
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      String labelA = getServiceLabel(indexA, serviceOffset);
-      String labelB = getServiceLabel(indexB, serviceOffset);
+      String labelA = getServiceLabel(indexA, serviceOffset, isTFL);
+      String labelB = getServiceLabel(indexB, serviceOffset, isTFL);
 
       displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
                                 labelA.c_str(), labelB.c_str(), config.yPosAlt,

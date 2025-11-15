@@ -243,14 +243,33 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   Serial.println("📊 Processing TFL Underground response (" + String(response.length()) + " bytes)");
 
-  // Find JSON array start
-  int jsonStart = response.indexOf('[');
+  // Skip HTTP headers - find the end of headers (blank line)
+  int headerEnd = response.indexOf("\r\n\r\n");
+  int bodyStart = 0;
+
+  if (headerEnd != -1) {
+    bodyStart = headerEnd + 4;  // Skip past the "\r\n\r\n"
+    Serial.println("📄 Headers end at position " + String(headerEnd));
+  } else {
+    // Try alternate line ending
+    headerEnd = response.indexOf("\n\n");
+    if (headerEnd != -1) {
+      bodyStart = headerEnd + 2;
+      Serial.println("📄 Headers end at position " + String(headerEnd) + " (\\n\\n)");
+    }
+  }
+
+  // Find JSON array start after headers
+  int jsonStart = response.indexOf('[', bodyStart);
   if (jsonStart == -1) {
     Serial.println("❌ No JSON array found in response");
+    Serial.println("First 200 chars: " + response.substring(0, 200));
     return false;
   }
 
+  Serial.println("📄 JSON starts at position " + String(jsonStart));
   String jsonBody = response.substring(jsonStart);
+  Serial.println("📄 JSON body length: " + String(jsonBody.length()) + " bytes");
 
   // Use ArduinoJson for parsing
   DynamicJsonDocument doc(16384);  // 16KB for JSON parsing
@@ -258,6 +277,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   if (error) {
     Serial.println("❌ JSON parse error: " + String(error.c_str()));
+    Serial.println("JSON preview (first 500 chars): " + jsonBody.substring(0, 500));
     return false;
   }
 
@@ -315,30 +335,28 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       }
     }
 
-    // Format scheduled time from expectedArrival
-    String scheduledTime = formatTime(String(expectedArrival));
-
-    // Format ETD (estimated time in minutes)
-    String etd;
+    // Format time to station in minutes
+    String timeInMinutes;
     int minutes = timeToStation / 60;
     if (minutes == 0) {
-      etd = "Due";
+      timeInMinutes = "Due";
     } else if (minutes == 1) {
-      etd = "1 min";
+      timeInMinutes = "1 min";
     } else {
-      etd = String(minutes) + " min";
+      timeInMinutes = String(minutes) + " mins";
     }
 
     // Format destination as "Line → Towards"
     String destination = String(lineName) + " → " + String(towards);
 
+    // For TFL: STD shows minutes, ETD is empty (we don't show actual arrival time on display)
     // Populate service data
-    scheduledTime.toCharArray(services[serviceCount].std, sizeof(services[serviceCount].std));
-    etd.toCharArray(services[serviceCount].etd, sizeof(services[serviceCount].etd));
+    timeInMinutes.toCharArray(services[serviceCount].std, sizeof(services[serviceCount].std));
+    services[serviceCount].etd[0] = '\0';  // Empty ETD for TFL
     destination.toCharArray(services[serviceCount].destination, sizeof(services[serviceCount].destination));
     services[serviceCount].callingPoints[0] = '\0';
 
-    Serial.println("🚇 " + String(serviceCount + 1) + ": " + scheduledTime + " " + destination + " (" + etd + ")");
+    Serial.println("🚇 " + String(serviceCount + 1) + ": " + destination + " (" + timeInMinutes + ")");
     serviceCount++;
   }
 

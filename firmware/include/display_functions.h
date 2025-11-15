@@ -189,12 +189,17 @@ inline void displayClock() {
 
 /**
  * Gets the service label based on index and offset
- * e.g., getServiceLabel(2, 0) = "3rd ", getServiceLabel(2, 1) = "4th "
+ * e.g., getServiceLabel(2, 0, false) = "3rd ", getServiceLabel(2, 0, true) = "3 "
  */
-inline String getServiceLabel(int index, int offset) {
+inline String getServiceLabel(int index, int offset, bool isTFL = false) {
   int displayNum = index + 1;
 
   if (offset == 1) displayNum++;  // Adjust for hidden station name
+
+  // TFL uses simple numbers, National Rail uses ordinals
+  if (isTFL) {
+    return String(displayNum) + " ";
+  }
 
   switch (displayNum) {
     case 1: return "1st ";
