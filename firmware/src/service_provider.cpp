@@ -268,16 +268,19 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   }
 
   Serial.println("📄 JSON starts at position " + String(jsonStart));
-  String jsonBody = response.substring(jsonStart);
-  Serial.println("📄 JSON body length: " + String(jsonBody.length()) + " bytes");
+  int jsonBodyLength = response.length() - jsonStart;
+  Serial.println("📄 JSON body length: " + String(jsonBodyLength) + " bytes");
 
-  // Use ArduinoJson for parsing
+  // Use ArduinoJson for parsing - parse directly from const char* to avoid String::substring() issues
+  // with large strings (36KB can cause memory issues with Arduino String operations)
   DynamicJsonDocument doc(16384);  // 16KB for JSON parsing
-  DeserializationError error = deserializeJson(doc, jsonBody);
+  DeserializationError error = deserializeJson(doc, response.c_str() + jsonStart);
 
   if (error) {
     Serial.println("❌ JSON parse error: " + String(error.c_str()));
-    Serial.println("JSON preview (first 500 chars): " + jsonBody.substring(0, 500));
+    // Show first 500 chars of JSON for debugging
+    int previewLen = min(500, jsonBodyLength);
+    Serial.println("JSON preview (first " + String(previewLen) + " chars): " + response.substring(jsonStart, jsonStart + previewLen));
     return false;
   }
 
