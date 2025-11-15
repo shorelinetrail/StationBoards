@@ -271,9 +271,14 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   if (arrivals.size() > 0) {
     const char* stName = arrivals[0]["stationName"];
     if (stName) {
-      strncpy(stationName, stName, stationNameSize - 1);
+      String cleanName = String(stName);
+      // Remove redundant suffix from TFL station names
+      cleanName.replace(" Underground Station", "");
+      cleanName.replace(" Rail Station", "");
+
+      strncpy(stationName, cleanName.c_str(), stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
-      Serial.println("📍 " + String(stName));
+      Serial.println("📍 " + cleanName);
     }
   }
 
@@ -315,9 +320,6 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       }
     }
 
-    // Format scheduled time from expectedArrival
-    String scheduledTime = formatTime(String(expectedArrival));
-
     // Format ETD (estimated time in minutes)
     String etd;
     int minutes = timeToStation / 60;
@@ -329,16 +331,17 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       etd = String(minutes) + " min";
     }
 
-    // Format destination as "Line → Towards"
-    String destination = String(lineName) + " → " + String(towards);
+    // Format destination as "Towards (Line)" - cleaner than arrow format
+    String destination = String(towards) + " (" + String(lineName) + ")";
 
-    // Populate service data
-    scheduledTime.toCharArray(services[serviceCount].std, sizeof(services[serviceCount].std));
+    // For TFL: STD is empty (no scheduled time), ETD shows minutes on the right
+    // This matches National Rail format where time info is on the right
+    services[serviceCount].std[0] = '\0';  // Empty STD for TFL
     etd.toCharArray(services[serviceCount].etd, sizeof(services[serviceCount].etd));
     destination.toCharArray(services[serviceCount].destination, sizeof(services[serviceCount].destination));
     services[serviceCount].callingPoints[0] = '\0';
 
-    Serial.println("🚇 " + String(serviceCount + 1) + ": " + scheduledTime + " " + destination + " (" + etd + ")");
+    Serial.println("🚇 " + String(serviceCount + 1) + ": " + destination + " - " + etd);
     serviceCount++;
   }
 
