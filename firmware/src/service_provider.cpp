@@ -271,10 +271,20 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   int jsonBodyLength = response.length() - jsonStart;
   Serial.println("📄 JSON body length: " + String(jsonBodyLength) + " bytes");
 
-  // Use ArduinoJson for parsing - parse directly from const char* to avoid String::substring() issues
-  // with large strings (36KB can cause memory issues with Arduino String operations)
-  DynamicJsonDocument doc(16384);  // 16KB for JSON parsing
-  DeserializationError error = deserializeJson(doc, response.c_str() + jsonStart);
+  // Create a filter to only parse the fields we need (much more memory efficient)
+  // TFL API returns ~200 arrivals with many fields, but we only need 6 fields from 8 arrivals
+  StaticJsonDocument<200> filter;
+  filter[0]["stationName"] = true;
+  filter[0]["lineName"] = true;
+  filter[0]["lineId"] = true;
+  filter[0]["towards"] = true;
+  filter[0]["expectedArrival"] = true;
+  filter[0]["timeToStation"] = true;
+
+  // Use ArduinoJson for parsing with filter - only extracts the fields we specify
+  // This allows parsing 36KB response with only 8KB buffer
+  DynamicJsonDocument doc(8192);  // 8KB is enough with filtering
+  DeserializationError error = deserializeJson(doc, response.c_str() + jsonStart, DeserializationOption::Filter(filter));
 
   if (error) {
     Serial.println("❌ JSON parse error: " + String(error.c_str()));
