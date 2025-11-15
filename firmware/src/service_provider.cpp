@@ -359,17 +359,17 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       timeInMinutes = String(minutes) + " mins";
     }
 
-    // Format destination as "Line → Towards"
-    String destination = String(lineName) + " → " + String(towards);
+    // Format destination as "Towards (Line)" - cleaner than arrow format
+    String destination = String(towards) + " (" + String(lineName) + ")";
 
-    // For TFL: STD shows minutes, ETD is empty (we don't show actual arrival time on display)
-    // Populate service data
-    timeInMinutes.toCharArray(services[serviceCount].std, sizeof(services[serviceCount].std));
-    services[serviceCount].etd[0] = '\0';  // Empty ETD for TFL
+    // For TFL: STD is empty (no scheduled time), ETD shows minutes on the right
+    // This matches National Rail format where time info is on the right
+    services[serviceCount].std[0] = '\0';  // Empty STD for TFL
+    timeInMinutes.toCharArray(services[serviceCount].etd, sizeof(services[serviceCount].etd));
     destination.toCharArray(services[serviceCount].destination, sizeof(services[serviceCount].destination));
     services[serviceCount].callingPoints[0] = '\0';
 
-    Serial.println("🚇 " + String(serviceCount + 1) + ": " + destination + " (" + timeInMinutes + ")");
+    Serial.println("🚇 " + String(serviceCount + 1) + ": " + destination + " - " + timeInMinutes);
     serviceCount++;
   }
 
