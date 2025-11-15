@@ -1344,12 +1344,18 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
+    Serial.println("🌐 Root handler called - GET /");
+    Serial.println("📊 Free heap before HTML load: " + String(ESP.getFreeHeap()) + " bytes");
+
     String html = FPSTR(CONFIG_PAGE_TEMPLATE);
-    
+    Serial.println("📄 HTML template loaded, length: " + String(html.length()));
+
     html.replace("{SSID}", String(config.wifiSSID));
     html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
     html.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
     html.replace("{TFL_API_KEY}", String(config.tflApiKey));
+
+    Serial.println("✓ Basic replacements done, heap: " + String(ESP.getFreeHeap()));
 
     // TFL Line Filter selections
     String lineFilter = String(config.tflLineFilter);
@@ -1366,6 +1372,8 @@ void setupWebServer() {
     html.replace("{TFL_LINE_VICTORIA}", lineFilter == "victoria" ? " selected" : "");
     html.replace("{TFL_LINE_WATERLOO}", lineFilter == "waterloo-city" ? " selected" : "");
     html.replace("{TFL_LINE_ELIZABETH}", lineFilter == "elizabeth" ? " selected" : "");
+
+    Serial.println("✓ Line filter replacements done, heap: " + String(ESP.getFreeHeap()));
 
     // TFL Direction Filter
     html.replace("{TFL_DIRECTION_FILTER}", String(config.tflDirectionFilter));
@@ -1390,8 +1398,11 @@ void setupWebServer() {
     html.replace("{Y3}", String(config.yPosAlt));
     html.replace("{IP}", WiFi.localIP().toString());
     html.replace("{DEVICE_ID}", config.deviceId);
-    
+
+    Serial.println("📤 Sending HTML response, final length: " + String(html.length()));
+    Serial.println("📊 Free heap before send: " + String(ESP.getFreeHeap()) + " bytes");
     server.send(200, "text/html", html);
+    Serial.println("✅ Response sent successfully");
   });
 
   server.on("/save", HTTP_POST, []() {
