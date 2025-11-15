@@ -1815,6 +1815,18 @@ void setupWebServer() {
     ESP.restart();
   });
 
+  // Skip setup wizard - removes firstboot flag
+  server.on("/skip-setup", HTTP_GET, []() {
+    Serial.println("⏭️  Skipping setup wizard");
+
+    if (SPIFFS.exists("/firstboot.flag")) {
+      SPIFFS.remove("/firstboot.flag");
+      Serial.println("✅ First boot flag removed");
+    }
+
+    server.send(200, "text/html", "<html><body><h1>Setup Skipped</h1><p>Redirecting to config page...</p><script>setTimeout(function(){window.location.href='/';}, 2000);</script></body></html>");
+  });
+
   server.on("/wizard-complete", HTTP_POST, []() {
     Serial.println("🧙 Setup wizard completion endpoint called");
 
