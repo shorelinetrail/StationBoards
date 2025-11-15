@@ -304,9 +304,14 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   if (arrivals.size() > 0) {
     const char* stName = arrivals[0]["stationName"];
     if (stName) {
-      strncpy(stationName, stName, stationNameSize - 1);
+      String cleanName = String(stName);
+      // Remove redundant suffix from TFL station names
+      cleanName.replace(" Underground Station", "");
+      cleanName.replace(" Rail Station", "");
+
+      strncpy(stationName, cleanName.c_str(), stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
-      Serial.println("📍 " + String(stName));
+      Serial.println("📍 " + cleanName);
     }
   }
 
