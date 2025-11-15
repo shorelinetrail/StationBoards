@@ -978,6 +978,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       </div>
     </div>
   </div>
+  </div>
 
   <script>
     // ==================== Security & Utilities ====================
