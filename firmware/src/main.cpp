@@ -1392,24 +1392,7 @@ void setupWebServer() {
     html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
     html.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
     html.replace("{TFL_API_KEY}", String(config.tflApiKey));
-
-    // TFL Line Filter selections
-    String lineFilter = String(config.tflLineFilter);
-    html.replace("{TFL_LINE_ALL}", lineFilter == "" ? " selected" : "");
-    html.replace("{TFL_LINE_BAKERLOO}", lineFilter == "bakerloo" ? " selected" : "");
-    html.replace("{TFL_LINE_CENTRAL}", lineFilter == "central" ? " selected" : "");
-    html.replace("{TFL_LINE_CIRCLE}", lineFilter == "circle" ? " selected" : "");
-    html.replace("{TFL_LINE_DISTRICT}", lineFilter == "district" ? " selected" : "");
-    html.replace("{TFL_LINE_HAMMERSMITH}", lineFilter == "hammersmith-city" ? " selected" : "");
-    html.replace("{TFL_LINE_JUBILEE}", lineFilter == "jubilee" ? " selected" : "");
-    html.replace("{TFL_LINE_METROPOLITAN}", lineFilter == "metropolitan" ? " selected" : "");
-    html.replace("{TFL_LINE_NORTHERN}", lineFilter == "northern" ? " selected" : "");
-    html.replace("{TFL_LINE_PICCADILLY}", lineFilter == "piccadilly" ? " selected" : "");
-    html.replace("{TFL_LINE_VICTORIA}", lineFilter == "victoria" ? " selected" : "");
-    html.replace("{TFL_LINE_WATERLOO}", lineFilter == "waterloo-city" ? " selected" : "");
-    html.replace("{TFL_LINE_ELIZABETH}", lineFilter == "elizabeth" ? " selected" : "");
-
-    // TFL Direction Filter
+    html.replace("{TFL_LINE_FILTER}", String(config.tflLineFilter));
     html.replace("{TFL_DIRECTION_FILTER}", String(config.tflDirectionFilter));
 
     html.replace("{STATION}", String(config.stationCode));

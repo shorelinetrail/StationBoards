@@ -792,7 +792,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="info-tooltip" title="Show arrivals for specific line only, or all lines" aria-label="Information: Filter by line">?</span>
           </label>
           <select id="tflLineFilter" name="tflLineFilter" aria-describedby="linefilter-help">
-            <option value=""{TFL_LINE_ALL}>All Lines</option>
+            <option value="">All Lines</option>
           </select>
           <span class="help-text" id="linefilter-help">Filter arrivals by Underground line (dynamically populated based on station)</span>
         </div>
@@ -1799,6 +1799,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       if (stationInput.value) {
         document.getElementById("currentStation").textContent = stationInput.value;
         updateLineFilter(stationInput.value);
+
+        // Set saved TFL line filter value after populating options
+        const savedLineFilter = "{TFL_LINE_FILTER}";
+        if (savedLineFilter) {
+          setTimeout(() => {
+            const lineFilterSelect = document.getElementById("tflLineFilter");
+            if (lineFilterSelect) {
+              lineFilterSelect.value = savedLineFilter;
+            }
+          }, 100);
+        }
       }
 
       // Auto-apply for all settings except WiFi
