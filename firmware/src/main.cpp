@@ -29,6 +29,9 @@
 #include "display_functions.h" // Display component functions
 #include "service_provider.h"  // Service provider abstraction
 
+// National Rail API Token (used for station validation)
+const char* apiToken = "73ee3834-af35-4f22-9b8b-480b70571c39";
+
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
 #endif
