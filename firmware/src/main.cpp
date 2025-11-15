@@ -286,31 +286,64 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             }
             else if (strcmp(command, "updateConfig") == 0) {
               Serial.println("⚙️ Remote config update");
-              
+
               if (doc.containsKey("stationCode")) {
                 String station = doc["stationCode"].as<String>();
                 station.toUpperCase();
                 strncpy(config.stationCode, station.c_str(), sizeof(config.stationCode) - 1);
               }
+
+              // Validate and constrain refreshInterval
               if (doc.containsKey("refreshInterval")) {
-                config.refreshInterval = doc["refreshInterval"];
+                int interval = doc["refreshInterval"];
+                int constrained = constrainToRange(interval, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL);
+                if (constrained != interval) {
+                  Serial.printf("⚠️ refreshInterval %d constrained to %d (valid: %d-%d)\n",
+                    interval, constrained, Data::MIN_REFRESH_INTERVAL, Data::MAX_REFRESH_INTERVAL);
+                }
+                config.refreshInterval = constrained;
               }
+
               if (doc.containsKey("useCallingAt")) {
                 config.useCallingAt = doc["useCallingAt"];
               }
               if (doc.containsKey("showStationName")) {
                 config.showStationName = doc["showStationName"];
               }
+
+              // Validate and constrain extraServices
               if (doc.containsKey("extraServices")) {
-                config.extraServices = doc["extraServices"];
+                int extra = doc["extraServices"];
+                int constrained = constrainToRange(extra, 0, Data::MAX_EXTRA_SERVICES);
+                if (constrained != extra) {
+                  Serial.printf("⚠️ extraServices %d constrained to %d (valid: 0-%d)\n",
+                    extra, constrained, Data::MAX_EXTRA_SERVICES);
+                }
+                config.extraServices = constrained;
               }
+
+              // Validate and constrain scrollSpeed
               if (doc.containsKey("scrollSpeed")) {
-                config.scrollSpeed = doc["scrollSpeed"];
+                int speed = doc["scrollSpeed"];
+                int constrained = constrainToRange(speed, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED);
+                if (constrained != speed) {
+                  Serial.printf("⚠️ scrollSpeed %d constrained to %d (valid: %d-%d)\n",
+                    speed, constrained, Data::MIN_SCROLL_SPEED, Data::MAX_SCROLL_SPEED);
+                }
+                config.scrollSpeed = constrained;
               }
+
+              // Validate and constrain rotationSpeed
               if (doc.containsKey("rotationSpeed")) {
-                config.rotationSpeed = doc["rotationSpeed"];
+                int speed = doc["rotationSpeed"];
+                int constrained = constrainToRange(speed, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED);
+                if (constrained != speed) {
+                  Serial.printf("⚠️ rotationSpeed %d constrained to %d (valid: %d-%d)\n",
+                    speed, constrained, Data::MIN_ROTATION_SPEED, Data::MAX_ROTATION_SPEED);
+                }
+                config.rotationSpeed = constrained;
               }
-              
+
               config.save();
               
               // Reset alternating service
