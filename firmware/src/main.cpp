@@ -1347,55 +1347,64 @@ void updateDisplay() {
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
     Serial.println("📄 Serving root page");
-    Serial.println("  Free heap BEFORE: " + String(ESP.getFreeHeap()) + " bytes");
-    Serial.println("  Largest free block: " + String(ESP.getMaxAllocHeap()) + " bytes");
+    Serial.println("  Free heap: " + String(ESP.getFreeHeap()) + " bytes");
+    Serial.println("  Largest block: " + String(ESP.getMaxAllocHeap()) + " bytes");
 
-    // Check PROGMEM size first
-    size_t progmemSize = strlen_P(CONFIG_PAGE_TEMPLATE);
-    Serial.println("  PROGMEM template size: " + String(progmemSize) + " bytes");
+    // Use chunked transfer encoding to avoid loading entire template into RAM
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
 
-    // Pre-allocate String with extra space for replacements to avoid fragmentation
-    String html;
-    html.reserve(progmemSize + 512);  // Reserve extra space for replacement expansion
+    // Process and send HTML in chunks
+    const size_t CHUNK_SIZE = 2048;  // Process 2KB at a time
+    size_t templateLen = strlen_P(CONFIG_PAGE_TEMPLATE);
+    size_t pos = 0;
 
-    html = FPSTR(CONFIG_PAGE_TEMPLATE);
-    Serial.println("  HTML template size: " + String(html.length()) + " bytes");
-    Serial.println("  Free heap AFTER FPSTR: " + String(ESP.getFreeHeap()) + " bytes");
+    Serial.println("  Sending HTML in chunks (template size: " + String(templateLen) + " bytes)");
 
-    if (html.length() == 0) {
-      Serial.println("  ❌ HTML is empty after FPSTR! Not enough contiguous RAM");
-      Serial.println("  ℹ️  Try reducing JSON buffer sizes or implementing streaming HTML");
-      server.send(500, "text/html", "<html><body><h1>Error: Not enough RAM to load page</h1><p>Free heap: " + String(ESP.getFreeHeap()) + " bytes</p><p>Largest block: " + String(ESP.getMaxAllocHeap()) + " bytes</p><p>Template size: " + String(progmemSize) + " bytes</p></body></html>");
-      return;
+    while (pos < templateLen) {
+      // Read chunk from PROGMEM
+      size_t chunkLen = min(CHUNK_SIZE, templateLen - pos);
+      char chunk[CHUNK_SIZE + 1];
+      memcpy_P(chunk, CONFIG_PAGE_TEMPLATE + pos, chunkLen);
+      chunk[chunkLen] = '\0';
+
+      // Do replacements on this chunk
+      String chunkStr = String(chunk);
+      chunkStr.replace("{SSID}", String(config.wifiSSID));
+      chunkStr.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
+      chunkStr.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
+      chunkStr.replace("{TFL_API_KEY}", String(config.tflApiKey));
+      chunkStr.replace("{STATION}", String(config.stationCode));
+      chunkStr.replace("{STATION_NAME}", String(displayState.stationName));
+      chunkStr.replace("{INTERVAL}", String(config.refreshInterval));
+      chunkStr.replace("{MODE_SEL_0}", config.useCallingAt ? "" : " selected");
+      chunkStr.replace("{MODE_SEL_1}", config.useCallingAt ? " selected" : "");
+      chunkStr.replace("{SHOWSTATION_SEL_1}", config.showStationName ? " selected" : "");
+      chunkStr.replace("{SHOWSTATION_SEL_0}", !config.showStationName ? " selected" : "");
+      chunkStr.replace("{EXTRA_SEL_0}", config.extraServices == 0 ? " selected" : "");
+      chunkStr.replace("{EXTRA_SEL_1}", config.extraServices == 1 ? " selected" : "");
+      chunkStr.replace("{EXTRA_SEL_2}", config.extraServices == 2 ? " selected" : "");
+      chunkStr.replace("{EXTRA_SEL_3}", config.extraServices == 3 ? " selected" : "");
+      chunkStr.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
+      chunkStr.replace("{SCROLL}", String(config.scrollSpeed));
+      chunkStr.replace("{ROTATION}", String(config.rotationSpeed));
+      chunkStr.replace("{YTOP}", String(config.yPosTop));
+      chunkStr.replace("{Y1}", String(config.yPos1st));
+      chunkStr.replace("{Y2}", String(config.yPos2nd));
+      chunkStr.replace("{Y3}", String(config.yPosAlt));
+      chunkStr.replace("{IP}", WiFi.localIP().toString());
+      chunkStr.replace("{DEVICE_ID}", config.deviceId);
+
+      // Send this chunk
+      server.sendContent(chunkStr);
+      pos += chunkLen;
+
+      yield();  // Allow other tasks to run
     }
 
-    html.replace("{SSID}", String(config.wifiSSID));
-    html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
-    html.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
-    html.replace("{TFL_API_KEY}", String(config.tflApiKey));
-    html.replace("{STATION}", String(config.stationCode));
-    html.replace("{STATION_NAME}", String(displayState.stationName));
-    html.replace("{INTERVAL}", String(config.refreshInterval));
-    html.replace("{MODE_SEL_0}", config.useCallingAt ? "" : " selected");
-    html.replace("{MODE_SEL_1}", config.useCallingAt ? " selected" : "");
-    html.replace("{SHOWSTATION_SEL_1}", config.showStationName ? " selected" : "");
-    html.replace("{SHOWSTATION_SEL_0}", !config.showStationName ? " selected" : "");
-    html.replace("{EXTRA_SEL_0}", config.extraServices == 0 ? " selected" : "");
-    html.replace("{EXTRA_SEL_1}", config.extraServices == 1 ? " selected" : "");
-    html.replace("{EXTRA_SEL_2}", config.extraServices == 2 ? " selected" : "");
-    html.replace("{EXTRA_SEL_3}", config.extraServices == 3 ? " selected" : "");
-    html.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
-    html.replace("{SCROLL}", String(config.scrollSpeed));
-    html.replace("{ROTATION}", String(config.rotationSpeed));
-    html.replace("{YTOP}", String(config.yPosTop));
-    html.replace("{Y1}", String(config.yPos1st));
-    html.replace("{Y2}", String(config.yPos2nd));
-    html.replace("{Y3}", String(config.yPosAlt));
-    html.replace("{IP}", WiFi.localIP().toString());
-    html.replace("{DEVICE_ID}", config.deviceId);
-
-    Serial.println("  Final HTML size: " + String(html.length()) + " bytes - sending to client");
-    server.send(200, "text/html", html);
+    // End chunked transfer
+    server.sendContent("");
+    Serial.println("  ✅ HTML sent successfully in chunks");
   });
 
   server.on("/save", HTTP_POST, []() {
