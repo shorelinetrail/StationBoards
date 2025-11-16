@@ -43,16 +43,25 @@ bool NationalRailProvider::buildRequest(const char* stationCode, String& request
     return false;
   }
 
-  // Build SOAP request - basic API includes calling points
+  // Build SOAP request - use detailed API for calling points
   String soapRequest;
   soapRequest.reserve(512);
   soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
   soapRequest += "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">";
   soapRequest += "<soap:Header><AccessToken xmlns=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\">";
   soapRequest += "<TokenValue>" + String(apiToken) + "</TokenValue></AccessToken></soap:Header>";
-  soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
-  soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
-  soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
+
+  if (useCallingAt) {
+    // Use GetDepBoardWithDetails to get calling points data
+    soapRequest += "<soap:Body><GetDepBoardWithDetailsRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
+    soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
+    soapRequest += "</GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
+  } else {
+    // Use basic GetDepartureBoard when calling points not needed
+    soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
+    soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
+    soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
+  }
 
   // Build HTTP request
   request = "POST " + String(apiPath) + " HTTP/1.1\r\n";
@@ -155,18 +164,11 @@ bool NationalRailProvider::parseResponse(const String& response,
 
       // Parse calling points for first service only if useCallingAt is enabled
       if (useCallingAt && serviceCount == 0) {
-        Serial.println("   🔍 Looking for calling points...");
-
-        // Debug: print first 500 chars of service block
-        Serial.println("   📋 Service block preview:");
-        Serial.println(block.substring(0, min(500, (int)block.length())));
-
         // Find subsequentCallingPoints section
         int cpListIdx = block.indexOf("<lt5:subsequentCallingPoints>");
         if (cpListIdx == -1) cpListIdx = block.indexOf("<lt4:subsequentCallingPoints>");
 
         if (cpListIdx != -1) {
-          Serial.println("   ✓ Found subsequentCallingPoints");
           int cpListEndIdx = block.indexOf("</lt5:subsequentCallingPoints>", cpListIdx);
           if (cpListEndIdx == -1) cpListEndIdx = block.indexOf("</lt4:subsequentCallingPoints>", cpListIdx);
 
@@ -178,7 +180,6 @@ bool NationalRailProvider::parseResponse(const String& response,
             if (cpListStart == -1) cpListStart = cpSection.indexOf("<lt5:callingPointList>");
 
             if (cpListStart != -1) {
-              Serial.println("   ✓ Found callingPointList");
               int cpListEnd = cpSection.indexOf("</lt4:callingPointList>", cpListStart);
               if (cpListEnd == -1) cpListEnd = cpSection.indexOf("</lt5:callingPointList>", cpListStart);
 
@@ -218,7 +219,6 @@ bool NationalRailProvider::parseResponse(const String& response,
 
                 if (callingPoints.length() > 0) {
                   callingPoints.toCharArray(services[serviceCount].callingPoints, sizeof(services[serviceCount].callingPoints));
-                  Serial.println("   ✅ Calling at: " + callingPoints);
                 } else {
                   services[serviceCount].callingPoints[0] = '\0';
                 }
@@ -232,7 +232,6 @@ bool NationalRailProvider::parseResponse(const String& response,
             services[serviceCount].callingPoints[0] = '\0';
           }
         } else {
-          Serial.println("   ✗ No subsequentCallingPoints found");
           services[serviceCount].callingPoints[0] = '\0';
         }
       } else {
@@ -240,6 +239,12 @@ bool NationalRailProvider::parseResponse(const String& response,
       }
 
       Serial.println("🚂 " + String(serviceCount + 1) + ": " + std + " → " + destination);
+
+      // Log calling points if present for first service
+      if (useCallingAt && serviceCount == 0 && strlen(services[serviceCount].callingPoints) > 0) {
+        Serial.println("   Calling at: " + String(services[serviceCount].callingPoints));
+      }
+
       serviceCount++;
     }
 
