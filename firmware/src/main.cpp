@@ -1257,7 +1257,8 @@ void updateDisplay() {
   if (config.showStationName) {
     displayStationName(displayState.stationName);
   } else if (displayState.serviceCount > 0) {
-    displayServiceLine(displayState.services[0], "1st ", config.yPosTop, u8g2);
+    String label = getServiceLabel(0, 0);
+    displayServiceLine(displayState.services[0], label.c_str(), config.yPosTop, u8g2);
   }
 
   // 2. Handle no services case
@@ -1270,7 +1271,8 @@ void updateDisplay() {
 
     // Show first service if station name is visible
     if (config.showStationName) {
-      displayServiceLine(displayState.services[0], "1st ", config.yPos1st, u8g2);
+      String label = getServiceLabel(0, 0);
+      displayServiceLine(displayState.services[0], label.c_str(), config.yPos1st, u8g2);
       // Show calling points at yPos2nd
       displayCallingPoints(displayState.services[0].callingPoints, config.yPos2nd,
                           displayState.callingAtScrollOffset, displayState.lastCallingAtScroll);
@@ -1281,7 +1283,8 @@ void updateDisplay() {
                           displayState.callingAtScrollOffset, displayState.lastCallingAtScroll);
       // Show second service at yPos2nd if available
       if (displayState.serviceCount > 1) {
-        displayServiceLine(displayState.services[1], "2nd ", config.yPos2nd, u8g2);
+        String label = getServiceLabel(1, 0);
+        displayServiceLine(displayState.services[1], label.c_str(), config.yPos2nd, u8g2);
       }
     }
 
