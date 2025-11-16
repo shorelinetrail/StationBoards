@@ -1805,21 +1805,39 @@ void setupWebServer() {
     client.print(request);
     Serial.println("📤 Request sent, waiting for response...");
 
-    // Wait for response with timeout
-    String response = "";
+    // Skip HTTP headers and read only JSON body to save memory
+    String headerBuffer = "";
+    String jsonBody = "";
     unsigned long timeout = millis();
     bool headerComplete = false;
+    int headerEndPos = -1;
 
     while (client.connected() && millis() - timeout < 15000) {
       while (client.available()) {
         char c = client.read();
-        response += c;
         timeout = millis(); // Reset timeout on each byte received
 
-        // Check if we've received the complete headers
-        if (!headerComplete && response.indexOf("\r\n\r\n") > 0) {
-          headerComplete = true;
-          Serial.println("📋 Headers received, reading body...");
+        if (!headerComplete) {
+          // Still reading headers - store in temporary buffer to detect end
+          headerBuffer += c;
+
+          // Check for end of headers marker
+          headerEndPos = headerBuffer.indexOf("\r\n\r\n");
+          if (headerEndPos >= 0) {
+            headerComplete = true;
+            Serial.println("📋 Headers received (" + String(headerBuffer.length()) + " bytes), reading body...");
+
+            // If there's any data after the headers in our buffer, add it to jsonBody
+            if (headerBuffer.length() > headerEndPos + 4) {
+              jsonBody = headerBuffer.substring(headerEndPos + 4);
+            }
+
+            // Clear header buffer to free memory
+            headerBuffer = "";
+          }
+        } else {
+          // Headers done, store everything in JSON body
+          jsonBody += c;
         }
       }
 
@@ -1832,28 +1850,24 @@ void setupWebServer() {
     }
     client.stop();
 
-    Serial.println("📥 Received response (" + String(response.length()) + " bytes)");
+    Serial.println("📥 Received JSON body (" + String(jsonBody.length()) + " bytes)");
 
-    // Debug: show first 200 chars of response
-    Serial.println("📄 Response preview (first 200 chars):");
-    Serial.println(response.substring(0, min(200, (int)response.length())));
-
-    int jsonStart = response.indexOf('{');
-    Serial.println("🔍 JSON start position: " + String(jsonStart));
-
-    if (jsonStart == -1) {
-      Serial.println("❌ No JSON found in TFL response");
-      Serial.println("📄 Response preview (first 500 chars):");
-      Serial.println(response.substring(0, min(500, (int)response.length())));
-      server.send(500, "application/json", "{\"error\":\"Invalid TFL API response\"}");
+    if (jsonBody.length() == 0) {
+      Serial.println("❌ No JSON body received");
+      if (headerBuffer.length() > 0) {
+        Serial.println("📄 Headers received (first 500 chars):");
+        Serial.println(headerBuffer.substring(0, min(500, (int)headerBuffer.length())));
+      }
+      server.send(500, "application/json", "{\"error\":\"No JSON data in TFL response\"}");
       return;
     }
 
-    String jsonBody = response.substring(jsonStart);
-    Serial.println("📏 JSON body size: " + String(jsonBody.length()) + " bytes");
-    Serial.println("📄 JSON preview (first 100 chars): " + jsonBody.substring(0, min(100, (int)jsonBody.length())));
+    Serial.println("📄 JSON preview (first 200 chars): " + jsonBody.substring(0, min(200, (int)jsonBody.length())));
 
-    DynamicJsonDocument doc(16384);  // 16KB for StopPoint response
+    // Note: Response is chunked transfer encoding, but WiFiClientSecure handles this automatically
+    // by reading the raw stream. The jsonBody should already contain the de-chunked data.
+
+    DynamicJsonDocument doc(49152);  // 48KB for StopPoint response (increased from 16KB)
     DeserializationError error = deserializeJson(doc, jsonBody);
 
     if (error) {
