@@ -1422,6 +1422,8 @@ void setupWebServer() {
       // Reinitialize service provider if type changed
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        tflUndergroundProvider.setLineFilter(String(config.tflLineId));
+        tflUndergroundProvider.setDirectionFilter(String(config.tflDirection));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1566,6 +1568,8 @@ void setupWebServer() {
       // Reinitialize service provider if type changed
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        tflUndergroundProvider.setLineFilter(String(config.tflLineId));
+        tflUndergroundProvider.setDirectionFilter(String(config.tflDirection));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1624,6 +1628,31 @@ void setupWebServer() {
       }
       Serial.println("  ✅ Station valid");
       safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
+    }
+
+    // Handle station name
+    if (server.hasArg("stationName")) {
+      String stationName = server.arg("stationName");
+      safeStrCopy(config.stationName, stationName, sizeof(config.stationName));
+      Serial.printf("  Station Name: %s\n", stationName.c_str());
+    }
+
+    // Handle TFL-specific parameters
+    if (server.hasArg("tflLine")) {
+      String lineId = server.arg("tflLine");
+      safeStrCopy(config.tflLineId, lineId, sizeof(config.tflLineId));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setLineFilter(lineId);
+        Serial.printf("  TFL Line: %s\n", lineId.c_str());
+      }
+    }
+    if (server.hasArg("tflDirection")) {
+      String direction = server.arg("tflDirection");
+      safeStrCopy(config.tflDirection, direction, sizeof(config.tflDirection));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setDirectionFilter(direction);
+        Serial.printf("  TFL Direction: %s\n", direction.c_str());
+      }
     }
 
     // Validate refresh interval
@@ -1823,78 +1852,6 @@ void setupWebServer() {
     server.send(200, "application/json", linesJson);
   });
 
-  server.on("/tfl-line-directions", HTTP_GET, []() {
-    if (!server.hasArg("lineId")) {
-      server.send(400, "application/json", "{\"error\":\"lineId parameter required\"}");
-      return;
-    }
-
-    String lineId = server.arg("lineId");
-    Serial.println("🔍 Fetching directions for line: " + lineId);
-
-    WiFiClientSecure client;
-    client.setInsecure();
-
-    if (!client.connect("api.tfl.gov.uk", 443)) {
-      Serial.println("❌ Failed to connect to TFL API");
-      server.send(500, "application/json", "{\"error\":\"Failed to connect to TFL API\"}");
-      return;
-    }
-
-    String path = "/Line/" + lineId + "/Route";
-    if (strlen(config.tflApiKey) > 0) {
-      path += "?app_key=" + String(config.tflApiKey);
-    }
-
-    String request = "GET " + path + " HTTP/1.1\r\n";
-    request += "Host: api.tfl.gov.uk\r\n";
-    request += "Connection: close\r\n\r\n";
-
-    client.print(request);
-
-    String response = "";
-    unsigned long timeout = millis();
-    while (client.connected() && millis() - timeout < 10000) {
-      if (client.available()) {
-        response += client.readString();
-        break;
-      }
-    }
-    client.stop();
-
-    int jsonStart = response.indexOf('{');
-    if (jsonStart == -1) {
-      Serial.println("❌ No JSON found in TFL response");
-      server.send(500, "application/json", "{\"error\":\"Invalid TFL API response\"}");
-      return;
-    }
-
-    String jsonBody = response.substring(jsonStart);
-    DynamicJsonDocument doc(2048);  // Reduced from 8KB to 2KB
-    DeserializationError error = deserializeJson(doc, jsonBody);
-
-    if (error) {
-      Serial.println("❌ JSON parse error: " + String(error.c_str()));
-      server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
-      return;
-    }
-
-    // Extract route sections with directions
-    JsonArray routeSections = doc["routeSections"];
-    String directionsJson = "[";
-    int directionCount = 0;
-
-    // Use a simple approach: inbound and outbound with better labels
-    directionsJson += "{\"id\":\"inbound\",\"name\":\"Inbound (towards central London)\"},";
-    directionsJson += "{\"id\":\"outbound\",\"name\":\"Outbound (away from central London)\"}";
-    directionCount = 2;
-
-    directionsJson += "]";
-
-    Serial.println("✅ Returning " + String(directionCount) + " directions");
-    server.send(200, "application/json", directionsJson);
-  });
-
   server.on("/reset", HTTP_GET, []() {
     if (SPIFFS.exists("/config.json")) {
       SPIFFS.remove("/config.json");
@@ -1988,6 +1945,8 @@ void setup() {
   // Initialize service provider based on config
   if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
     tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+    tflUndergroundProvider.setLineFilter(String(config.tflLineId));
+    tflUndergroundProvider.setDirectionFilter(String(config.tflDirection));
     serviceProvider = &tflUndergroundProvider;
     Serial.println("🚇 Using TFL Underground provider");
   } else {

@@ -311,13 +311,27 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   }
 
   // Build TFL API request
-  // GET /StopPoint/{stationCode}/Arrivals
-  // Note: TFL API doesn't provide calling points in the same way as National Rail
-  String path = "/StopPoint/" + String(stationCode) + "/Arrivals";
+  // If line filter is set, use Line-specific endpoint for better filtering
+  // Otherwise fall back to all arrivals at station
+  String path;
+  if (lineId.length() > 0) {
+    // GET /Line/{lineId}/Arrivals/{stationCode}
+    path = "/Line/" + lineId + "/Arrivals/" + String(stationCode);
+    Serial.println("  🚇 Filtering by line: " + lineId);
+  } else {
+    // GET /StopPoint/{stationCode}/Arrivals
+    path = "/StopPoint/" + String(stationCode) + "/Arrivals";
+  }
 
   // Add API key if configured
   if (apiKey.length() > 0) {
     path += "?app_key=" + apiKey;
+  }
+
+  // Add direction filter if specified
+  if (direction.length() > 0) {
+    path += (apiKey.length() > 0 ? "&" : "?") + String("direction=") + direction;
+    Serial.println("  ➡️  Filtering by direction: " + direction);
   }
 
   request = "GET " + path + " HTTP/1.1\r\n";

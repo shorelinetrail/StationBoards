@@ -1216,6 +1216,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       setTimeout(() => { autocompleteJustSelected = false; }, 100);
 
       input.value = code;
+      input.setAttribute('data-station-name', name);  // Store station name
       document.getElementById("stationAutocomplete").classList.remove("show");
       showToast(`Selected: ${escapeHtml(name)} (${escapeHtml(code)})`, "success");
 
@@ -1228,9 +1229,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const isUnderground = serviceTypeSelect && serviceTypeSelect.value === "1";
 
       if (isUnderground) {
-        fetchTflStationLines(code);
+        fetchTflStationLines(code, name);
       } else {
-        autoApplySettings(code);
+        autoApplySettings(code, name);
       }
     };
 
@@ -1632,12 +1633,26 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // ==================== Auto-Apply Settings ====================
 
-    const autoApplySettings = (stationCodeOverride) => {
+    const autoApplySettings = (stationCodeOverride, stationNameOverride) => {
       const formData = new URLSearchParams();
       const stationValue = stationCodeOverride || document.getElementById('station').value;
+      const stationNameValue = stationNameOverride || document.getElementById('station').getAttribute('data-station-name') || '';
+
       formData.append('serviceType', document.getElementById('serviceType').value);
       formData.append('tflApiKey', document.getElementById('tflApiKey').value);
       formData.append('station', stationValue);
+      formData.append('stationName', stationNameValue);
+
+      // TFL-specific parameters
+      const tflLineSelect = document.getElementById('tflLine');
+      const tflDirectionSelect = document.getElementById('tflDirection');
+      if (tflLineSelect && tflLineSelect.value) {
+        formData.append('tflLine', tflLineSelect.value);
+      }
+      if (tflDirectionSelect && tflDirectionSelect.value) {
+        formData.append('tflDirection', tflDirectionSelect.value);
+      }
+
       formData.append('interval', document.getElementById('interval').value);
       formData.append('mode', document.getElementById('mode').value);
       formData.append('showstation', document.getElementById('showstation').value);
@@ -1709,11 +1724,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // Disable calling at mode for TFL
         const modeSelect = document.getElementById("mode");
+        const modeHelp = document.getElementById("mode-help");
         if (isUnderground) {
           modeSelect.value = "0";  // Reset to standard view
           modeSelect.disabled = true;
+          if (modeHelp) modeHelp.textContent = "Calling points mode is not available for TFL Underground";
         } else {
           modeSelect.disabled = false;
+          if (modeHelp) modeHelp.textContent = "Calling At mode shows detailed stops for the first train";
         }
 
         const stationInput = document.getElementById("station");
@@ -1747,21 +1765,34 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         return stationCleared;
       };
 
+      // Cache for station lines to avoid redundant API calls
+      const stationLinesCache = new Map();
+
       // Fetch lines serving a TFL station
       const fetchTflStationLines = async (stationId) => {
         const lineSelect = document.getElementById("tflLine");
         const directionSelect = document.getElementById("tflDirection");
 
         try {
-          showToast("Loading lines for this station...", "info");
+          // Check cache first
+          let lines;
+          if (stationLinesCache.has(stationId)) {
+            lines = stationLinesCache.get(stationId);
+            console.log(`Using cached lines for ${stationId}`);
+          } else {
+            showToast("Loading lines...", "info");
+            lineSelect.innerHTML = '<option value="">Loading...</option>';
+            lineSelect.classList.add('loading');
 
-          const response = await fetch(`/tfl-station-lines?stationId=${stationId}`);
-          if (!response.ok) {
-            throw new Error('Failed to fetch lines');
+            const response = await fetch(`/tfl-station-lines?stationId=${stationId}`);
+            if (!response.ok) {
+              throw new Error('Failed to fetch lines');
+            }
+
+            lines = await response.json();
+            stationLinesCache.set(stationId, lines);  // Cache the result
+            console.log(`Station has ${lines.length} tube lines:`, lines);
           }
-
-          const lines = await response.json();
-          console.log(`Station has ${lines.length} tube lines:`, lines);
 
           // Populate line dropdown
           lineSelect.innerHTML = '<option value="">-- Select Line --</option>';
@@ -1772,12 +1803,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             lineSelect.appendChild(option);
           });
 
-          // Enable line dropdown
+          lineSelect.classList.remove('loading');
           lineSelect.disabled = false;
           directionSelect.disabled = true;
 
-          if (lines.length > 0) {
-            showToast(`Found ${lines.length} line${lines.length > 1 ? 's' : ''} at this station`, "success");
+          // Auto-select if only one line available
+          if (lines.length === 1) {
+            lineSelect.value = lines[0].id;
+            lineSelect.dispatchEvent(new Event('change'));
+            showToast(`Auto-selected ${lines[0].name}`, "success");
+          } else if (lines.length > 0) {
+            showToast(`Found ${lines.length} lines at this station`, "success");
           } else {
             showToast("No tube lines found at this station", "warning");
           }
@@ -1797,8 +1833,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         }
       });
 
-      // TFL line selection handler - fetch directions and enable dropdown
-      document.getElementById("tflLine").addEventListener("change", async () => {
+      // TFL line selection handler - populate direction dropdown
+      document.getElementById("tflLine").addEventListener("change", () => {
         const lineSelect = document.getElementById("tflLine");
         const directionSelect = document.getElementById("tflDirection");
 
@@ -1808,39 +1844,39 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           return;
         }
 
-        try {
-          const response = await fetch(`/tfl-line-directions?lineId=${lineSelect.value}`);
-          if (!response.ok) {
-            throw new Error('Failed to fetch directions');
-          }
+        // Hardcoded directions (same for all lines)
+        const directions = [
+          {id: "inbound", name: "Inbound (towards central London)"},
+          {id: "outbound", name: "Outbound (away from central London)"}
+        ];
 
-          const directions = await response.json();
+        // Populate direction dropdown
+        directionSelect.innerHTML = '';
+        directions.forEach(dir => {
+          const option = document.createElement('option');
+          option.value = dir.id;
+          option.textContent = dir.name;
+          directionSelect.appendChild(option);
+        });
 
-          // Populate direction dropdown
-          directionSelect.innerHTML = '';
-          directions.forEach(dir => {
-            const option = document.createElement('option');
-            option.value = dir.id;
-            option.textContent = dir.name;
-            directionSelect.appendChild(option);
-          });
+        directionSelect.disabled = false;
 
-          directionSelect.disabled = false;
-
-          // Auto-apply if direction is already selected
-          if (directionSelect.value) {
-            autoApplySettings();
-          }
-        } catch (error) {
-          console.error('Error fetching directions:', error);
-          directionSelect.innerHTML = '<option value="">-- Error loading directions --</option>';
-          directionSelect.disabled = true;
+        // Auto-apply if direction is already selected
+        if (directionSelect.value) {
+          autoApplySettings();
         }
       });
 
-      // TFL direction selection handler
+      // TFL direction selection handler - only apply if all required fields are set
       document.getElementById("tflDirection").addEventListener("change", () => {
-        autoApplySettings();
+        const stationInput = document.getElementById("station");
+        const lineSelect = document.getElementById("tflLine");
+        const directionSelect = document.getElementById("tflDirection");
+
+        // Only auto-apply if station, line, and direction are all selected
+        if (stationInput.value && lineSelect.value && directionSelect.value) {
+          autoApplySettings();
+        }
       });
 
       // Initialize UI on load

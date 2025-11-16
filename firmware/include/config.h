@@ -23,6 +23,11 @@ public:
 
   // Station Settings
   char stationCode[16] = "PAD";  // Increased size for TFL NaPTAN IDs
+  char stationName[64] = "";     // Human-readable station name
+
+  // TFL-specific Settings
+  char tflLineId[32] = "";       // TFL line ID (e.g., "northern", "circle")
+  char tflDirection[16] = "";    // TFL direction (e.g., "inbound", "outbound")
   
   // Display Settings
   bool useCallingAt = false;
@@ -106,6 +111,32 @@ public:
       strncpy(stationCode, "PAD", sizeof(stationCode) - 1);
       stationCode[sizeof(stationCode) - 1] = '\0';
     }
+    if (doc.containsKey("stationName")) {
+      String name = doc["stationName"].as<String>();
+      name.trim();
+      strncpy(stationName, name.c_str(), sizeof(stationName) - 1);
+      stationName[sizeof(stationName) - 1] = '\0';
+    } else {
+      stationName[0] = '\0';
+    }
+
+    // Load TFL-specific Settings
+    if (doc.containsKey("tflLineId")) {
+      String lineId = doc["tflLineId"].as<String>();
+      lineId.trim();
+      strncpy(tflLineId, lineId.c_str(), sizeof(tflLineId) - 1);
+      tflLineId[sizeof(tflLineId) - 1] = '\0';
+    } else {
+      tflLineId[0] = '\0';
+    }
+    if (doc.containsKey("tflDirection")) {
+      String direction = doc["tflDirection"].as<String>();
+      direction.trim();
+      strncpy(tflDirection, direction.c_str(), sizeof(tflDirection) - 1);
+      tflDirection[sizeof(tflDirection) - 1] = '\0';
+    } else {
+      tflDirection[0] = '\0';
+    }
     
     // Load Display Settings
     useCallingAt = doc["useCallingAt"] | false;
@@ -151,6 +182,11 @@ public:
 
     // Save Station
     doc["stationCode"] = stationCode;
+    doc["stationName"] = stationName;
+
+    // Save TFL-specific Settings
+    doc["tflLineId"] = tflLineId;
+    doc["tflDirection"] = tflDirection;
     
     // Save Display Settings
     doc["useCallingAt"] = useCallingAt;
