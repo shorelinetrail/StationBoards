@@ -208,9 +208,13 @@ bool NationalRailProvider::parseResponse(const String& response,
                   if (cpName == "") cpName = extractTagValue(cpBlock, "locationName", "lt5");
                   cpName = decodeHTMLEntities(cpName);
 
+                  String cpTime = extractTagValue(cpBlock, "st", "lt4");
+                  if (cpTime == "") cpTime = extractTagValue(cpBlock, "st", "lt5");
+
                   if (cpName.length() > 0) {
                     if (callingPoints.length() > 0) callingPoints += ", ";
                     callingPoints += cpName;
+                    if (cpTime.length() > 0) callingPoints += " (" + cpTime + ")";
                   }
 
                   cpPos = cpEnd;
