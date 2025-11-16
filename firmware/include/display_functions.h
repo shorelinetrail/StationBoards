@@ -58,7 +58,7 @@ inline void displayServiceLine(const ServiceData& service, const char* label,
  */
 inline void displayNoServicesMessage(bool fetchingNewStation) {
   u8g2.setFont(u8g2_font_helvB10_tr);
-  String msg = fetchingNewStation ? "Loading station data..." : "No trains scheduled";
+  String msg = fetchingNewStation ? "Loading..." : "No trains scheduled";
   int msgWidth = u8g2.getUTF8Width(msg.c_str());
   u8g2.setCursor((Display::WIDTH - msgWidth) / 2, 35);
   u8g2.print(msg);
