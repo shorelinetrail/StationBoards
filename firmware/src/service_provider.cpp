@@ -328,10 +328,10 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
     path += "?app_key=" + apiKey;
   }
 
-  // Add direction filter if specified
+  // Note: Direction filtering is done in parseResponse, not via API parameter
+  // The TFL Arrivals API doesn't support a 'direction' query parameter
   if (direction.length() > 0) {
-    path += (apiKey.length() > 0 ? "&" : "?") + String("direction=") + direction;
-    Serial.println("  ➡️  Filtering by direction: " + direction);
+    Serial.println("  ➡️  Will filter by direction: " + direction);
   }
 
   request = "GET " + path + " HTTP/1.1\r\n";
@@ -339,6 +339,7 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   request += "Accept: application/json\r\n";
   request += "Connection: close\r\n\r\n";
 
+  Serial.println("  🌐 API Path: " + path);
   return true;
 }
 
@@ -356,18 +357,26 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   int jsonStart = response.indexOf('[');
   if (jsonStart == -1) {
     Serial.println("❌ No JSON array found in response");
+    // Check if it's an error response
+    int errorStart = response.indexOf('{');
+    if (errorStart != -1) {
+      String preview = response.substring(errorStart, min(errorStart + 200, (int)response.length()));
+      Serial.println("📄 Response preview: " + preview);
+    }
     return false;
   }
 
   String jsonBody = response.substring(jsonStart);
+  Serial.println("📏 JSON body size: " + String(jsonBody.length()) + " bytes");
 
   // Use ArduinoJson for parsing
-  // TFL responses can be large (28KB+), so use 32KB buffer
-  DynamicJsonDocument doc(32768);  // 32KB for JSON parsing
+  // TFL responses can be large (30KB+), increase to 40KB buffer
+  DynamicJsonDocument doc(40960);  // 40KB for JSON parsing
   DeserializationError error = deserializeJson(doc, jsonBody);
 
   if (error) {
     Serial.println("❌ JSON parse error: " + String(error.c_str()));
+    Serial.println("📄 First 500 chars of JSON: " + jsonBody.substring(0, min(500, (int)jsonBody.length())));
     return false;
   }
 
@@ -387,18 +396,27 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     }
   }
 
-  // Parse arrivals (max 8 services)
-  int maxServices = min(8, (int)arrivals.size());
+  // Parse arrivals (max 8 services), applying direction filter if set
+  int processedCount = 0;
 
-  for (int i = 0; i < maxServices; i++) {
+  for (int i = 0; i < arrivals.size() && serviceCount < 8; i++) {
     JsonObject arrival = arrivals[i];
 
     const char* lineName = arrival["lineName"];
     const char* towards = arrival["towards"];
     const char* expectedArrival = arrival["expectedArrival"];
+    const char* arrivalDirection = arrival["direction"];
     int timeToStation = arrival["timeToStation"] | 0;
 
     if (!lineName || !towards || !expectedArrival) continue;
+
+    // Apply direction filter if set
+    if (direction.length() > 0 && arrivalDirection) {
+      // TFL API uses "inbound" and "outbound" in lowercase
+      if (direction != String(arrivalDirection)) {
+        continue;  // Skip arrivals that don't match the direction filter
+      }
+    }
 
     // Format scheduled time from expectedArrival
     String scheduledTime = formatTime(String(expectedArrival));
@@ -425,6 +443,13 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
     Serial.println("🚇 " + String(serviceCount + 1) + ": " + scheduledTime + " " + destination + " (" + etd + ")");
     serviceCount++;
+    processedCount++;
+  }
+
+  if (direction.length() > 0) {
+    Serial.println("✅ Filtered " + String(serviceCount) + " arrivals (direction: " + direction + ") from " + String(arrivals.size()) + " total");
+  } else {
+    Serial.println("✅ Processed " + String(serviceCount) + " arrivals");
   }
 
   return serviceCount > 0;
