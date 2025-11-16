@@ -43,25 +43,16 @@ bool NationalRailProvider::buildRequest(const char* stationCode, String& request
     return false;
   }
 
-  // Build SOAP request - use detailed API if calling points are needed
+  // Build SOAP request - basic API includes calling points
   String soapRequest;
   soapRequest.reserve(512);
   soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
   soapRequest += "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">";
   soapRequest += "<soap:Header><AccessToken xmlns=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\">";
   soapRequest += "<TokenValue>" + String(apiToken) + "</TokenValue></AccessToken></soap:Header>";
-
-  if (useCallingAt) {
-    // Use GetDepBoardWithDetails to get calling points
-    soapRequest += "<soap:Body><GetDepBoardWithDetailsRequest xmlns=\"http://thalesgroup.com/RTTI/2017-10-01/ldb/\">";
-    soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
-    soapRequest += "</GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
-  } else {
-    // Use basic GetDepartureBoard for faster response
-    soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
-    soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
-    soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
-  }
+  soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
+  soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
+  soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
 
   // Build HTTP request
   request = "POST " + String(apiPath) + " HTTP/1.1\r\n";
@@ -162,51 +153,84 @@ bool NationalRailProvider::parseResponse(const String& response,
       etd.toCharArray(services[serviceCount].etd, sizeof(services[serviceCount].etd));
       destination.toCharArray(services[serviceCount].destination, sizeof(services[serviceCount].destination));
 
-      // Parse calling points if useCallingAt is enabled
-      if (useCallingAt) {
-        String callingPoints = "";
+      // Parse calling points for first service only if useCallingAt is enabled
+      if (useCallingAt && serviceCount == 0) {
+        // Find subsequentCallingPoints section
+        int cpListIdx = block.indexOf("<lt5:subsequentCallingPoints>");
+        if (cpListIdx == -1) cpListIdx = block.indexOf("<lt4:subsequentCallingPoints>");
 
-        // Look for subsequentCallingPoints in lt7 namespace (detailed response)
-        String callingPointsBlock = extractTagValue(block, "subsequentCallingPoints", "lt7");
-        if (callingPointsBlock == "") {
-          callingPointsBlock = extractTagValue(block, "subsequentCallingPoints", "lt4");
-        }
+        if (cpListIdx != -1) {
+          int cpListEndIdx = block.indexOf("</lt5:subsequentCallingPoints>", cpListIdx);
+          if (cpListEndIdx == -1) cpListEndIdx = block.indexOf("</lt4:subsequentCallingPoints>", cpListIdx);
 
-        if (callingPointsBlock.length() > 0) {
-          // Extract individual calling point location names
-          int cpPos = 0;
-          while (cpPos < callingPointsBlock.length()) {
-            int cpStart = callingPointsBlock.indexOf("<lt7:callingPoint>", cpPos);
-            if (cpStart == -1) cpStart = callingPointsBlock.indexOf("<lt4:callingPoint>", cpPos);
-            if (cpStart == -1) break;
+          if (cpListEndIdx != -1) {
+            String cpSection = block.substring(cpListIdx, cpListEndIdx);
 
-            int cpEnd = callingPointsBlock.indexOf("</lt7:callingPoint>", cpStart);
-            if (cpEnd == -1) cpEnd = callingPointsBlock.indexOf("</lt4:callingPoint>", cpStart);
-            if (cpEnd == -1) break;
+            // Find callingPointList inside subsequentCallingPoints
+            int cpListStart = cpSection.indexOf("<lt4:callingPointList>");
+            if (cpListStart == -1) cpListStart = cpSection.indexOf("<lt5:callingPointList>");
 
-            String cpBlock = callingPointsBlock.substring(cpStart, cpEnd);
-            String locationName = extractTagValue(cpBlock, "locationName", "lt4");
-            if (locationName == "") locationName = extractTagValue(cpBlock, "locationName", "lt7");
-            locationName = decodeHTMLEntities(locationName);
+            if (cpListStart != -1) {
+              int cpListEnd = cpSection.indexOf("</lt4:callingPointList>", cpListStart);
+              if (cpListEnd == -1) cpListEnd = cpSection.indexOf("</lt5:callingPointList>", cpListStart);
 
-            if (locationName.length() > 0) {
-              if (callingPoints.length() > 0) callingPoints += ", ";
-              callingPoints += locationName;
+              if (cpListEnd != -1) {
+                String cpList = cpSection.substring(cpListStart, cpListEnd);
+
+                // Determine which namespace to use
+                String cpTag = "<lt4:callingPoint>";
+                String cpEndTag = "</lt4:callingPoint>";
+                if (cpList.indexOf(cpTag) == -1) {
+                  cpTag = "<lt5:callingPoint>";
+                  cpEndTag = "</lt5:callingPoint>";
+                }
+
+                String callingPoints = "";
+                int cpPos = 0;
+
+                // Extract each calling point
+                while ((cpPos = cpList.indexOf(cpTag, cpPos)) != -1) {
+                  int cpEnd = cpList.indexOf(cpEndTag, cpPos);
+                  if (cpEnd == -1) break;
+
+                  String cpBlock = cpList.substring(cpPos, cpEnd);
+
+                  String cpName = extractTagValue(cpBlock, "locationName", "lt4");
+                  if (cpName == "") cpName = extractTagValue(cpBlock, "locationName", "lt5");
+                  cpName = decodeHTMLEntities(cpName);
+
+                  if (cpName.length() > 0) {
+                    if (callingPoints.length() > 0) callingPoints += ", ";
+                    callingPoints += cpName;
+                  }
+
+                  cpPos = cpEnd;
+                  yield();  // Allow other tasks during long lists
+                }
+
+                if (callingPoints.length() > 0) {
+                  callingPoints.toCharArray(services[serviceCount].callingPoints, sizeof(services[serviceCount].callingPoints));
+                  Serial.println("   ✅ Calling at: " + callingPoints);
+                } else {
+                  services[serviceCount].callingPoints[0] = '\0';
+                }
+              } else {
+                services[serviceCount].callingPoints[0] = '\0';
+              }
+            } else {
+              services[serviceCount].callingPoints[0] = '\0';
             }
-
-            cpPos = cpEnd + 1;
+          } else {
+            services[serviceCount].callingPoints[0] = '\0';
           }
+        } else {
+          services[serviceCount].callingPoints[0] = '\0';
         }
-
-        callingPoints.toCharArray(services[serviceCount].callingPoints, sizeof(services[serviceCount].callingPoints));
       } else {
         services[serviceCount].callingPoints[0] = '\0';
       }
 
       Serial.println("🚂 " + String(serviceCount + 1) + ": " + std + " → " + destination);
-      if (useCallingAt && strlen(services[serviceCount].callingPoints) > 0) {
-        Serial.println("   Calling at: " + String(services[serviceCount].callingPoints));
-      }
       serviceCount++;
     }
 
