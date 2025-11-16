@@ -1774,7 +1774,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const stationLinesCache = new Map();
 
       // Fetch lines serving a TFL station
-      const fetchTflStationLines = async (stationId) => {
+      const fetchTflStationLines = async (stationId, stationName) => {
+        console.log('fetchTflStationLines called with:', stationId, stationName);
         const lineSelect = document.getElementById("tflLine");
         const directionSelect = document.getElementById("tflDirection");
 
@@ -1783,18 +1784,24 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           let lines;
           if (stationLinesCache.has(stationId)) {
             lines = stationLinesCache.get(stationId);
-            console.log(`Using cached lines for ${stationId}`);
+            console.log(`Using cached lines for ${stationId}`, lines);
           } else {
             showToast("Loading lines...", "info");
             lineSelect.innerHTML = '<option value="">Loading...</option>';
             lineSelect.classList.add('loading');
 
+            console.log('Fetching from /tfl-station-lines?stationId=' + stationId);
             const response = await fetch(`/tfl-station-lines?stationId=${stationId}`);
+            console.log('Response status:', response.status, response.statusText);
+
             if (!response.ok) {
-              throw new Error('Failed to fetch lines');
+              const errorText = await response.text();
+              console.error('Error response:', errorText);
+              throw new Error('Failed to fetch lines: ' + response.status);
             }
 
             lines = await response.json();
+            console.log('Received lines:', lines);
             stationLinesCache.set(stationId, lines);  // Cache the result
             console.log(`Station has ${lines.length} tube lines:`, lines);
           }
@@ -1888,9 +1895,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         directionSelect.disabled = false;
 
-        // Auto-apply if direction is already selected
-        if (directionSelect.value) {
-          autoApplySettings();
+        // Auto-select first direction and trigger fetch
+        if (directions.length > 0) {
+          directionSelect.value = directions[0].id;
+          // Trigger change event to apply settings
+          directionSelect.dispatchEvent(new Event('change'));
+          console.log('Auto-selected direction:', directions[0].id);
         }
       });
 
