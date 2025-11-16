@@ -1834,7 +1834,13 @@ void setupWebServer() {
 
     Serial.println("📥 Received response (" + String(response.length()) + " bytes)");
 
+    // Debug: show first 200 chars of response
+    Serial.println("📄 Response preview (first 200 chars):");
+    Serial.println(response.substring(0, min(200, (int)response.length())));
+
     int jsonStart = response.indexOf('{');
+    Serial.println("🔍 JSON start position: " + String(jsonStart));
+
     if (jsonStart == -1) {
       Serial.println("❌ No JSON found in TFL response");
       Serial.println("📄 Response preview (first 500 chars):");
@@ -1845,6 +1851,7 @@ void setupWebServer() {
 
     String jsonBody = response.substring(jsonStart);
     Serial.println("📏 JSON body size: " + String(jsonBody.length()) + " bytes");
+    Serial.println("📄 JSON preview (first 100 chars): " + jsonBody.substring(0, min(100, (int)jsonBody.length())));
 
     DynamicJsonDocument doc(16384);  // 16KB for StopPoint response
     DeserializationError error = deserializeJson(doc, jsonBody);
