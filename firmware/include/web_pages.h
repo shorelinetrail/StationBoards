@@ -1666,6 +1666,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         // Clear station input when switching service types to avoid confusion
         const stationInput = document.getElementById("station");
         const currentValue = stationInput.value.trim();
+        let stationCleared = false;
 
         // Clear if switching between types and code format doesn't match
         if (currentValue) {
@@ -1675,14 +1676,20 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           // Clear if format doesn't match service type
           if ((isUnderground && isCrsCode) || (!isUnderground && isNaptanCode)) {
             stationInput.value = "";
+            stationCleared = true;
             showToast("Station cleared - please select a station for " + (isUnderground ? "TFL Underground" : "National Rail"), "info");
           }
         }
+
+        return stationCleared;
       };
 
       serviceTypeSelect.addEventListener("change", () => {
-        updateServiceTypeUI();
-        autoApplySettings();
+        const stationWasCleared = updateServiceTypeUI();
+        // Only auto-apply if station wasn't cleared
+        if (!stationWasCleared) {
+          autoApplySettings();
+        }
       });
 
       // Initialize UI on load
