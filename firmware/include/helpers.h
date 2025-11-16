@@ -33,16 +33,12 @@ inline ValidationResult validateStationCode(const String& code) {
 
 /**
  * Validates and sanitizes a station code string
- * Extracts 3-letter code from longer strings, converts to uppercase
+ * Trims whitespace and converts to uppercase
+ * Supports both National Rail (3-letter) and TFL (9-12 character) codes
  */
 inline String sanitizeStationCode(String code) {
   code.trim();
   code.toUpperCase();
-
-  if (code.length() >= 3) {
-    code = code.substring(0, 3);
-  }
-
   return code;
 }
 
