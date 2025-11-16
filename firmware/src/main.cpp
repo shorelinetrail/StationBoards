@@ -1432,14 +1432,17 @@ void setupWebServer() {
       safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
     }
 
-    // Validate station code
+    // Validate station code using active service provider
     if (server.hasArg("station")) {
       String station = sanitizeStationCode(server.arg("station"));
       Serial.printf("  Validating station code: '%s'\n", station.c_str());
-      ValidationResult result = validateStationCode(station);
-      if (!result.valid) {
-        Serial.printf("  ❌ Station code validation failed: %s\n", result.message.c_str());
-        server.send(400, "text/plain", "Invalid station code: " + result.message);
+
+      // Use provider-specific validation
+      if (!serviceProvider->isValidStationCode(station.c_str())) {
+        String errorMsg = "Invalid station code format for " + String(serviceProvider->getProviderName());
+        errorMsg += ". Expected: " + String(serviceProvider->getStationCodeDescription());
+        Serial.printf("  ❌ %s\n", errorMsg.c_str());
+        server.send(400, "text/plain", errorMsg);
         return;
       }
       Serial.println("  ✅ Station code valid");
@@ -1570,14 +1573,17 @@ void setupWebServer() {
       safeStrCopy(config.wifiPassword, password, sizeof(config.wifiPassword));
     }
 
-    // Validate station code
+    // Validate station code using active service provider
     if (server.hasArg("station")) {
       String station = sanitizeStationCode(server.arg("station"));
       Serial.printf("  Validating station: '%s'\n", station.c_str());
-      ValidationResult result = validateStationCode(station);
-      if (!result.valid) {
-        Serial.printf("  ❌ Station validation failed: %s\n", result.message.c_str());
-        server.send(400, "text/plain", "Invalid station code: " + result.message);
+
+      // Use provider-specific validation
+      if (!serviceProvider->isValidStationCode(station.c_str())) {
+        String errorMsg = "Invalid station code format for " + String(serviceProvider->getProviderName());
+        errorMsg += ". Expected: " + String(serviceProvider->getStationCodeDescription());
+        Serial.printf("  ❌ %s\n", errorMsg.c_str());
+        server.send(400, "text/plain", errorMsg);
         return;
       }
       Serial.println("  ✅ Station valid");
