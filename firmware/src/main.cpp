@@ -1796,6 +1796,8 @@ void setupWebServer() {
       path += "?app_key=" + String(config.tflApiKey);
     }
 
+    Serial.println("🌐 API Path: " + path);
+
     String request = "GET " + path + " HTTP/1.1\r\n";
     request += "Host: api.tfl.gov.uk\r\n";
     request += "Connection: close\r\n\r\n";
@@ -1812,25 +1814,34 @@ void setupWebServer() {
     }
     client.stop();
 
+    Serial.println("📥 Received response (" + String(response.length()) + " bytes)");
+
     int jsonStart = response.indexOf('{');
     if (jsonStart == -1) {
       Serial.println("❌ No JSON found in TFL response");
+      Serial.println("📄 Response preview (first 500 chars):");
+      Serial.println(response.substring(0, min(500, (int)response.length())));
       server.send(500, "application/json", "{\"error\":\"Invalid TFL API response\"}");
       return;
     }
 
     String jsonBody = response.substring(jsonStart);
-    DynamicJsonDocument doc(4096);  // Reduced from 16KB to 4KB
+    Serial.println("📏 JSON body size: " + String(jsonBody.length()) + " bytes");
+
+    DynamicJsonDocument doc(16384);  // 16KB for StopPoint response
     DeserializationError error = deserializeJson(doc, jsonBody);
 
     if (error) {
       Serial.println("❌ JSON parse error: " + String(error.c_str()));
+      Serial.println("📄 First 300 chars of JSON: " + jsonBody.substring(0, min(300, (int)jsonBody.length())));
       server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
       return;
     }
 
     // Extract tube lines serving this station
     JsonArray lines = doc["lines"];
+    Serial.println("📊 Total lines in response: " + String(lines.size()));
+
     String linesJson = "[";
     int tubeLineCount = 0;
 
@@ -1838,6 +1849,10 @@ void setupWebServer() {
       const char* modeName = lines[i]["modeName"];
       const char* lineId = lines[i]["id"];
       const char* lineName = lines[i]["name"];
+
+      if (modeName) {
+        Serial.println("  Line " + String(i) + ": " + String(lineName ? lineName : "?") + " (mode: " + String(modeName) + ")");
+      }
 
       // Only include tube lines
       if (modeName && strcmp(modeName, "tube") == 0 && lineId && lineName) {
@@ -1848,7 +1863,7 @@ void setupWebServer() {
     }
     linesJson += "]";
 
-    Serial.println("✅ Found " + String(tubeLineCount) + " tube lines");
+    Serial.println("✅ Found " + String(tubeLineCount) + " tube lines (from " + String(lines.size()) + " total)");
     server.send(200, "application/json", linesJson);
   });
 
