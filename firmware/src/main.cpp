@@ -1806,18 +1806,11 @@ void setupWebServer() {
       return;
     }
 
-    // Get response as String (HTTPClient handles chunked encoding automatically)
-    String payload = http.getString();
-    http.end();
+    int contentLength = http.getSize();
+    Serial.println("📥 Content-Length: " + String(contentLength) + " bytes");
 
-    Serial.println("📥 Response size: " + String(payload.length()) + " bytes");
-    Serial.println("📄 Response preview (first 200 chars): " + payload.substring(0, min(200, (int)payload.length())));
-
-    if (payload.length() == 0) {
-      Serial.println("❌ Empty response from TFL API");
-      server.send(500, "application/json", "{\"error\":\"Empty TFL API response\"}");
-      return;
-    }
+    // Get stream (HTTPClient handles chunked encoding internally)
+    WiFiClient* stream = http.getStreamPtr();
 
     // Use filter to only parse the "lines" array we need (saves memory!)
     StaticJsonDocument<200> filter;
@@ -1825,13 +1818,15 @@ void setupWebServer() {
     filter["lines"][0]["name"] = true;
     filter["lines"][0]["modeName"] = true;
 
-    // Parse only the filtered fields (much smaller memory footprint)
+    // Parse directly from stream with filter (no intermediate String allocation!)
+    // HTTPClient's stream automatically handles chunked transfer encoding
     DynamicJsonDocument doc(16384);  // 16KB is enough for just the lines array
-    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
+    DeserializationError error = deserializeJson(doc, *stream, DeserializationOption::Filter(filter));
+
+    http.end();
 
     if (error) {
       Serial.println("❌ JSON parse error: " + String(error.c_str()));
-      Serial.println("📄 First 300 chars: " + payload.substring(0, min(300, (int)payload.length())));
       server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
       return;
     }
