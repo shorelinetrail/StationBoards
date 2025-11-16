@@ -1806,19 +1806,26 @@ void setupWebServer() {
       return;
     }
 
-    int contentLength = http.getSize();
-    Serial.println("📥 Response size: " + String(contentLength) + " bytes");
-
-    // Parse JSON directly from the stream (no need to load into String!)
-    WiFiClient* stream = http.getStreamPtr();
-
-    DynamicJsonDocument doc(49152);  // 48KB buffer
-    DeserializationError error = deserializeJson(doc, *stream);
-
+    // Get response as String (HTTPClient handles chunked encoding automatically)
+    String payload = http.getString();
     http.end();
+
+    Serial.println("📥 Response size: " + String(payload.length()) + " bytes");
+    Serial.println("📄 Response preview (first 200 chars): " + payload.substring(0, min(200, (int)payload.length())));
+
+    if (payload.length() == 0) {
+      Serial.println("❌ Empty response from TFL API");
+      server.send(500, "application/json", "{\"error\":\"Empty TFL API response\"}");
+      return;
+    }
+
+    // Parse JSON from String
+    DynamicJsonDocument doc(49152);  // 48KB buffer
+    DeserializationError error = deserializeJson(doc, payload);
 
     if (error) {
       Serial.println("❌ JSON parse error: " + String(error.c_str()));
+      Serial.println("📄 First 300 chars: " + payload.substring(0, min(300, (int)payload.length())));
       server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
       return;
     }
