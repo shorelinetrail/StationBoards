@@ -157,6 +157,10 @@ bool NationalRailProvider::parseResponse(const String& response,
       if (useCallingAt && serviceCount == 0) {
         Serial.println("   🔍 Looking for calling points...");
 
+        // Debug: print first 500 chars of service block
+        Serial.println("   📋 Service block preview:");
+        Serial.println(block.substring(0, min(500, (int)block.length())));
+
         // Find subsequentCallingPoints section
         int cpListIdx = block.indexOf("<lt5:subsequentCallingPoints>");
         if (cpListIdx == -1) cpListIdx = block.indexOf("<lt4:subsequentCallingPoints>");
