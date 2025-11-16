@@ -1347,17 +1347,25 @@ void updateDisplay() {
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
     Serial.println("📄 Serving root page");
+    Serial.println("  Free heap BEFORE: " + String(ESP.getFreeHeap()) + " bytes");
+    Serial.println("  Largest free block: " + String(ESP.getMaxAllocHeap()) + " bytes");
 
     // Check PROGMEM size first
     size_t progmemSize = strlen_P(CONFIG_PAGE_TEMPLATE);
     Serial.println("  PROGMEM template size: " + String(progmemSize) + " bytes");
 
-    String html = FPSTR(CONFIG_PAGE_TEMPLATE);
+    // Pre-allocate String with extra space for replacements to avoid fragmentation
+    String html;
+    html.reserve(progmemSize + 512);  // Reserve extra space for replacement expansion
+
+    html = FPSTR(CONFIG_PAGE_TEMPLATE);
     Serial.println("  HTML template size: " + String(html.length()) + " bytes");
+    Serial.println("  Free heap AFTER FPSTR: " + String(ESP.getFreeHeap()) + " bytes");
 
     if (html.length() == 0) {
-      Serial.println("  ❌ HTML is empty after FPSTR! Sending error page...");
-      server.send(500, "text/html", "<html><body><h1>Error: Template failed to load (too large?)</h1></body></html>");
+      Serial.println("  ❌ HTML is empty after FPSTR! Not enough contiguous RAM");
+      Serial.println("  ℹ️  Try reducing JSON buffer sizes or implementing streaming HTML");
+      server.send(500, "text/html", "<html><body><h1>Error: Not enough RAM to load page</h1><p>Free heap: " + String(ESP.getFreeHeap()) + " bytes</p><p>Largest block: " + String(ESP.getMaxAllocHeap()) + " bytes</p><p>Template size: " + String(progmemSize) + " bytes</p></body></html>");
       return;
     }
 
@@ -1724,95 +1732,6 @@ void setupWebServer() {
     }
   });
 
-  server.on("/tfl-stations", HTTP_GET, []() {
-    if (!server.hasArg("lineId")) {
-      server.send(400, "application/json", "{\"error\":\"lineId parameter required\"}");
-      return;
-    }
-
-    String lineId = server.arg("lineId");
-    String direction = server.hasArg("direction") ? server.arg("direction") : "inbound";
-
-    Serial.println("🔍 Fetching TFL stations for line: " + lineId + " (" + direction + ")");
-
-    // Use TFL API to get stations by line with route sequence
-    WiFiClientSecure client;
-    client.setInsecure();  // Skip cert validation for simplicity
-
-    if (!client.connect("api.tfl.gov.uk", 443)) {
-      Serial.println("❌ Failed to connect to TFL API");
-      server.send(500, "application/json", "{\"error\":\"Failed to connect to TFL API\"}");
-      return;
-    }
-
-    String path = "/Line/" + lineId + "/Route/Sequence/" + direction + "?serviceTypes=Regular&excludeCrowding=true";
-    if (strlen(config.tflApiKey) > 0) {
-      path += "&app_key=" + String(config.tflApiKey);
-    }
-
-    String request = "GET " + path + " HTTP/1.1\r\n";
-    request += "Host: api.tfl.gov.uk\r\n";
-    request += "Connection: close\r\n\r\n";
-
-    client.print(request);
-
-    // Read response
-    String response = "";
-    unsigned long timeout = millis();
-    while (client.connected() && millis() - timeout < 10000) {
-      if (client.available()) {
-        response += client.readString();
-        break;
-      }
-    }
-    client.stop();
-
-    // Find JSON body
-    int jsonStart = response.indexOf('{');
-    if (jsonStart == -1) {
-      Serial.println("❌ No JSON found in TFL response");
-      server.send(500, "application/json", "{\"error\":\"Invalid TFL API response\"}");
-      return;
-    }
-
-    String jsonBody = response.substring(jsonStart);
-
-    // Parse JSON to extract stations
-    DynamicJsonDocument doc(32768);  // 32KB for large response
-    DeserializationError error = deserializeJson(doc, jsonBody);
-
-    if (error) {
-      Serial.println("❌ JSON parse error: " + String(error.c_str()));
-      server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
-      return;
-    }
-
-    // Extract station points
-    JsonArray stopPointSequences = doc["stopPointSequences"];
-    if (stopPointSequences.size() == 0) {
-      server.send(200, "application/json", "[]");
-      return;
-    }
-
-    // Build station list JSON
-    String stationsJson = "[";
-    JsonArray stopPoints = stopPointSequences[0]["stopPoint"];
-
-    for (size_t i = 0; i < stopPoints.size(); i++) {
-      const char* name = stopPoints[i]["name"];
-      const char* id = stopPoints[i]["id"];
-
-      if (name && id) {
-        if (i > 0) stationsJson += ",";
-        stationsJson += "{\"name\":\"" + String(name) + "\",\"code\":\"" + String(id) + "\"}";
-      }
-    }
-    stationsJson += "]";
-
-    Serial.println("✅ Found " + String(stopPoints.size()) + " stations");
-    server.send(200, "application/json", stationsJson);
-  });
-
   server.on("/tfl-station-lines", HTTP_GET, []() {
     if (!server.hasArg("stationId")) {
       server.send(400, "application/json", "{\"error\":\"stationId parameter required\"}");
@@ -1860,7 +1779,7 @@ void setupWebServer() {
     }
 
     String jsonBody = response.substring(jsonStart);
-    DynamicJsonDocument doc(16384);
+    DynamicJsonDocument doc(4096);  // Reduced from 16KB to 4KB
     DeserializationError error = deserializeJson(doc, jsonBody);
 
     if (error) {
@@ -1939,7 +1858,7 @@ void setupWebServer() {
     }
 
     String jsonBody = response.substring(jsonStart);
-    DynamicJsonDocument doc(8192);
+    DynamicJsonDocument doc(2048);  // Reduced from 8KB to 2KB
     DeserializationError error = deserializeJson(doc, jsonBody);
 
     if (error) {
