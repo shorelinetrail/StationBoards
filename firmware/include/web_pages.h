@@ -1623,6 +1623,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       fetch("/apply", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
         body: formData
       })
       .then(() => {
