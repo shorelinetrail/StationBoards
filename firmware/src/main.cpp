@@ -1808,6 +1808,38 @@ void setupWebServer() {
 
     Serial.println("💾 Free heap before fetch: " + String(ESP.getFreeHeap()) + " bytes");
 
+    // Read stream manually (more reliable than getString() for large responses)
+    WiFiClient* stream = http.getStreamPtr();
+    String payload = "";
+    payload.reserve(45000);  // Pre-allocate to reduce fragmentation
+
+    char buff[512];
+    while (http.connected()) {
+      size_t available = stream->available();
+      if (available) {
+        int bytesToRead = min(available, sizeof(buff));
+        int bytesRead = stream->readBytes(buff, bytesToRead);
+        if (bytesRead > 0) {
+          payload.concat(buff, bytesRead);  // More efficient than char-by-char
+        }
+      } else {
+        delay(1);
+      }
+      // Check for timeout or completion
+      if (!stream->available() && !http.connected()) break;
+    }
+
+    http.end();
+
+    Serial.println("📥 Response size: " + String(payload.length()) + " bytes");
+    Serial.println("💾 Free heap after reading: " + String(ESP.getFreeHeap()) + " bytes");
+
+    if (payload.length() == 0) {
+      Serial.println("❌ Empty response from TFL API");
+      server.send(500, "application/json", "{\"error\":\"Empty TFL API response\"}");
+      return;
+    }
+
     // Use filter to only parse the "lines" array we need (saves memory!)
     StaticJsonDocument<200> filter;
     filter["lines"][0]["id"] = true;
@@ -1815,26 +1847,7 @@ void setupWebServer() {
     filter["lines"][0]["modeName"] = true;
 
     DynamicJsonDocument doc(8192);  // 8KB for filtered lines array
-    DeserializationError error;
-
-    {
-      // Scope the String so it gets destroyed immediately after parsing
-      String payload = http.getString();
-      http.end();
-
-      Serial.println("📥 Response size: " + String(payload.length()) + " bytes");
-      Serial.println("💾 Free heap after getString: " + String(ESP.getFreeHeap()) + " bytes");
-
-      if (payload.length() == 0) {
-        Serial.println("❌ Empty response from TFL API");
-        server.send(500, "application/json", "{\"error\":\"Empty TFL API response\"}");
-        return;
-      }
-
-      // Parse with filter (payload String will be destroyed when this block exits)
-      error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
-    }
-    // payload String is now destroyed, memory freed
+    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
     Serial.println("💾 Free heap after parsing: " + String(ESP.getFreeHeap()) + " bytes");
 
