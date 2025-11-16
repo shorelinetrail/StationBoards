@@ -1797,6 +1797,85 @@ void setupWebServer() {
     server.send(200, "application/json", stationsJson);
   });
 
+  server.on("/tfl-station-lines", HTTP_GET, []() {
+    if (!server.hasArg("stationId")) {
+      server.send(400, "application/json", "{\"error\":\"stationId parameter required\"}");
+      return;
+    }
+
+    String stationId = server.arg("stationId");
+    Serial.println("🔍 Fetching lines for station: " + stationId);
+
+    WiFiClientSecure client;
+    client.setInsecure();
+
+    if (!client.connect("api.tfl.gov.uk", 443)) {
+      Serial.println("❌ Failed to connect to TFL API");
+      server.send(500, "application/json", "{\"error\":\"Failed to connect to TFL API\"}");
+      return;
+    }
+
+    String path = "/StopPoint/" + stationId;
+    if (strlen(config.tflApiKey) > 0) {
+      path += "?app_key=" + String(config.tflApiKey);
+    }
+
+    String request = "GET " + path + " HTTP/1.1\r\n";
+    request += "Host: api.tfl.gov.uk\r\n";
+    request += "Connection: close\r\n\r\n";
+
+    client.print(request);
+
+    String response = "";
+    unsigned long timeout = millis();
+    while (client.connected() && millis() - timeout < 10000) {
+      if (client.available()) {
+        response += client.readString();
+        break;
+      }
+    }
+    client.stop();
+
+    int jsonStart = response.indexOf('{');
+    if (jsonStart == -1) {
+      Serial.println("❌ No JSON found in TFL response");
+      server.send(500, "application/json", "{\"error\":\"Invalid TFL API response\"}");
+      return;
+    }
+
+    String jsonBody = response.substring(jsonStart);
+    DynamicJsonDocument doc(16384);
+    DeserializationError error = deserializeJson(doc, jsonBody);
+
+    if (error) {
+      Serial.println("❌ JSON parse error: " + String(error.c_str()));
+      server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
+      return;
+    }
+
+    // Extract tube lines serving this station
+    JsonArray lines = doc["lines"];
+    String linesJson = "[";
+    int tubeLineCount = 0;
+
+    for (size_t i = 0; i < lines.size(); i++) {
+      const char* modeName = lines[i]["modeName"];
+      const char* lineId = lines[i]["id"];
+      const char* lineName = lines[i]["name"];
+
+      // Only include tube lines
+      if (modeName && strcmp(modeName, "tube") == 0 && lineId && lineName) {
+        if (tubeLineCount > 0) linesJson += ",";
+        linesJson += "{\"id\":\"" + String(lineId) + "\",\"name\":\"" + String(lineName) + "\"}";
+        tubeLineCount++;
+      }
+    }
+    linesJson += "]";
+
+    Serial.println("✅ Found " + String(tubeLineCount) + " tube lines");
+    server.send(200, "application/json", linesJson);
+  });
+
   server.on("/reset", HTTP_GET, []() {
     if (SPIFFS.exists("/config.json")) {
       SPIFFS.remove("/config.json");

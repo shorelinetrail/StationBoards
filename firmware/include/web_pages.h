@@ -758,40 +758,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="tflkey-help">Free API key from <a href="https://api.tfl.gov.uk" target="_blank">api.tfl.gov.uk</a></span>
         </div>
 
-        <div class="form-group" id="tflLineGroup" style="display:none;">
-          <label for="tflLine">
-            Underground Line
-            <span class="info-tooltip" title="Select which Underground line to view" aria-label="Information: Select tube line">?</span>
-          </label>
-          <select id="tflLine" name="tflLine" aria-describedby="tflline-help">
-            <option value="">-- Select Line --</option>
-            <option value="bakerloo">Bakerloo</option>
-            <option value="central">Central</option>
-            <option value="circle">Circle</option>
-            <option value="district">District</option>
-            <option value="hammersmith-city">Hammersmith & City</option>
-            <option value="jubilee">Jubilee</option>
-            <option value="metropolitan">Metropolitan</option>
-            <option value="northern">Northern</option>
-            <option value="piccadilly">Piccadilly</option>
-            <option value="victoria">Victoria</option>
-            <option value="waterloo-city">Waterloo & City</option>
-          </select>
-          <span class="help-text" id="tflline-help">Choose a line to filter stations</span>
-        </div>
-
-        <div class="form-group" id="tflDirectionGroup" style="display:none;">
-          <label for="tflDirection">
-            Direction
-            <span class="info-tooltip" title="Train direction on the selected line" aria-label="Information: Train direction">?</span>
-          </label>
-          <select id="tflDirection" name="tflDirection" aria-describedby="tfldirection-help">
-            <option value="inbound">Inbound</option>
-            <option value="outbound">Outbound</option>
-          </select>
-          <span class="help-text" id="tfldirection-help">Direction of travel</span>
-        </div>
-
         <div class="form-group">
           <label for="station">
             <span id="stationLabel">Station Code (CRS)</span>
@@ -818,6 +784,29 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <div id="stationAutocomplete" class="autocomplete-results" role="listbox" aria-label="Station suggestions"></div>
           </div>
           <span class="help-text" id="station-help">Start typing to search for a station</span>
+        </div>
+
+        <div class="form-group" id="tflLineGroup" style="display:none;">
+          <label for="tflLine">
+            Line at Station
+            <span class="info-tooltip" title="Which line to monitor at this station" aria-label="Information: Select tube line">?</span>
+          </label>
+          <select id="tflLine" name="tflLine" aria-describedby="tflline-help" disabled>
+            <option value="">-- Select station first --</option>
+          </select>
+          <span class="help-text" id="tflline-help">Choose which line to monitor at this station</span>
+        </div>
+
+        <div class="form-group" id="tflDirectionGroup" style="display:none;">
+          <label for="tflDirection">
+            Direction
+            <span class="info-tooltip" title="Train direction on the selected line" aria-label="Information: Train direction">?</span>
+          </label>
+          <select id="tflDirection" name="tflDirection" aria-describedby="tfldirection-help" disabled>
+            <option value="inbound">Inbound</option>
+            <option value="outbound">Outbound</option>
+          </select>
+          <span class="help-text" id="tfldirection-help">Direction of travel on this line</span>
         </div>
 
         <div class="form-row">
@@ -1235,7 +1224,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.classList.remove("error");
       input.blur();
 
-      autoApplySettings(code);
+      // If TFL, fetch lines for this station
+      const serviceTypeSelect = document.getElementById("serviceType");
+      const isUnderground = serviceTypeSelect && serviceTypeSelect.value === "1";
+
+      if (isUnderground) {
+        fetchTflStationLines(code);
+      } else {
+        autoApplySettings(code);
+      }
     };
 
     // ==================== Tab Switching ====================
@@ -1541,7 +1538,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       showToast(`Station set to: ${code}`, "success");
       input.blur();
 
-      autoApplySettings(code);
+      // If TFL, fetch lines for this station
+      const serviceTypeSelect = document.getElementById("serviceType");
+      const isUnderground = serviceTypeSelect && serviceTypeSelect.value === "1";
+
+      if (isUnderground) {
+        fetchTflStationLines(code);
+      } else {
+        autoApplySettings(code);
+      }
     };
 
     // ==================== Form Validation ====================
@@ -1715,8 +1720,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const stationInput = document.getElementById("station");
         if (isUnderground) {
           stationLabel.textContent = "TFL Station";
-          stationTooltip.title = "Select a line first, then choose your station";
-          stationInput.placeholder = "Select a line above, then type to search...";
+          stationTooltip.title = "Type to search for your underground station";
+          stationInput.placeholder = "Type station name to search...";
         } else {
           stationLabel.textContent = "Station Code (CRS)";
           stationTooltip.title = "Three-letter National Rail station code";
@@ -1743,46 +1748,45 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         return stationCleared;
       };
 
-      // Fetch TFL stations by line and direction
-      const fetchTflStations = async () => {
+      // Fetch lines serving a TFL station
+      const fetchTflStationLines = async (stationId) => {
         const lineSelect = document.getElementById("tflLine");
         const directionSelect = document.getElementById("tflDirection");
-        const lineId = lineSelect.value;
-        const direction = directionSelect.value;
-
-        if (!lineId) {
-          tflStationData = [];
-          return;
-        }
-
-        showToast("Loading stations for " + lineSelect.options[lineSelect.selectedIndex].text + "...", "info");
 
         try {
-          const response = await fetch(`/tfl-stations?lineId=${lineId}&direction=${direction}`);
+          showToast("Loading lines for this station...", "info");
+
+          const response = await fetch(`/tfl-station-lines?stationId=${stationId}`);
           if (!response.ok) {
-            throw new Error('Failed to fetch stations');
+            throw new Error('Failed to fetch lines');
           }
 
-          const stations = await response.json();
-          console.log(`Received ${stations.length} stations from API:`, stations.slice(0, 5));
+          const lines = await response.json();
+          console.log(`Station has ${lines.length} tube lines:`, lines);
 
-          tflStationData = stations.map(s => ({
-            name: s.name,
-            code: s.code,
-            line: lineSelect.options[lineSelect.selectedIndex].text
-          }));
+          // Populate line dropdown
+          lineSelect.innerHTML = '<option value="">-- Select Line --</option>';
+          lines.forEach(line => {
+            const option = document.createElement('option');
+            option.value = line.id;
+            option.textContent = line.name;
+            lineSelect.appendChild(option);
+          });
 
-          console.log(`tflStationData now has ${tflStationData.length} stations`);
+          // Enable line dropdown
+          lineSelect.disabled = false;
+          directionSelect.disabled = true;
 
-          // Update placeholder to indicate stations are ready
-          const stationInput = document.getElementById("station");
-          stationInput.placeholder = "Type station name to search...";
-
-          showToast(`Loaded ${stations.length} stations`, "success");
+          if (lines.length > 0) {
+            showToast(`Found ${lines.length} line${lines.length > 1 ? 's' : ''} at this station`, "success");
+          } else {
+            showToast("No tube lines found at this station", "warning");
+          }
         } catch (error) {
-          console.error('Error fetching TFL stations:', error);
-          showToast("Failed to load stations", "error");
-          tflStationData = [];
+          console.error('Error fetching station lines:', error);
+          showToast("Failed to load lines", "error");
+          lineSelect.innerHTML = '<option value="">-- Error loading lines --</option>';
+          lineSelect.disabled = true;
         }
       };
 
@@ -1794,9 +1798,23 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         }
       });
 
-      // TFL line and direction change handlers
-      document.getElementById("tflLine").addEventListener("change", fetchTflStations);
-      document.getElementById("tflDirection").addEventListener("change", fetchTflStations);
+      // TFL line selection handler - enable direction when line is selected
+      document.getElementById("tflLine").addEventListener("change", () => {
+        const lineSelect = document.getElementById("tflLine");
+        const directionSelect = document.getElementById("tflDirection");
+
+        if (lineSelect.value) {
+          directionSelect.disabled = false;
+          autoApplySettings();
+        } else {
+          directionSelect.disabled = true;
+        }
+      });
+
+      // TFL direction selection handler
+      document.getElementById("tflDirection").addEventListener("change", () => {
+        autoApplySettings();
+      });
 
       // Initialize UI on load
       updateServiceTypeUI();
