@@ -1614,6 +1614,11 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const y3Field = document.getElementById('y3');
       if (y3Field) formData.append('y3', y3Field.value);
 
+      console.log('=== autoApplySettings Debug ===');
+      console.log('stationCodeOverride:', stationCodeOverride);
+      console.log('stationValue:', stationValue);
+      console.log('formData contents:', formData.toString());
+
       showToast("Applying changes...", "info");
 
       fetch("/apply", {
