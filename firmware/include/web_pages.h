@@ -763,13 +763,21 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span id="stationLabel">Station Code (CRS)</span>
             <span class="info-tooltip" id="stationTooltip" title="Three-letter National Rail station code" aria-label="Information: Three-letter National Rail station code">?</span>
           </label>
-          <div class="preset-stations">
+          <div class="preset-stations" id="railPresets">
             <button type="button" class="preset-btn" data-station="PAD" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
             <button type="button" class="preset-btn" data-station="VIC" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
             <button type="button" class="preset-btn" data-station="WAT" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
             <button type="button" class="preset-btn" data-station="KGX" aria-label="Select Kings Cross station">KGX<br><small>Kings Cross</small></button>
             <button type="button" class="preset-btn" data-station="EUS" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
             <button type="button" class="preset-btn" data-station="LST" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
+          </div>
+          <div class="preset-stations" id="tflPresets" style="display:none;">
+            <button type="button" class="preset-btn" data-station="940GZZLUPAC" aria-label="Select Paddington Underground">PAC<br><small>Paddington</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUOXC" aria-label="Select Oxford Circus">OXC<br><small>Oxford Circus</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUWLO" aria-label="Select Waterloo">WLO<br><small>Waterloo</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUKSX" aria-label="Select King's Cross">KSX<br><small>King's Cross</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUVIC" aria-label="Select Victoria">VIC<br><small>Victoria</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLULNB" aria-label="Select London Bridge">LNB<br><small>London Bridge</small></button>
           </div>
           <div class="autocomplete-wrapper">
             <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="50" aria-label="Station code or name" aria-describedby="station-help">
@@ -999,14 +1007,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     let ws = null;
     let reconnectTimer = null;
     let previewUpdateTimer = null;
-    let stationData = [];
+    let railStationData = [];
+    let tflStationData = [];
     let stationDataLoaded = false;
     let autocompleteJustSelected = false;
 
     // ==================== Station Data Loading ====================
 
     const loadStationData = () => {
-      const fallbackStations = [
+      const fallbackRailStations = [
         {name: "London Paddington", code: "PAD"}, {name: "London Victoria", code: "VIC"},
         {name: "London Waterloo", code: "WAT"}, {name: "London Kings Cross", code: "KGX"},
         {name: "London Euston", code: "EUS"}, {name: "London Liverpool Street", code: "LST"},
@@ -1033,26 +1042,72 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         {name: "Chester", code: "CTR"}, {name: "Peterborough", code: "PBO"}
       ];
 
+      // TFL Underground stations with NaPTAN IDs
+      const tflUndergroundStations = [
+        // Central Line
+        {name: "Bank", code: "940GZZLUBNK", line: "Central"}, {name: "Bond Street", code: "940GZZLUBND", line: "Central"},
+        {name: "Chancery Lane", code: "940GZZLUCHL", line: "Central"}, {name: "Ealing Broadway", code: "940GZZLUEBN", line: "Central"},
+        {name: "Epping", code: "940GZZLUEPG", line: "Central"}, {name: "Holborn", code: "940GZZLUHBN", line: "Central"},
+        {name: "Liverpool Street", code: "940GZZLULVT", line: "Central"}, {name: "Marble Arch", code: "940GZZLUMAR", line: "Central"},
+        {name: "Mile End", code: "940GZZLUMND", line: "Central"}, {name: "Notting Hill Gate", code: "940GZZLUNHG", line: "Central"},
+        {name: "Oxford Circus", code: "940GZZLUOXC", line: "Central"}, {name: "Tottenham Court Road", code: "940GZZLUTCR", line: "Central"},
+
+        // Piccadilly Line
+        {name: "Piccadilly Circus", code: "940GZZLUPCC", line: "Piccadilly"}, {name: "Leicester Square", code: "940GZZLULSQ", line: "Piccadilly"},
+        {name: "Covent Garden", code: "940GZZLUCGN", line: "Piccadilly"}, {name: "Knightsbridge", code: "940GZZLUKNB", line: "Piccadilly"},
+        {name: "South Kensington", code: "940GZZLUSKS", line: "Piccadilly"}, {name: "Heathrow Terminal 5", code: "940GZZLUHR5", line: "Piccadilly"},
+        {name: "Heathrow Terminals 2 & 3", code: "940GZZLUHR3", line: "Piccadilly"},
+
+        // Northern Line
+        {name: "King's Cross St. Pancras", code: "940GZZLUKSX", line: "Northern"}, {name: "Camden Town", code: "940GZZLUCTN", line: "Northern"},
+        {name: "Euston", code: "940GZZLUEUS", line: "Northern"}, {name: "Old Street", code: "940GZZLUOST", line: "Northern"},
+        {name: "Moorgate", code: "940GZZLUMGT", line: "Northern"}, {name: "Angel", code: "940GZZLUAGL", line: "Northern"},
+        {name: "Waterloo", code: "940GZZLUWLO", line: "Northern"}, {name: "Embankment", code: "940GZZLUEMB", line: "Northern"},
+
+        // Victoria Line
+        {name: "Victoria", code: "940GZZLUVIC", line: "Victoria"}, {name: "Green Park", code: "940GZZLUGPK", line: "Victoria"},
+        {name: "Warren Street", code: "940GZZLUWRR", line: "Victoria"}, {name: "Highbury & Islington", code: "940GZZLUHSB", line: "Victoria"},
+
+        // Circle, District, H&C Line
+        {name: "Paddington", code: "940GZZLUPAC", line: "Circle/H&C"}, {name: "Westminster", code: "940GZZLUWSM", line: "Circle/District"},
+        {name: "Tower Hill", code: "940GZZLUTWH", line: "Circle/District"}, {name: "Gloucester Road", code: "940GZZLUGTR", line: "Circle/District"},
+        {name: "Sloane Square", code: "940GZZLUSSP", line: "Circle/District"}, {name: "Earl's Court", code: "940GZZLUECT", line: "District"},
+
+        // Jubilee Line
+        {name: "London Bridge", code: "940GZZLULNB", line: "Jubilee"}, {name: "Canary Wharf", code: "940GZZLUCYF", line: "Jubilee"},
+        {name: "Stratford", code: "940GZZLUSTD", line: "Jubilee"}, {name: "Baker Street", code: "940GZZLUBST", line: "Jubilee"},
+
+        // Bakerloo Line
+        {name: "Charing Cross", code: "940GZZLUCHX", line: "Bakerloo"}, {name: "Regent's Park", code: "940GZZLURGP", line: "Bakerloo"},
+
+        // Metropolitan Line
+        {name: "Aldgate", code: "940GZZLUALD", line: "Metropolitan"}, {name: "Harrow-on-the-Hill", code: "940GZZLUHAR", line: "Metropolitan"}
+      ];
+
       const stationsURL = "https://raw.githubusercontent.com/davwheat/uk-railway-stations/main/stations.json";
 
+      // Load National Rail stations
       fetchWithTimeout(stationsURL, {}, 10000)
         .then(response => {
           if (!response.ok) throw new Error("API failed");
           return response.json();
         })
         .then(data => {
-          stationData = data.map(station => ({
+          railStationData = data.map(station => ({
             name: station.stationName || station.name,
             code: (station.crsCode || station.code || "").toUpperCase()
           })).filter(station => station.code && station.code.length === 3);
-          stationDataLoaded = true;
-          console.log(`Loaded ${stationData.length} stations from API`);
+          console.log(`Loaded ${railStationData.length} National Rail stations`);
         })
         .catch(error => {
-          console.log("Using fallback station data:", error.message);
-          stationData = fallbackStations;
-          stationDataLoaded = true;
+          console.log("Using fallback National Rail data:", error.message);
+          railStationData = fallbackRailStations;
         });
+
+      // Load TFL stations
+      tflStationData = tflUndergroundStations;
+      stationDataLoaded = true;
+      console.log(`Loaded ${tflStationData.length} TFL Underground stations`);
     };
 
     // ==================== Station Autocomplete ====================
@@ -1070,9 +1125,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           return;
         }
 
-        const matches = stationData.filter(station =>
+        // Use appropriate dataset based on service type
+        const serviceTypeSelect = document.getElementById("serviceType");
+        const isUnderground = serviceTypeSelect && serviceTypeSelect.value === "1";
+        const currentStationData = isUnderground ? tflStationData : railStationData;
+
+        const matches = currentStationData.filter(station =>
           station.name.toUpperCase().includes(query) ||
-          station.code.includes(query)
+          station.code.toUpperCase().includes(query)
         ).slice(0, 10);
 
         if (matches.length === 0) {
@@ -1084,9 +1144,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         results.innerHTML = matches.map(station => {
           const escapedName = escapeHtml(station.name);
           const escapedCode = escapeHtml(station.code);
+          const lineInfo = station.line ? ` <small>(${escapeHtml(station.line)})</small>` : '';
 
           return `<div class="autocomplete-item" role="option" data-code="${escapedCode}" data-name="${escapedName}" tabindex="0">
-            <span class="station-name">${escapedName}</span>
+            <span class="station-name">${escapedName}${lineInfo}</span>
             <span class="station-code">${escapedCode}</span>
           </div>`;
         }).join("");
@@ -1585,10 +1646,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const tflApiKeyGroup = document.getElementById("tflApiKeyGroup");
       const stationLabel = document.getElementById("stationLabel");
       const stationTooltip = document.getElementById("stationTooltip");
+      const railPresets = document.getElementById("railPresets");
+      const tflPresets = document.getElementById("tflPresets");
 
       const updateServiceTypeUI = () => {
         const isUnderground = serviceTypeSelect.value === "1";
         tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+        railPresets.style.display = isUnderground ? "none" : "flex";
+        tflPresets.style.display = isUnderground ? "flex" : "none";
 
         if (isUnderground) {
           stationLabel.textContent = "TFL Station ID (NaPTAN)";
