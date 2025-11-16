@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <SPIFFS.h>
 #include <time.h>
 #include <ArduinoOTA.h>
@@ -1346,57 +1347,6 @@ void updateDisplay() {
   u8g2.sendBuffer();
 }
 
-// Helper function to decode chunked transfer encoding
-String decodeChunkedBody(const String& chunkedBody) {
-  String decoded = "";
-  int pos = 0;
-  int chunkCount = 0;
-
-  Serial.println("  🔍 Starting chunk decode (total: " + String(chunkedBody.length()) + " bytes)");
-
-  while (pos < chunkedBody.length()) {
-    // Find the chunk size line (hex number followed by \r\n)
-    int crlfPos = chunkedBody.indexOf("\r\n", pos);
-    if (crlfPos == -1) {
-      Serial.println("  ⚠️  No more CRLF found at pos " + String(pos));
-      break;
-    }
-
-    // Extract chunk size (hex string)
-    String chunkSizeStr = chunkedBody.substring(pos, crlfPos);
-    chunkSizeStr.trim();
-
-    // Convert hex to decimal
-    long chunkSize = strtol(chunkSizeStr.c_str(), NULL, 16);
-    chunkCount++;
-
-    Serial.println("  📦 Chunk " + String(chunkCount) + ": " + chunkSizeStr + " (hex) = " + String(chunkSize) + " bytes");
-
-    if (chunkSize == 0) {
-      // Last chunk, we're done
-      Serial.println("  ✅ Found final chunk marker (0)");
-      break;
-    }
-
-    // Move past the chunk size line
-    pos = crlfPos + 2;
-
-    // Extract the chunk data
-    if (pos + chunkSize <= chunkedBody.length()) {
-      decoded += chunkedBody.substring(pos, pos + chunkSize);
-      Serial.println("     ✓ Extracted " + String(chunkSize) + " bytes (total decoded: " + String(decoded.length()) + ")");
-    } else {
-      Serial.println("     ⚠️  Not enough data! Need " + String(chunkSize) + " but only " + String(chunkedBody.length() - pos) + " available");
-    }
-
-    // Move past the chunk data and trailing \r\n
-    pos += chunkSize + 2;
-  }
-
-  Serial.println("  ✅ Decoded " + String(chunkCount) + " chunks, total: " + String(decoded.length()) + " bytes");
-  return decoded;
-}
-
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
     Serial.println("📄 Serving root page");
@@ -1832,106 +1782,43 @@ void setupWebServer() {
     String stationId = server.arg("stationId");
     Serial.println("🔍 Fetching lines for station: " + stationId);
 
+    // Use HTTPClient which handles HTTPS, chunked encoding, etc. automatically
+    HTTPClient http;
     WiFiClientSecure client;
     client.setInsecure();
 
-    if (!client.connect("api.tfl.gov.uk", 443)) {
-      Serial.println("❌ Failed to connect to TFL API");
-      server.send(500, "application/json", "{\"error\":\"Failed to connect to TFL API\"}");
-      return;
-    }
-
-    String path = "/StopPoint/" + stationId;
+    String url = "https://api.tfl.gov.uk/StopPoint/" + stationId;
     if (strlen(config.tflApiKey) > 0) {
-      path += "?app_key=" + String(config.tflApiKey);
+      url += "?app_key=" + String(config.tflApiKey);
     }
 
-    Serial.println("🌐 API Path: " + path);
+    Serial.println("🌐 URL: " + url);
 
-    String request = "GET " + path + " HTTP/1.1\r\n";
-    request += "Host: api.tfl.gov.uk\r\n";
-    request += "Connection: close\r\n\r\n";
+    http.begin(client, url);
+    http.setTimeout(15000);  // 15 second timeout
 
-    client.print(request);
-    Serial.println("📤 Request sent, waiting for response...");
+    int httpCode = http.GET();
 
-    // Skip HTTP headers and read only JSON body to save memory
-    String headerBuffer = "";
-    String jsonBody = "";
-    unsigned long timeout = millis();
-    bool headerComplete = false;
-    int headerEndPos = -1;
-
-    while (client.connected() && millis() - timeout < 15000) {
-      while (client.available()) {
-        char c = client.read();
-        timeout = millis(); // Reset timeout on each byte received
-
-        if (!headerComplete) {
-          // Still reading headers - store in temporary buffer to detect end
-          headerBuffer += c;
-
-          // Check for end of headers marker
-          headerEndPos = headerBuffer.indexOf("\r\n\r\n");
-          if (headerEndPos >= 0) {
-            headerComplete = true;
-            Serial.println("📋 Headers received (" + String(headerBuffer.length()) + " bytes), reading body...");
-
-            // If there's any data after the headers in our buffer, add it to jsonBody
-            if (headerBuffer.length() > headerEndPos + 4) {
-              jsonBody = headerBuffer.substring(headerEndPos + 4);
-            }
-
-            // Clear header buffer to free memory
-            headerBuffer = "";
-          }
-        } else {
-          // Headers done, store everything in JSON body
-          jsonBody += c;
-        }
-      }
-
-      // If headers complete and no more data for 1 second, assume done
-      if (headerComplete && millis() - timeout > 1000) {
-        break;
-      }
-
-      delay(10);
-    }
-    client.stop();
-
-    Serial.println("📥 Received JSON body (" + String(jsonBody.length()) + " bytes)");
-
-    if (jsonBody.length() == 0) {
-      Serial.println("❌ No JSON body received");
-      if (headerBuffer.length() > 0) {
-        Serial.println("📄 Headers received (first 500 chars):");
-        Serial.println(headerBuffer.substring(0, min(500, (int)headerBuffer.length())));
-      }
-      server.send(500, "application/json", "{\"error\":\"No JSON data in TFL response\"}");
+    if (httpCode != HTTP_CODE_OK) {
+      Serial.println("❌ HTTP request failed, code: " + String(httpCode));
+      http.end();
+      server.send(500, "application/json", "{\"error\":\"TFL API request failed\"}");
       return;
     }
 
-    Serial.println("📄 Raw body preview (first 200 chars): " + jsonBody.substring(0, min(200, (int)jsonBody.length())));
+    int contentLength = http.getSize();
+    Serial.println("📥 Response size: " + String(contentLength) + " bytes");
 
-    // Decode chunked transfer encoding
-    Serial.println("🔧 Decoding chunked transfer encoding...");
-    String decodedJson = decodeChunkedBody(jsonBody);
-    Serial.println("✅ Decoded JSON (" + String(decodedJson.length()) + " bytes)");
-    Serial.println("📄 Decoded preview (first 200 chars): " + decodedJson.substring(0, min(200, (int)decodedJson.length())));
+    // Parse JSON directly from the stream (no need to load into String!)
+    WiFiClient* stream = http.getStreamPtr();
 
-    if (decodedJson.length() == 0) {
-      Serial.println("❌ Failed to decode chunked response");
-      server.send(500, "application/json", "{\"error\":\"Failed to decode TFL response\"}");
-      return;
-    }
+    DynamicJsonDocument doc(49152);  // 48KB buffer
+    DeserializationError error = deserializeJson(doc, *stream);
 
-    DynamicJsonDocument doc(49152);  // 48KB for StopPoint response (increased from 16KB)
-    DeserializationError error = deserializeJson(doc, decodedJson);
+    http.end();
 
     if (error) {
       Serial.println("❌ JSON parse error: " + String(error.c_str()));
-      Serial.println("📄 First 300 chars of decoded JSON: " + decodedJson.substring(0, min(300, (int)decodedJson.length())));
       server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
       return;
     }
