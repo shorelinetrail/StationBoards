@@ -1710,16 +1710,18 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           modeSelect.disabled = false;
         }
 
+        const stationInput = document.getElementById("station");
         if (isUnderground) {
-          stationLabel.textContent = "TFL Station ID (NaPTAN)";
-          stationTooltip.title = "TFL Station NaPTAN ID (e.g., 940GZZLUPAC for Paddington)";
+          stationLabel.textContent = "TFL Station";
+          stationTooltip.title = "Select a line first, then choose your station";
+          stationInput.placeholder = "Select a line above, then type to search...";
         } else {
           stationLabel.textContent = "Station Code (CRS)";
           stationTooltip.title = "Three-letter National Rail station code";
+          stationInput.placeholder = "Type station name or code...";
         }
 
         // Clear station input when switching service types to avoid confusion
-        const stationInput = document.getElementById("station");
         const currentValue = stationInput.value.trim();
         let stationCleared = false;
 
@@ -1765,6 +1767,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             code: s.code,
             line: lineSelect.options[lineSelect.selectedIndex].text
           }));
+
+          // Update placeholder to indicate stations are ready
+          const stationInput = document.getElementById("station");
+          stationInput.placeholder = "Type station name to search...";
 
           showToast(`Loaded ${stations.length} stations`, "success");
         } catch (error) {
