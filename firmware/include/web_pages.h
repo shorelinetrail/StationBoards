@@ -1528,6 +1528,95 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // ==================== Station Presets ====================
 
+    // Cache for station lines to avoid redundant API calls
+    const stationLinesCache = new Map();
+
+    // Fetch lines serving a TFL station
+    const fetchTflStationLines = async (stationId, stationName) => {
+      console.log('fetchTflStationLines called with:', stationId, stationName);
+      const lineSelect = document.getElementById("tflLine");
+      const directionSelect = document.getElementById("tflDirection");
+
+      try {
+        // Check cache first
+        let lines;
+        if (stationLinesCache.has(stationId)) {
+          lines = stationLinesCache.get(stationId);
+          console.log(`Using cached lines for ${stationId}`, lines);
+        } else {
+          showToast("Loading lines...", "info");
+          lineSelect.innerHTML = '<option value="">Loading...</option>';
+          lineSelect.classList.add('loading');
+
+          console.log('Fetching from /tfl-station-lines?stationId=' + stationId);
+          const response = await fetch(`/tfl-station-lines?stationId=${stationId}`);
+          console.log('Response status:', response.status, response.statusText);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
+            throw new Error('Failed to fetch lines: ' + response.status);
+          }
+
+          lines = await response.json();
+          console.log('Received lines:', lines);
+          stationLinesCache.set(stationId, lines);  // Cache the result
+          console.log(`Station has ${lines.length} tube lines:`, lines);
+        }
+
+        // TFL official line colors
+        const lineColors = {
+          'bakerloo': '#B36305',
+          'central': '#E32017',
+          'circle': '#FFD300',
+          'district': '#00782A',
+          'hammersmith-city': '#F3A9BB',
+          'jubilee': '#A0A5A9',
+          'metropolitan': '#9B0056',
+          'northern': '#000000',
+          'piccadilly': '#003688',
+          'victoria': '#0098D4',
+          'waterloo-city': '#95CDBA',
+          'elizabeth': '#7156A5',
+          'dlr': '#00A4A7',
+          'london-overground': '#EE7C0E',
+          'tram': '#84B817'
+        };
+
+        // Populate line dropdown with color badges
+        lineSelect.innerHTML = '<option value="">-- Select Line --</option>';
+        lines.forEach(line => {
+          const option = document.createElement('option');
+          option.value = line.id;
+          const color = lineColors[line.id] || '#666';
+          option.textContent = `⬤ ${line.name}`;
+          option.style.color = color;
+          lineSelect.appendChild(option);
+        });
+
+        lineSelect.classList.remove('loading');
+        lineSelect.disabled = false;
+        directionSelect.disabled = true;
+
+        // Auto-select if only one line available
+        if (lines.length === 1) {
+          lineSelect.value = lines[0].id;
+          lineSelect.dispatchEvent(new Event('change'));
+          showToast(`Auto-selected ${lines[0].name}`, "success");
+        } else if (lines.length > 0) {
+          showToast(`Found ${lines.length} lines at this station`, "success");
+        } else {
+          showToast("No tube lines found at this station", "warning");
+        }
+      } catch (error) {
+        console.error('Error fetching station lines:', error);
+        showToast("Failed to load lines. Check your TFL API key or try refreshing the page.", "error");
+        lineSelect.innerHTML = '<option value="">-- Error loading lines --</option>';
+        lineSelect.classList.remove('loading');
+        lineSelect.disabled = true;
+      }
+    };
+
     const setStation = (code, name) => {
       const input = document.getElementById("station");
 
@@ -1768,95 +1857,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         }
 
         return stationCleared;
-      };
-
-      // Cache for station lines to avoid redundant API calls
-      const stationLinesCache = new Map();
-
-      // Fetch lines serving a TFL station
-      const fetchTflStationLines = async (stationId, stationName) => {
-        console.log('fetchTflStationLines called with:', stationId, stationName);
-        const lineSelect = document.getElementById("tflLine");
-        const directionSelect = document.getElementById("tflDirection");
-
-        try {
-          // Check cache first
-          let lines;
-          if (stationLinesCache.has(stationId)) {
-            lines = stationLinesCache.get(stationId);
-            console.log(`Using cached lines for ${stationId}`, lines);
-          } else {
-            showToast("Loading lines...", "info");
-            lineSelect.innerHTML = '<option value="">Loading...</option>';
-            lineSelect.classList.add('loading');
-
-            console.log('Fetching from /tfl-station-lines?stationId=' + stationId);
-            const response = await fetch(`/tfl-station-lines?stationId=${stationId}`);
-            console.log('Response status:', response.status, response.statusText);
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error('Error response:', errorText);
-              throw new Error('Failed to fetch lines: ' + response.status);
-            }
-
-            lines = await response.json();
-            console.log('Received lines:', lines);
-            stationLinesCache.set(stationId, lines);  // Cache the result
-            console.log(`Station has ${lines.length} tube lines:`, lines);
-          }
-
-          // TFL official line colors
-          const lineColors = {
-            'bakerloo': '#B36305',
-            'central': '#E32017',
-            'circle': '#FFD300',
-            'district': '#00782A',
-            'hammersmith-city': '#F3A9BB',
-            'jubilee': '#A0A5A9',
-            'metropolitan': '#9B0056',
-            'northern': '#000000',
-            'piccadilly': '#003688',
-            'victoria': '#0098D4',
-            'waterloo-city': '#95CDBA',
-            'elizabeth': '#7156A5',
-            'dlr': '#00A4A7',
-            'london-overground': '#EE7C0E',
-            'tram': '#84B817'
-          };
-
-          // Populate line dropdown with color badges
-          lineSelect.innerHTML = '<option value="">-- Select Line --</option>';
-          lines.forEach(line => {
-            const option = document.createElement('option');
-            option.value = line.id;
-            const color = lineColors[line.id] || '#666';
-            option.textContent = `⬤ ${line.name}`;
-            option.style.color = color;
-            lineSelect.appendChild(option);
-          });
-
-          lineSelect.classList.remove('loading');
-          lineSelect.disabled = false;
-          directionSelect.disabled = true;
-
-          // Auto-select if only one line available
-          if (lines.length === 1) {
-            lineSelect.value = lines[0].id;
-            lineSelect.dispatchEvent(new Event('change'));
-            showToast(`Auto-selected ${lines[0].name}`, "success");
-          } else if (lines.length > 0) {
-            showToast(`Found ${lines.length} lines at this station`, "success");
-          } else {
-            showToast("No tube lines found at this station", "warning");
-          }
-        } catch (error) {
-          console.error('Error fetching station lines:', error);
-          showToast("Failed to load lines. Check your TFL API key or try refreshing the page.", "error");
-          lineSelect.innerHTML = '<option value="">-- Error loading lines --</option>';
-          lineSelect.classList.remove('loading');
-          lineSelect.disabled = true;
-        }
       };
 
       serviceTypeSelect.addEventListener("change", () => {
