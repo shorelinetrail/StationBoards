@@ -803,8 +803,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="info-tooltip" title="Train direction on the selected line" aria-label="Information: Train direction">?</span>
           </label>
           <select id="tflDirection" name="tflDirection" aria-describedby="tfldirection-help" disabled>
-            <option value="inbound">Inbound</option>
-            <option value="outbound">Outbound</option>
+            <option value="">-- Select line first --</option>
           </select>
           <span class="help-text" id="tfldirection-help">Direction of travel on this line</span>
         </div>
@@ -1798,15 +1797,43 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         }
       });
 
-      // TFL line selection handler - enable direction when line is selected
-      document.getElementById("tflLine").addEventListener("change", () => {
+      // TFL line selection handler - fetch directions and enable dropdown
+      document.getElementById("tflLine").addEventListener("change", async () => {
         const lineSelect = document.getElementById("tflLine");
         const directionSelect = document.getElementById("tflDirection");
 
-        if (lineSelect.value) {
+        if (!lineSelect.value) {
+          directionSelect.disabled = true;
+          directionSelect.innerHTML = '<option value="">-- Select line first --</option>';
+          return;
+        }
+
+        try {
+          const response = await fetch(`/tfl-line-directions?lineId=${lineSelect.value}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch directions');
+          }
+
+          const directions = await response.json();
+
+          // Populate direction dropdown
+          directionSelect.innerHTML = '';
+          directions.forEach(dir => {
+            const option = document.createElement('option');
+            option.value = dir.id;
+            option.textContent = dir.name;
+            directionSelect.appendChild(option);
+          });
+
           directionSelect.disabled = false;
-          autoApplySettings();
-        } else {
+
+          // Auto-apply if direction is already selected
+          if (directionSelect.value) {
+            autoApplySettings();
+          }
+        } catch (error) {
+          console.error('Error fetching directions:', error);
+          directionSelect.innerHTML = '<option value="">-- Error loading directions --</option>';
           directionSelect.disabled = true;
         }
       });
