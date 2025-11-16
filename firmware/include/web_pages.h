@@ -1663,6 +1663,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         railPresets.style.display = isUnderground ? "none" : "flex";
         tflPresets.style.display = isUnderground ? "flex" : "none";
 
+        // Disable calling at mode for TFL
+        const modeSelect = document.getElementById("mode");
+        if (isUnderground) {
+          modeSelect.value = "0";  // Reset to standard view
+          modeSelect.disabled = true;
+        } else {
+          modeSelect.disabled = false;
+        }
+
         if (isUnderground) {
           stationLabel.textContent = "TFL Station ID (NaPTAN)";
           stationTooltip.title = "TFL Station NaPTAN ID (e.g., 940GZZLUPAC for Paddington)";
