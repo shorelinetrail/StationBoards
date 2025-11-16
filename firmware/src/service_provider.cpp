@@ -348,7 +348,8 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   String jsonBody = response.substring(jsonStart);
 
   // Use ArduinoJson for parsing
-  DynamicJsonDocument doc(16384);  // 16KB for JSON parsing
+  // TFL responses can be large (28KB+), so use 32KB buffer
+  DynamicJsonDocument doc(32768);  // 32KB for JSON parsing
   DeserializationError error = deserializeJson(doc, jsonBody);
 
   if (error) {
