@@ -758,6 +758,40 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="tflkey-help">Free API key from <a href="https://api.tfl.gov.uk" target="_blank">api.tfl.gov.uk</a></span>
         </div>
 
+        <div class="form-group" id="tflLineGroup" style="display:none;">
+          <label for="tflLine">
+            Underground Line
+            <span class="info-tooltip" title="Select which Underground line to view" aria-label="Information: Select tube line">?</span>
+          </label>
+          <select id="tflLine" name="tflLine" aria-describedby="tflline-help">
+            <option value="">-- Select Line --</option>
+            <option value="bakerloo">Bakerloo</option>
+            <option value="central">Central</option>
+            <option value="circle">Circle</option>
+            <option value="district">District</option>
+            <option value="hammersmith-city">Hammersmith & City</option>
+            <option value="jubilee">Jubilee</option>
+            <option value="metropolitan">Metropolitan</option>
+            <option value="northern">Northern</option>
+            <option value="piccadilly">Piccadilly</option>
+            <option value="victoria">Victoria</option>
+            <option value="waterloo-city">Waterloo & City</option>
+          </select>
+          <span class="help-text" id="tflline-help">Choose a line to filter stations</span>
+        </div>
+
+        <div class="form-group" id="tflDirectionGroup" style="display:none;">
+          <label for="tflDirection">
+            Direction
+            <span class="info-tooltip" title="Train direction on the selected line" aria-label="Information: Train direction">?</span>
+          </label>
+          <select id="tflDirection" name="tflDirection" aria-describedby="tfldirection-help">
+            <option value="inbound">Inbound</option>
+            <option value="outbound">Outbound</option>
+          </select>
+          <span class="help-text" id="tfldirection-help">Direction of travel</span>
+        </div>
+
         <div class="form-group">
           <label for="station">
             <span id="stationLabel">Station Code (CRS)</span>
@@ -1652,6 +1686,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       // Service type selection handler
       const serviceTypeSelect = document.getElementById("serviceType");
       const tflApiKeyGroup = document.getElementById("tflApiKeyGroup");
+      const tflLineGroup = document.getElementById("tflLineGroup");
+      const tflDirectionGroup = document.getElementById("tflDirectionGroup");
       const stationLabel = document.getElementById("stationLabel");
       const stationTooltip = document.getElementById("stationTooltip");
       const railPresets = document.getElementById("railPresets");
@@ -1660,8 +1696,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const updateServiceTypeUI = () => {
         const isUnderground = serviceTypeSelect.value === "1";
         tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+        tflLineGroup.style.display = isUnderground ? "block" : "none";
+        tflDirectionGroup.style.display = isUnderground ? "block" : "none";
         railPresets.style.display = isUnderground ? "none" : "flex";
-        tflPresets.style.display = isUnderground ? "flex" : "none";
+        tflPresets.style.display = isUnderground ? "none" : "none";  // Hide presets, use dynamic search instead
 
         // Disable calling at mode for TFL
         const modeSelect = document.getElementById("mode");
@@ -1701,6 +1739,41 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         return stationCleared;
       };
 
+      // Fetch TFL stations by line and direction
+      const fetchTflStations = async () => {
+        const lineSelect = document.getElementById("tflLine");
+        const directionSelect = document.getElementById("tflDirection");
+        const lineId = lineSelect.value;
+        const direction = directionSelect.value;
+
+        if (!lineId) {
+          tflStationData = [];
+          return;
+        }
+
+        showToast("Loading stations for " + lineSelect.options[lineSelect.selectedIndex].text + "...", "info");
+
+        try {
+          const response = await fetch(`/tfl-stations?lineId=${lineId}&direction=${direction}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch stations');
+          }
+
+          const stations = await response.json();
+          tflStationData = stations.map(s => ({
+            name: s.name,
+            code: s.code,
+            line: lineSelect.options[lineSelect.selectedIndex].text
+          }));
+
+          showToast(`Loaded ${stations.length} stations`, "success");
+        } catch (error) {
+          console.error('Error fetching TFL stations:', error);
+          showToast("Failed to load stations", "error");
+          tflStationData = [];
+        }
+      };
+
       serviceTypeSelect.addEventListener("change", () => {
         const stationWasCleared = updateServiceTypeUI();
         // Only auto-apply if station wasn't cleared
@@ -1708,6 +1781,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           autoApplySettings();
         }
       });
+
+      // TFL line and direction change handlers
+      document.getElementById("tflLine").addEventListener("change", fetchTflStations);
+      document.getElementById("tflDirection").addEventListener("change", fetchTflStations);
 
       // Initialize UI on load
       updateServiceTypeUI();

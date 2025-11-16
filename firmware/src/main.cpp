@@ -1708,6 +1708,95 @@ void setupWebServer() {
     }
   });
 
+  server.on("/tfl-stations", HTTP_GET, []() {
+    if (!server.hasArg("lineId")) {
+      server.send(400, "application/json", "{\"error\":\"lineId parameter required\"}");
+      return;
+    }
+
+    String lineId = server.arg("lineId");
+    String direction = server.hasArg("direction") ? server.arg("direction") : "inbound";
+
+    Serial.println("🔍 Fetching TFL stations for line: " + lineId + " (" + direction + ")");
+
+    // Use TFL API to get stations by line with route sequence
+    WiFiClientSecure client;
+    client.setInsecure();  // Skip cert validation for simplicity
+
+    if (!client.connect("api.tfl.gov.uk", 443)) {
+      Serial.println("❌ Failed to connect to TFL API");
+      server.send(500, "application/json", "{\"error\":\"Failed to connect to TFL API\"}");
+      return;
+    }
+
+    String path = "/Line/" + lineId + "/Route/Sequence/" + direction + "?serviceTypes=Regular&excludeCrowding=true";
+    if (strlen(config.tflApiKey) > 0) {
+      path += "&app_key=" + String(config.tflApiKey);
+    }
+
+    String request = "GET " + path + " HTTP/1.1\r\n";
+    request += "Host: api.tfl.gov.uk\r\n";
+    request += "Connection: close\r\n\r\n";
+
+    client.print(request);
+
+    // Read response
+    String response = "";
+    unsigned long timeout = millis();
+    while (client.connected() && millis() - timeout < 10000) {
+      if (client.available()) {
+        response += client.readString();
+        break;
+      }
+    }
+    client.stop();
+
+    // Find JSON body
+    int jsonStart = response.indexOf('{');
+    if (jsonStart == -1) {
+      Serial.println("❌ No JSON found in TFL response");
+      server.send(500, "application/json", "{\"error\":\"Invalid TFL API response\"}");
+      return;
+    }
+
+    String jsonBody = response.substring(jsonStart);
+
+    // Parse JSON to extract stations
+    DynamicJsonDocument doc(32768);  // 32KB for large response
+    DeserializationError error = deserializeJson(doc, jsonBody);
+
+    if (error) {
+      Serial.println("❌ JSON parse error: " + String(error.c_str()));
+      server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
+      return;
+    }
+
+    // Extract station points
+    JsonArray stopPointSequences = doc["stopPointSequences"];
+    if (stopPointSequences.size() == 0) {
+      server.send(200, "application/json", "[]");
+      return;
+    }
+
+    // Build station list JSON
+    String stationsJson = "[";
+    JsonArray stopPoints = stopPointSequences[0]["stopPoint"];
+
+    for (size_t i = 0; i < stopPoints.size(); i++) {
+      const char* name = stopPoints[i]["name"];
+      const char* id = stopPoints[i]["id"];
+
+      if (name && id) {
+        if (i > 0) stationsJson += ",";
+        stationsJson += "{\"name\":\"" + String(name) + "\",\"code\":\"" + String(id) + "\"}";
+      }
+    }
+    stationsJson += "]";
+
+    Serial.println("✅ Found " + String(stopPoints.size()) + " stations");
+    server.send(200, "application/json", stationsJson);
+  });
+
   server.on("/reset", HTTP_GET, []() {
     if (SPIFFS.exists("/config.json")) {
       SPIFFS.remove("/config.json");
