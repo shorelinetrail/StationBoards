@@ -1773,6 +1773,43 @@ void setupWebServer() {
     }
   });
 
+  // Helper function to decode chunked transfer encoding
+  auto decodeChunkedBody = [](const String& chunkedBody) -> String {
+    String decoded = "";
+    int pos = 0;
+
+    while (pos < chunkedBody.length()) {
+      // Find the chunk size line (hex number followed by \r\n)
+      int crlfPos = chunkedBody.indexOf("\r\n", pos);
+      if (crlfPos == -1) break;
+
+      // Extract chunk size (hex string)
+      String chunkSizeStr = chunkedBody.substring(pos, crlfPos);
+      chunkSizeStr.trim();
+
+      // Convert hex to decimal
+      long chunkSize = strtol(chunkSizeStr.c_str(), NULL, 16);
+
+      if (chunkSize == 0) {
+        // Last chunk, we're done
+        break;
+      }
+
+      // Move past the chunk size line
+      pos = crlfPos + 2;
+
+      // Extract the chunk data
+      if (pos + chunkSize <= chunkedBody.length()) {
+        decoded += chunkedBody.substring(pos, pos + chunkSize);
+      }
+
+      // Move past the chunk data and trailing \r\n
+      pos += chunkSize + 2;
+    }
+
+    return decoded;
+  };
+
   server.on("/tfl-station-lines", HTTP_GET, []() {
     if (!server.hasArg("stationId")) {
       server.send(400, "application/json", "{\"error\":\"stationId parameter required\"}");
@@ -1862,17 +1899,26 @@ void setupWebServer() {
       return;
     }
 
-    Serial.println("📄 JSON preview (first 200 chars): " + jsonBody.substring(0, min(200, (int)jsonBody.length())));
+    Serial.println("📄 Raw body preview (first 200 chars): " + jsonBody.substring(0, min(200, (int)jsonBody.length())));
 
-    // Note: Response is chunked transfer encoding, but WiFiClientSecure handles this automatically
-    // by reading the raw stream. The jsonBody should already contain the de-chunked data.
+    // Decode chunked transfer encoding
+    Serial.println("🔧 Decoding chunked transfer encoding...");
+    String decodedJson = decodeChunkedBody(jsonBody);
+    Serial.println("✅ Decoded JSON (" + String(decodedJson.length()) + " bytes)");
+    Serial.println("📄 Decoded preview (first 200 chars): " + decodedJson.substring(0, min(200, (int)decodedJson.length())));
+
+    if (decodedJson.length() == 0) {
+      Serial.println("❌ Failed to decode chunked response");
+      server.send(500, "application/json", "{\"error\":\"Failed to decode TFL response\"}");
+      return;
+    }
 
     DynamicJsonDocument doc(49152);  // 48KB for StopPoint response (increased from 16KB)
-    DeserializationError error = deserializeJson(doc, jsonBody);
+    DeserializationError error = deserializeJson(doc, decodedJson);
 
     if (error) {
       Serial.println("❌ JSON parse error: " + String(error.c_str()));
-      Serial.println("📄 First 300 chars of JSON: " + jsonBody.substring(0, min(300, (int)jsonBody.length())));
+      Serial.println("📄 First 300 chars of decoded JSON: " + decodedJson.substring(0, min(300, (int)decodedJson.length())));
       server.send(500, "application/json", "{\"error\":\"Failed to parse TFL response\"}");
       return;
     }
