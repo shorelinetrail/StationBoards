@@ -1803,14 +1803,32 @@ void setupWebServer() {
     request += "Connection: close\r\n\r\n";
 
     client.print(request);
+    Serial.println("📤 Request sent, waiting for response...");
 
+    // Wait for response with timeout
     String response = "";
     unsigned long timeout = millis();
-    while (client.connected() && millis() - timeout < 10000) {
-      if (client.available()) {
-        response += client.readString();
+    bool headerComplete = false;
+
+    while (client.connected() && millis() - timeout < 15000) {
+      while (client.available()) {
+        char c = client.read();
+        response += c;
+        timeout = millis(); // Reset timeout on each byte received
+
+        // Check if we've received the complete headers
+        if (!headerComplete && response.indexOf("\r\n\r\n") > 0) {
+          headerComplete = true;
+          Serial.println("📋 Headers received, reading body...");
+        }
+      }
+
+      // If headers complete and no more data for 1 second, assume done
+      if (headerComplete && millis() - timeout > 1000) {
         break;
       }
+
+      delay(10);
     }
     client.stop();
 
