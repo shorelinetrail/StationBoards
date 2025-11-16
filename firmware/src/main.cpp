@@ -200,7 +200,7 @@ void displayStatus(const char* status);
 // Note: extractTagValue, decodeHTMLEntities, formatETD, generateDeviceId
 // are defined later in this file - no forward declaration needed
 void handleFetchStateMachine();
-bool parseAndDisplayResponse(String response);
+bool parseAndDisplayResponse(const String& response);
 bool asyncFetchStart();
 void setupWebServer();
 bool initializeWiFi();
@@ -1129,7 +1129,9 @@ void handleFetchStateMachine() {
 }
 
 // Parse function - using the WORKING logic from original
-bool parseAndDisplayResponse(String response) {
+bool parseAndDisplayResponse(const String& response) {
+  Serial.println("🔍 parseAndDisplayResponse called with " + String(response.length()) + " bytes");
+
   if (!serviceProvider) {
     Serial.println("❌ Service provider not initialized");
     return false;
@@ -1344,8 +1346,10 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
+    Serial.println("📄 Serving root page");
     String html = FPSTR(CONFIG_PAGE_TEMPLATE);
-    
+    Serial.println("  HTML template size: " + String(html.length()) + " bytes");
+
     html.replace("{SSID}", String(config.wifiSSID));
     html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
     html.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
@@ -1370,7 +1374,8 @@ void setupWebServer() {
     html.replace("{Y3}", String(config.yPosAlt));
     html.replace("{IP}", WiFi.localIP().toString());
     html.replace("{DEVICE_ID}", config.deviceId);
-    
+
+    Serial.println("  Final HTML size: " + String(html.length()) + " bytes - sending to client");
     server.send(200, "text/html", html);
   });
 
