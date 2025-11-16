@@ -1662,6 +1662,22 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           stationLabel.textContent = "Station Code (CRS)";
           stationTooltip.title = "Three-letter National Rail station code";
         }
+
+        // Clear station input when switching service types to avoid confusion
+        const stationInput = document.getElementById("station");
+        const currentValue = stationInput.value.trim();
+
+        // Clear if switching between types and code format doesn't match
+        if (currentValue) {
+          const isCrsCode = currentValue.length === 3 && /^[A-Z]{3}$/i.test(currentValue);
+          const isNaptanCode = currentValue.startsWith("940GZZLU");
+
+          // Clear if format doesn't match service type
+          if ((isUnderground && isCrsCode) || (!isUnderground && isNaptanCode)) {
+            stationInput.value = "";
+            showToast("Station cleared - please select a station for " + (isUnderground ? "TFL Underground" : "National Rail"), "info");
+          }
+        }
       };
 
       serviceTypeSelect.addEventListener("change", () => {
