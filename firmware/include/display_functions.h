@@ -35,10 +35,18 @@ inline void displayStationName(const char* stationName) {
 
 /**
  * Displays a single service line with time, destination, and ETD
+ * For TFL, scheduled time is omitted (only label + destination + ETD)
  */
 inline void displayServiceLine(const ServiceData& service, const char* label,
                                 int yPos, U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI& display) {
-  String leftSide = String(label) + String(service.std) + " ";
+  // TFL doesn't show scheduled time, only label + destination + ETD
+  String leftSide;
+  if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+    leftSide = String(label);
+  } else {
+    leftSide = String(label) + String(service.std) + " ";
+  }
+
   String rightSide = formatETD(String(service.etd));
 
   int leftWidth = display.getUTF8Width(leftSide.c_str());
@@ -120,6 +128,7 @@ inline bool displayCallingPoints(const char* callingPoints, int yPos,
 
 /**
  * Displays two services with animation between them (for alternating line)
+ * For TFL, scheduled time is omitted
  */
 inline void displayAlternatingServices(const ServiceData& serviceA, const ServiceData& serviceB,
                                         const char* labelA, const char* labelB,
@@ -129,8 +138,13 @@ inline void displayAlternatingServices(const ServiceData& serviceA, const Servic
   int descent = u8g2.getDescent();
   int textHeight = ascent - descent;
 
-  // Build service A
-  String leftA = String(labelA) + String(serviceA.std) + " ";
+  // Build service A (TFL omits scheduled time)
+  String leftA;
+  if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+    leftA = String(labelA);
+  } else {
+    leftA = String(labelA) + String(serviceA.std) + " ";
+  }
   String rightA = formatETD(String(serviceA.etd));
   int leftAWidth = u8g2.getUTF8Width(leftA.c_str());
   int rightAWidth = u8g2.getUTF8Width(rightA.c_str());
@@ -147,8 +161,13 @@ inline void displayAlternatingServices(const ServiceData& serviceA, const Servic
     u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY - animOffset);
     u8g2.print(rightA);
 
-    // Draw next service scrolling up from below
-    String leftB = String(labelB) + String(serviceB.std) + " ";
+    // Draw next service scrolling up from below (TFL omits scheduled time)
+    String leftB;
+    if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+      leftB = String(labelB);
+    } else {
+      leftB = String(labelB) + String(serviceB.std) + " ";
+    }
     String rightB = formatETD(String(serviceB.etd));
     int leftBWidth = u8g2.getUTF8Width(leftB.c_str());
     int rightBWidth = u8g2.getUTF8Width(rightB.c_str());
