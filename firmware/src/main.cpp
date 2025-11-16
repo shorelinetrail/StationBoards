@@ -1350,11 +1350,17 @@ void updateDisplay() {
 String decodeChunkedBody(const String& chunkedBody) {
   String decoded = "";
   int pos = 0;
+  int chunkCount = 0;
+
+  Serial.println("  🔍 Starting chunk decode (total: " + String(chunkedBody.length()) + " bytes)");
 
   while (pos < chunkedBody.length()) {
     // Find the chunk size line (hex number followed by \r\n)
     int crlfPos = chunkedBody.indexOf("\r\n", pos);
-    if (crlfPos == -1) break;
+    if (crlfPos == -1) {
+      Serial.println("  ⚠️  No more CRLF found at pos " + String(pos));
+      break;
+    }
 
     // Extract chunk size (hex string)
     String chunkSizeStr = chunkedBody.substring(pos, crlfPos);
@@ -1362,9 +1368,13 @@ String decodeChunkedBody(const String& chunkedBody) {
 
     // Convert hex to decimal
     long chunkSize = strtol(chunkSizeStr.c_str(), NULL, 16);
+    chunkCount++;
+
+    Serial.println("  📦 Chunk " + String(chunkCount) + ": " + chunkSizeStr + " (hex) = " + String(chunkSize) + " bytes");
 
     if (chunkSize == 0) {
       // Last chunk, we're done
+      Serial.println("  ✅ Found final chunk marker (0)");
       break;
     }
 
@@ -1374,12 +1384,16 @@ String decodeChunkedBody(const String& chunkedBody) {
     // Extract the chunk data
     if (pos + chunkSize <= chunkedBody.length()) {
       decoded += chunkedBody.substring(pos, pos + chunkSize);
+      Serial.println("     ✓ Extracted " + String(chunkSize) + " bytes (total decoded: " + String(decoded.length()) + ")");
+    } else {
+      Serial.println("     ⚠️  Not enough data! Need " + String(chunkSize) + " but only " + String(chunkedBody.length() - pos) + " available");
     }
 
     // Move past the chunk data and trailing \r\n
     pos += chunkSize + 2;
   }
 
+  Serial.println("  ✅ Decoded " + String(chunkCount) + " chunks, total: " + String(decoded.length()) + " bytes");
   return decoded;
 }
 
