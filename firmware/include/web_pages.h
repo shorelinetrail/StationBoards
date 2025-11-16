@@ -772,12 +772,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <button type="button" class="preset-btn" data-station="LST" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
           </div>
           <div class="preset-stations" id="tflPresets" style="display:none;">
-            <button type="button" class="preset-btn" data-station="940GZZLUPAC" aria-label="Select Paddington Underground">PAC<br><small>Paddington</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUOXC" aria-label="Select Oxford Circus">OXC<br><small>Oxford Circus</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUWLO" aria-label="Select Waterloo">WLO<br><small>Waterloo</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUKSX" aria-label="Select King's Cross">KSX<br><small>King's Cross</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUVIC" aria-label="Select Victoria">VIC<br><small>Victoria</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLULNB" aria-label="Select London Bridge">LNB<br><small>London Bridge</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUPAC" data-name="Paddington" aria-label="Select Paddington Underground">🚇<br><small>Paddington</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUOXC" data-name="Oxford Circus" aria-label="Select Oxford Circus">🚇<br><small>Oxford Circus</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUWLO" data-name="Waterloo" aria-label="Select Waterloo">🚇<br><small>Waterloo</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUKSX" data-name="King's Cross St. Pancras" aria-label="Select King's Cross">🚇<br><small>King's Cross</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUVIC" data-name="Victoria" aria-label="Select Victoria">🚇<br><small>Victoria</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLULNB" data-name="London Bridge" aria-label="Select London Bridge">🚇<br><small>London Bridge</small></button>
           </div>
           <div class="autocomplete-wrapper">
             <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="50" aria-label="Station code or name" aria-describedby="station-help">
@@ -794,7 +794,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <select id="tflLine" name="tflLine" aria-describedby="tflline-help" disabled>
             <option value="">-- Select station first --</option>
           </select>
-          <span class="help-text" id="tflline-help">Choose which line to monitor at this station</span>
+          <span class="help-text" id="tflline-help">Select which line to monitor. Only trains on this line will be displayed</span>
         </div>
 
         <div class="form-group" id="tflDirectionGroup" style="display:none;">
@@ -805,7 +805,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <select id="tflDirection" name="tflDirection" aria-describedby="tfldirection-help" disabled>
             <option value="">-- Select line first --</option>
           </select>
-          <span class="help-text" id="tfldirection-help">Direction of travel on this line</span>
+          <span class="help-text" id="tfldirection-help">Choose your direction of travel. Only trains in this direction will be shown</span>
         </div>
 
         <div class="form-row">
@@ -1528,14 +1528,19 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // ==================== Station Presets ====================
 
-    const setStation = (code) => {
+    const setStation = (code, name) => {
       const input = document.getElementById("station");
 
       autocompleteJustSelected = true;
       setTimeout(() => { autocompleteJustSelected = false; }, 100);
 
       input.value = code;
-      showToast(`Station set to: ${code}`, "success");
+      if (name) {
+        input.setAttribute('data-station-name', name);
+        showToast(`Station set to: ${escapeHtml(name)}`, "success");
+      } else {
+        showToast(`Station set to: ${escapeHtml(code)}`, "success");
+      }
       input.blur();
 
       // If TFL, fetch lines for this station
@@ -1543,7 +1548,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const isUnderground = serviceTypeSelect && serviceTypeSelect.value === "1";
 
       if (isUnderground) {
-        fetchTflStationLines(code);
+        fetchTflStationLines(code, name);
       } else {
         autoApplySettings(code);
       }
@@ -1794,12 +1799,33 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             console.log(`Station has ${lines.length} tube lines:`, lines);
           }
 
-          // Populate line dropdown
+          // TFL official line colors
+          const lineColors = {
+            'bakerloo': '#B36305',
+            'central': '#E32017',
+            'circle': '#FFD300',
+            'district': '#00782A',
+            'hammersmith-city': '#F3A9BB',
+            'jubilee': '#A0A5A9',
+            'metropolitan': '#9B0056',
+            'northern': '#000000',
+            'piccadilly': '#003688',
+            'victoria': '#0098D4',
+            'waterloo-city': '#95CDBA',
+            'elizabeth': '#7156A5',
+            'dlr': '#00A4A7',
+            'london-overground': '#EE7C0E',
+            'tram': '#84B817'
+          };
+
+          // Populate line dropdown with color badges
           lineSelect.innerHTML = '<option value="">-- Select Line --</option>';
           lines.forEach(line => {
             const option = document.createElement('option');
             option.value = line.id;
-            option.textContent = line.name;
+            const color = lineColors[line.id] || '#666';
+            option.textContent = `⬤ ${line.name}`;
+            option.style.color = color;
             lineSelect.appendChild(option);
           });
 
@@ -1819,8 +1845,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           }
         } catch (error) {
           console.error('Error fetching station lines:', error);
-          showToast("Failed to load lines", "error");
+          showToast("Failed to load lines. Check your TFL API key or try refreshing the page.", "error");
           lineSelect.innerHTML = '<option value="">-- Error loading lines --</option>';
+          lineSelect.classList.remove('loading');
           lineSelect.disabled = true;
         }
       };
@@ -1921,7 +1948,11 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       // Preset station buttons
       document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => setStation(btn.dataset.station));
+        btn.addEventListener('click', () => {
+          const stationCode = btn.dataset.station;
+          const stationName = btn.dataset.name || btn.querySelector('small')?.textContent || stationCode;
+          setStation(stationCode, stationName);
+        });
       });
 
       // Reset button
