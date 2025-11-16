@@ -1573,11 +1573,14 @@ void setupWebServer() {
     // Validate station code
     if (server.hasArg("station")) {
       String station = sanitizeStationCode(server.arg("station"));
+      Serial.printf("  Validating station: '%s'\n", station.c_str());
       ValidationResult result = validateStationCode(station);
       if (!result.valid) {
+        Serial.printf("  ❌ Station validation failed: %s\n", result.message.c_str());
         server.send(400, "text/plain", "Invalid station code: " + result.message);
         return;
       }
+      Serial.println("  ✅ Station valid");
       safeStrCopy(config.stationCode, station, sizeof(config.stationCode));
     }
 
