@@ -1164,6 +1164,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const isUnderground = serviceTypeSelect && serviceTypeSelect.value === "1";
         const currentStationData = isUnderground ? tflStationData : railStationData;
 
+        console.log(`Autocomplete: Using ${isUnderground ? 'TFL' : 'Rail'} data, ${currentStationData.length} stations available`);
+
         const matches = currentStationData.filter(station =>
           station.name.toUpperCase().includes(query) ||
           station.code.toUpperCase().includes(query)
@@ -1699,7 +1701,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         tflLineGroup.style.display = isUnderground ? "block" : "none";
         tflDirectionGroup.style.display = isUnderground ? "block" : "none";
         railPresets.style.display = isUnderground ? "none" : "flex";
-        tflPresets.style.display = isUnderground ? "none" : "none";  // Hide presets, use dynamic search instead
+        tflPresets.style.display = isUnderground ? "flex" : "none";
 
         // Disable calling at mode for TFL
         const modeSelect = document.getElementById("mode");
@@ -1762,11 +1764,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           }
 
           const stations = await response.json();
+          console.log(`Received ${stations.length} stations from API:`, stations.slice(0, 5));
+
           tflStationData = stations.map(s => ({
             name: s.name,
             code: s.code,
             line: lineSelect.options[lineSelect.selectedIndex].text
           }));
+
+          console.log(`tflStationData now has ${tflStationData.length} stations`);
 
           // Update placeholder to indicate stations are ready
           const stationInput = document.getElementById("station");
