@@ -1819,9 +1819,15 @@ void setupWebServer() {
       return;
     }
 
-    // Parse JSON from String
-    DynamicJsonDocument doc(49152);  // 48KB buffer
-    DeserializationError error = deserializeJson(doc, payload);
+    // Use filter to only parse the "lines" array we need (saves memory!)
+    StaticJsonDocument<200> filter;
+    filter["lines"][0]["id"] = true;
+    filter["lines"][0]["name"] = true;
+    filter["lines"][0]["modeName"] = true;
+
+    // Parse only the filtered fields (much smaller memory footprint)
+    DynamicJsonDocument doc(16384);  // 16KB is enough for just the lines array
+    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
     if (error) {
       Serial.println("❌ JSON parse error: " + String(error.c_str()));
