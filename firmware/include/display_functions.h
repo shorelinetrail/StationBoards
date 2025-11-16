@@ -189,12 +189,17 @@ inline void displayClock() {
 
 /**
  * Gets the service label based on index and offset
- * e.g., getServiceLabel(2, 0) = "3rd ", getServiceLabel(2, 1) = "4th "
+ * e.g., getServiceLabel(2, 0) = "3rd " for National Rail, "3 " for TFL
  */
 inline String getServiceLabel(int index, int offset) {
   int displayNum = index + 1;
 
   if (offset == 1) displayNum++;  // Adjust for hidden station name
+
+  // TFL uses plain numbers (1, 2, 3...), National Rail uses ordinals (1st, 2nd, 3rd...)
+  if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+    return String(displayNum) + " ";
+  }
 
   switch (displayNum) {
     case 1: return "1st ";
