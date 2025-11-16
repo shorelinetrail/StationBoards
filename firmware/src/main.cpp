@@ -1347,8 +1347,19 @@ void updateDisplay() {
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
     Serial.println("📄 Serving root page");
+
+    // Check PROGMEM size first
+    size_t progmemSize = strlen_P(CONFIG_PAGE_TEMPLATE);
+    Serial.println("  PROGMEM template size: " + String(progmemSize) + " bytes");
+
     String html = FPSTR(CONFIG_PAGE_TEMPLATE);
     Serial.println("  HTML template size: " + String(html.length()) + " bytes");
+
+    if (html.length() == 0) {
+      Serial.println("  ❌ HTML is empty after FPSTR! Sending error page...");
+      server.send(500, "text/html", "<html><body><h1>Error: Template failed to load (too large?)</h1></body></html>");
+      return;
+    }
 
     html.replace("{SSID}", String(config.wifiSSID));
     html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
