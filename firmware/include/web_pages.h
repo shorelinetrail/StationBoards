@@ -1531,7 +1531,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     // Cache for station lines to avoid redundant API calls
     const stationLinesCache = new Map();
 
-    // Fetch lines serving a TFL station
+    // Fetch lines serving a TFL station (client-side API call)
     const fetchTflStationLines = async (stationId, stationName) => {
       console.log('fetchTflStationLines called with:', stationId, stationName);
       const lineSelect = document.getElementById("tflLine");
@@ -1548,18 +1548,34 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           lineSelect.innerHTML = '<option value="">Loading...</option>';
           lineSelect.classList.add('loading');
 
-          console.log('Fetching from /tfl-station-lines?stationId=' + stationId);
-          const response = await fetch(`/tfl-station-lines?stationId=${stationId}`);
+          // Get TFL API key from the form
+          const apiKey = document.getElementById('tflApiKey')?.value || '';
+
+          // Call TFL API directly from browser (handles chunked encoding perfectly!)
+          const url = `https://api.tfl.gov.uk/StopPoint/${stationId}${apiKey ? '?app_key=' + apiKey : ''}`;
+          console.log('Fetching from TFL API:', url.replace(apiKey, 'XXX'));
+
+          const response = await fetch(url);
           console.log('Response status:', response.status, response.statusText);
 
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error response:', errorText);
-            throw new Error('Failed to fetch lines: ' + response.status);
+            throw new Error('Failed to fetch from TFL API: ' + response.status);
           }
 
-          lines = await response.json();
-          console.log('Received lines:', lines);
+          const data = await response.json();
+          console.log('Received TFL data');
+
+          // Extract tube lines from the response
+          lines = [];
+          if (data.lines && Array.isArray(data.lines)) {
+            lines = data.lines
+              .filter(line => line.modeName === 'tube')
+              .map(line => ({
+                id: line.id,
+                name: line.name
+              }));
+          }
+
           stationLinesCache.set(stationId, lines);  // Cache the result
           console.log(`Station has ${lines.length} tube lines:`, lines);
         }
