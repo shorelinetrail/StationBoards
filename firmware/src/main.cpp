@@ -1506,6 +1506,12 @@ void setupWebServer() {
   server.on("/apply", HTTP_POST, []() {
     Serial.println("⚙️  /apply endpoint called");
 
+    // Debug: Log all received arguments
+    Serial.printf("  📋 Received %d arguments:\n", server.args());
+    for (int i = 0; i < server.args(); i++) {
+      Serial.printf("    [%d] %s = %s\n", i, server.argName(i).c_str(), server.arg(i).c_str());
+    }
+
     String oldSSID = String(config.wifiSSID);
     String oldPassword = String(config.wifiPassword);
     String oldStation = String(config.stationCode);
