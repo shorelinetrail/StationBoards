@@ -37,22 +37,31 @@ bool NationalRailProvider::isValidStationCode(const char* code) {
   return true;
 }
 
-bool NationalRailProvider::buildRequest(const char* stationCode, String& request) {
+bool NationalRailProvider::buildRequest(const char* stationCode, String& request, bool useCallingAt) {
   if (!isValidStationCode(stationCode)) {
     Serial.println("❌ Invalid National Rail station code: " + String(stationCode));
     return false;
   }
 
-  // Build SOAP request
+  // Build SOAP request - use detailed API if calling points are needed
   String soapRequest;
   soapRequest.reserve(512);
   soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
   soapRequest += "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">";
   soapRequest += "<soap:Header><AccessToken xmlns=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\">";
   soapRequest += "<TokenValue>" + String(apiToken) + "</TokenValue></AccessToken></soap:Header>";
-  soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
-  soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
-  soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
+
+  if (useCallingAt) {
+    // Use GetDepBoardWithDetails to get calling points
+    soapRequest += "<soap:Body><GetDepBoardWithDetailsRequest xmlns=\"http://thalesgroup.com/RTTI/2017-10-01/ldb/\">";
+    soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
+    soapRequest += "</GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
+  } else {
+    // Use basic GetDepartureBoard for faster response
+    soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
+    soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
+    soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
+  }
 
   // Build HTTP request
   request = "POST " + String(apiPath) + " HTTP/1.1\r\n";
@@ -152,9 +161,52 @@ bool NationalRailProvider::parseResponse(const String& response,
       std.toCharArray(services[serviceCount].std, sizeof(services[serviceCount].std));
       etd.toCharArray(services[serviceCount].etd, sizeof(services[serviceCount].etd));
       destination.toCharArray(services[serviceCount].destination, sizeof(services[serviceCount].destination));
-      services[serviceCount].callingPoints[0] = '\0';
+
+      // Parse calling points if useCallingAt is enabled
+      if (useCallingAt) {
+        String callingPoints = "";
+
+        // Look for subsequentCallingPoints in lt7 namespace (detailed response)
+        String callingPointsBlock = extractTagValue(block, "subsequentCallingPoints", "lt7");
+        if (callingPointsBlock == "") {
+          callingPointsBlock = extractTagValue(block, "subsequentCallingPoints", "lt4");
+        }
+
+        if (callingPointsBlock.length() > 0) {
+          // Extract individual calling point location names
+          int cpPos = 0;
+          while (cpPos < callingPointsBlock.length()) {
+            int cpStart = callingPointsBlock.indexOf("<lt7:callingPoint>", cpPos);
+            if (cpStart == -1) cpStart = callingPointsBlock.indexOf("<lt4:callingPoint>", cpPos);
+            if (cpStart == -1) break;
+
+            int cpEnd = callingPointsBlock.indexOf("</lt7:callingPoint>", cpStart);
+            if (cpEnd == -1) cpEnd = callingPointsBlock.indexOf("</lt4:callingPoint>", cpStart);
+            if (cpEnd == -1) break;
+
+            String cpBlock = callingPointsBlock.substring(cpStart, cpEnd);
+            String locationName = extractTagValue(cpBlock, "locationName", "lt4");
+            if (locationName == "") locationName = extractTagValue(cpBlock, "locationName", "lt7");
+            locationName = decodeHTMLEntities(locationName);
+
+            if (locationName.length() > 0) {
+              if (callingPoints.length() > 0) callingPoints += ", ";
+              callingPoints += locationName;
+            }
+
+            cpPos = cpEnd + 1;
+          }
+        }
+
+        callingPoints.toCharArray(services[serviceCount].callingPoints, sizeof(services[serviceCount].callingPoints));
+      } else {
+        services[serviceCount].callingPoints[0] = '\0';
+      }
 
       Serial.println("🚂 " + String(serviceCount + 1) + ": " + std + " → " + destination);
+      if (useCallingAt && strlen(services[serviceCount].callingPoints) > 0) {
+        Serial.println("   Calling at: " + String(services[serviceCount].callingPoints));
+      }
       serviceCount++;
     }
 
@@ -210,7 +262,7 @@ bool TflUndergroundProvider::isValidStationCode(const char* code) {
   return true;
 }
 
-bool TflUndergroundProvider::buildRequest(const char* stationCode, String& request) {
+bool TflUndergroundProvider::buildRequest(const char* stationCode, String& request, bool useCallingAt) {
   if (!isValidStationCode(stationCode)) {
     Serial.println("❌ Invalid TFL station code: " + String(stationCode));
     return false;
@@ -218,6 +270,7 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
 
   // Build TFL API request
   // GET /StopPoint/{stationCode}/Arrivals
+  // Note: TFL API doesn't provide calling points in the same way as National Rail
   String path = "/StopPoint/" + String(stationCode) + "/Arrivals";
 
   // Add API key if configured

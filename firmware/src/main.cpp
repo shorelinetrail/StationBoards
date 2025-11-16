@@ -1012,7 +1012,7 @@ bool asyncFetchStart() {
 
   // Build request using service provider
   String request;
-  if (!serviceProvider->buildRequest(config.stationCode, request)) {
+  if (!serviceProvider->buildRequest(config.stationCode, request, config.useCallingAt)) {
     Serial.println("❌ Failed to build request");
     fetchClient.stop();
     displayStatus("ERROR");

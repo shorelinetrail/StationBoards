@@ -23,7 +23,7 @@ public:
 
   // Build HTTP request for fetching services
   // Returns true if request was built successfully
-  virtual bool buildRequest(const char* stationCode, String& request) = 0;
+  virtual bool buildRequest(const char* stationCode, String& request, bool useCallingAt) = 0;
 
   // Parse API response and populate ServiceData array
   // Returns true if parsing was successful
@@ -60,7 +60,7 @@ public:
   int getApiPort() override { return 443; }
   const char* getStationCodeDescription() override { return "3-letter CRS code (e.g., PAD, BHM)"; }
 
-  bool buildRequest(const char* stationCode, String& request) override;
+  bool buildRequest(const char* stationCode, String& request, bool useCallingAt) override;
   bool parseResponse(const String& response,
                     ServiceData* services,
                     int& serviceCount,
@@ -91,7 +91,7 @@ public:
   int getApiPort() override { return 443; }
   const char* getStationCodeDescription() override { return "TFL Station NaPTAN ID (e.g., 940GZZLUPAC)"; }
 
-  bool buildRequest(const char* stationCode, String& request) override;
+  bool buildRequest(const char* stationCode, String& request, bool useCallingAt) override;
   bool parseResponse(const String& response,
                     ServiceData* services,
                     int& serviceCount,
