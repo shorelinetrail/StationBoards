@@ -796,6 +796,163 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       font-size: 14px;
     }
 
+    /* Signal Bars */
+    .signal-bars {
+      display: inline-flex;
+      gap: 3px;
+      align-items: flex-end;
+      height: 20px;
+      vertical-align: middle;
+    }
+
+    .signal-bar {
+      width: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      transition: background 0.3s ease;
+    }
+
+    .signal-bar:nth-child(1) { height: 25%; }
+    .signal-bar:nth-child(2) { height: 50%; }
+    .signal-bar:nth-child(3) { height: 75%; }
+    .signal-bar:nth-child(4) { height: 100%; }
+
+    .signal-bar.active {
+      background: #28a745;
+    }
+
+    .signal-bar.active.weak {
+      background: #dc3545;
+    }
+
+    .signal-bar.active.fair {
+      background: #ffc107;
+    }
+
+    .signal-bar.active.good,
+    .signal-bar.active.excellent {
+      background: #28a745;
+    }
+
+    /* Device Info Panel */
+    .device-info-panel {
+      margin-top: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .device-info-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      color: #667eea;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+
+    .device-info-toggle:hover {
+      background: #e9ecef;
+    }
+
+    .device-info-content {
+      display: none;
+      padding: 12px;
+      font-size: 11px;
+      color: #666;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .device-info-content.show {
+      display: block;
+    }
+
+    .device-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .device-info-row:last-child {
+      border-bottom: none;
+    }
+
+    .device-info-label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .uptime-counter {
+      font-family: 'Courier New', monospace;
+      color: #667eea;
+      font-weight: 600;
+    }
+
+    /* Undo/Snapshot Controls */
+    .settings-snapshot-bar {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      border-radius: 8px;
+      padding: 12px 15px;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    .settings-snapshot-bar .snapshot-icon {
+      font-size: 20px;
+    }
+
+    .settings-snapshot-bar .snapshot-text {
+      flex: 1;
+      color: #856404;
+    }
+
+    .settings-snapshot-bar .snapshot-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-snapshot {
+      padding: 6px 12px;
+      background: white;
+      border: 2px solid #ffc107;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #856404;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-snapshot:hover {
+      background: #ffc107;
+      color: white;
+    }
+
+    .btn-snapshot.btn-undo {
+      border-color: #667eea;
+      color: #667eea;
+    }
+
+    .btn-snapshot.btn-undo:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-snapshot:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     /* Focus visible for accessibility */
     *:focus-visible {
       outline: 2px solid #667eea;
@@ -818,8 +975,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <div class="value">
           <span class="status-badge online">Online</span>
         </div>
-        <div style="margin-top: 8px; font-size: 12px; color: #666;" id="wifiStrength" aria-live="polite">
-          📶 <span id="rssiValue">--</span> dBm
+        <div style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;" id="wifiStrength" aria-live="polite">
+          <div class="signal-bars" id="signalBars" aria-label="WiFi signal strength">
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+          </div>
+          <span style="font-size: 11px; color: #666;" id="rssiText">--</span>
         </div>
       </div>
       <div class="status-item">
@@ -827,12 +990,42 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <div class="value" id="currentStation" aria-live="polite">{STATION_NAME}</div>
       </div>
       <div class="status-item">
-        <div class="label">Device ID</div>
-        <div class="value" style="font-size: 14px;">{DEVICE_ID}</div>
+        <div class="label">Uptime</div>
+        <div class="value uptime-counter" id="deviceUptime" aria-live="polite">--:--:--</div>
       </div>
-      <div class="status-item">
-        <div class="label">IP Address</div>
-        <div class="value" style="font-size: 14px;">{IP}</div>
+      <div class="status-item" style="grid-column: span 2;">
+        <div class="device-info-panel">
+          <div class="device-info-toggle" id="deviceInfoToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="deviceInfoContent">
+            <span>📊 Device Information</span>
+            <span style="font-size: 10px;">▼</span>
+          </div>
+          <div class="device-info-content" id="deviceInfoContent">
+            <div class="device-info-row">
+              <span class="device-info-label">Device ID:</span>
+              <span id="deviceIdInfo">{DEVICE_ID}</span>
+            </div>
+            <div class="device-info-row">
+              <span class="device-info-label">IP Address:</span>
+              <span id="ipAddressInfo">{IP}</span>
+            </div>
+            <div class="device-info-row">
+              <span class="device-info-label">WiFi RSSI:</span>
+              <span id="rssiValue">-- dBm</span>
+            </div>
+            <div class="device-info-row">
+              <span class="device-info-label">Firmware:</span>
+              <span>v2.1.0</span>
+            </div>
+            <div class="device-info-row">
+              <span class="device-info-label">Free Memory:</span>
+              <span id="freeMemory">-- KB</span>
+            </div>
+            <div class="device-info-row">
+              <span class="device-info-label">Last Refresh:</span>
+              <span id="lastRefreshTime">Never</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -845,6 +1038,25 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       <!-- Tab 1: Station Board Configuration -->
       <div class="tab-content active" id="tab-0" role="tabpanel" aria-labelledby="tab-btn-0">
+        <!-- Settings Snapshot/Undo Bar -->
+        <div class="settings-snapshot-bar" id="snapshotBar" style="display: none;">
+          <span class="snapshot-icon" aria-hidden="true">📸</span>
+          <div class="snapshot-text">
+            <strong>Changes made</strong> - Settings auto-saved
+          </div>
+          <div class="snapshot-actions">
+            <button type="button" class="btn-snapshot btn-undo" id="undoButton" onclick="undoSettings()" disabled aria-label="Undo recent changes">
+              ↶ Undo
+            </button>
+            <button type="button" class="btn-snapshot" id="snapshotButton" onclick="saveSnapshot()" aria-label="Save current settings snapshot">
+              💾 Save Snapshot
+            </button>
+            <button type="button" class="btn-snapshot" id="viewHistoryButton" onclick="viewHistory()" aria-label="View settings history">
+              📋 History
+            </button>
+          </div>
+        </div>
+
         <div id="configForm">
       <div class="card">
         <h2>🚉 Station Configuration</h2>
@@ -1467,18 +1679,42 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       if (!rssi) return;
 
       let signal = "Weak";
-      if (rssi > -50) signal = "Excellent";
-      else if (rssi > -60) signal = "Good";
-      else if (rssi > -70) signal = "Fair";
+      let activeBars = 1;
+      let signalClass = "weak";
 
-      const rssiValueEl = document.getElementById("rssiValue");
-      if (rssiValueEl) {
-        rssiValueEl.textContent = escapeHtml(rssi);
+      if (rssi > -50) {
+        signal = "Excellent";
+        activeBars = 4;
+        signalClass = "excellent";
+      } else if (rssi > -60) {
+        signal = "Good";
+        activeBars = 3;
+        signalClass = "good";
+      } else if (rssi > -70) {
+        signal = "Fair";
+        activeBars = 2;
+        signalClass = "fair";
       }
 
-      const wifiStrengthEl = document.getElementById("wifiStrength");
-      if (wifiStrengthEl) {
-        wifiStrengthEl.textContent = `📶 ${escapeHtml(signal)} (${escapeHtml(rssi)} dBm)`;
+      // Update signal bars
+      const signalBars = document.querySelectorAll('#signalBars .signal-bar');
+      signalBars.forEach((bar, index) => {
+        bar.classList.remove('active', 'weak', 'fair', 'good', 'excellent');
+        if (index < activeBars) {
+          bar.classList.add('active', signalClass);
+        }
+      });
+
+      // Update RSSI text
+      const rssiTextEl = document.getElementById("rssiText");
+      if (rssiTextEl) {
+        rssiTextEl.textContent = `${escapeHtml(signal)}`;
+      }
+
+      // Update RSSI value in device info
+      const rssiValueEl = document.getElementById("rssiValue");
+      if (rssiValueEl) {
+        rssiValueEl.textContent = `${escapeHtml(rssi)} dBm`;
       }
     };
 
@@ -1750,17 +1986,28 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     };
 
     const confirmReset = () => {
+      // Save a snapshot before factory reset
+      try {
+        saveSnapshot();
+        showToast("Settings backed up before reset", "info");
+      } catch (e) {
+        console.error("Failed to backup settings:", e);
+      }
+
       hideResetModal();
       showToast("Resetting device...", "warning");
 
       setTimeout(() => {
         window.location.href = "/reset";
-      }, 1000);
+      }, 1500);
     };
 
     // ==================== Auto-Apply Settings ====================
 
     const autoApplySettings = (stationCodeOverride) => {
+      // Auto-snapshot before applying changes
+      autoSnapshot();
+
       const formData = new URLSearchParams();
       const stationValue = stationCodeOverride || document.getElementById('station').value;
       formData.append('serviceType', document.getElementById('serviceType').value);
@@ -1892,6 +2139,198 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       showToast('Layout positions reset to defaults', 'success');
     }
 
+    // ==================== Device Uptime Counter ====================
+
+    let deviceStartTime = Date.now();
+
+    /**
+     * Update the device uptime display
+     */
+    function updateUptime() {
+      const uptime = Date.now() - deviceStartTime;
+      const seconds = Math.floor(uptime / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      let uptimeStr = '';
+      if (days > 0) {
+        uptimeStr = `${days}d ${hours % 24}h ${minutes % 60}m`;
+      } else if (hours > 0) {
+        uptimeStr = `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+      } else if (minutes > 0) {
+        uptimeStr = `${minutes}m ${seconds % 60}s`;
+      } else {
+        uptimeStr = `${seconds}s`;
+      }
+
+      const uptimeEl = document.getElementById('deviceUptime');
+      if (uptimeEl) {
+        uptimeEl.textContent = uptimeStr;
+      }
+    }
+
+    // Update uptime every second
+    setInterval(updateUptime, 1000);
+
+    // ==================== Settings Snapshot & Undo ====================
+
+    let settingsHistory = [];
+    let currentSettingsSnapshot = null;
+    const MAX_HISTORY = 10;
+
+    /**
+     * Get current form settings as object
+     */
+    function getCurrentSettings() {
+      return {
+        serviceType: document.getElementById('serviceType')?.value,
+        tflApiKey: document.getElementById('tflApiKey')?.value,
+        station: document.getElementById('station')?.value,
+        interval: document.getElementById('interval')?.value,
+        scrollspeed: document.getElementById('scrollspeed')?.value,
+        mode: document.getElementById('mode')?.value,
+        showstation: document.getElementById('showstation')?.value,
+        extra: document.getElementById('extra')?.value,
+        rotationspeed: document.getElementById('rotationspeed')?.value,
+        ytop: document.getElementById('ytop')?.value,
+        y1: document.getElementById('y1')?.value,
+        y2: document.getElementById('y2')?.value,
+        y3: document.getElementById('y3')?.value,
+        timestamp: Date.now()
+      };
+    }
+
+    /**
+     * Apply settings from snapshot
+     */
+    function applySettings(settings) {
+      if (!settings) return;
+
+      Object.keys(settings).forEach(key => {
+        const element = document.getElementById(key);
+        if (element && key !== 'timestamp') {
+          element.value = settings[key];
+        }
+      });
+
+      // Sync range sliders
+      const scrollspeedRange = document.getElementById('scrollspeedRange');
+      if (scrollspeedRange) scrollspeedRange.value = settings.scrollspeed;
+
+      const rotationspeedRange = document.getElementById('rotationspeedRange');
+      if (rotationspeedRange) rotationspeedRange.value = settings.rotationspeed;
+    }
+
+    /**
+     * Auto-snapshot before applying changes
+     */
+    function autoSnapshot() {
+      const current = getCurrentSettings();
+
+      // Only create snapshot if settings have changed
+      if (!currentSettingsSnapshot || JSON.stringify(current) !== JSON.stringify(currentSettingsSnapshot)) {
+        currentSettingsSnapshot = current;
+
+        // Show snapshot bar
+        const snapshotBar = document.getElementById('snapshotBar');
+        if (snapshotBar) {
+          snapshotBar.style.display = 'flex';
+        }
+
+        // Enable undo button
+        const undoBtn = document.getElementById('undoButton');
+        if (undoBtn) {
+          undoBtn.disabled = false;
+        }
+      }
+    }
+
+    /**
+     * Undo to previous settings
+     */
+    function undoSettings() {
+      try {
+        const history = JSON.parse(localStorage.getItem('settingsHistory') || '[]');
+        if (history.length === 0) {
+          showToast('No previous settings to restore', 'warning');
+          return;
+        }
+
+        // Get the most recent snapshot
+        const previousSettings = history[history.length - 1];
+        applySettings(previousSettings);
+
+        // Apply to device
+        autoApplySettings();
+
+        // Remove from history
+        history.pop();
+        localStorage.setItem('settingsHistory', JSON.stringify(history));
+
+        // Update UI
+        const undoBtn = document.getElementById('undoButton');
+        if (undoBtn && history.length === 0) {
+          undoBtn.disabled = true;
+        }
+
+        showToast('Settings restored to previous state', 'success');
+      } catch (e) {
+        console.error('Error undoing settings:', e);
+        showToast('Failed to restore previous settings', 'error');
+      }
+    }
+
+    /**
+     * Save current settings as named snapshot
+     */
+    function saveSnapshot() {
+      try {
+        const current = getCurrentSettings();
+        let history = JSON.parse(localStorage.getItem('settingsHistory') || '[]');
+
+        // Add to history
+        history.push(current);
+
+        // Keep only last MAX_HISTORY items
+        if (history.length > MAX_HISTORY) {
+          history = history.slice(-MAX_HISTORY);
+        }
+
+        localStorage.setItem('settingsHistory', JSON.stringify(history));
+        showToast('Settings snapshot saved!', 'success');
+      } catch (e) {
+        console.error('Error saving snapshot:', e);
+        showToast('Failed to save snapshot', 'error');
+      }
+    }
+
+    /**
+     * View settings history
+     */
+    function viewHistory() {
+      try {
+        const history = JSON.parse(localStorage.getItem('settingsHistory') || '[]');
+
+        if (history.length === 0) {
+          showToast('No saved snapshots yet', 'info');
+          return;
+        }
+
+        // Create a simple history display
+        let historyText = `You have ${history.length} saved snapshot(s):\n\n`;
+        history.forEach((snapshot, index) => {
+          const date = new Date(snapshot.timestamp);
+          historyText += `${index + 1}. ${date.toLocaleString()} - Station: ${snapshot.station}\n`;
+        });
+
+        alert(historyText + '\nUse "Undo" to restore the most recent snapshot.');
+      } catch (e) {
+        console.error('Error viewing history:', e);
+        showToast('Failed to load history', 'error');
+      }
+    }
+
     // ==================== Recent Stations Management ====================
 
     /**
@@ -1970,6 +2409,32 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       loadStationData();
       setupStationAutocomplete();
       setupValidation();
+
+      // Initialize uptime counter
+      updateUptime();
+
+      // Setup device info panel toggle
+      const deviceInfoToggle = document.getElementById('deviceInfoToggle');
+      const deviceInfoContent = document.getElementById('deviceInfoContent');
+
+      if (deviceInfoToggle && deviceInfoContent) {
+        deviceInfoToggle.addEventListener('click', function() {
+          const isExpanded = deviceInfoContent.classList.toggle('show');
+          this.setAttribute('aria-expanded', isExpanded);
+          const arrow = this.querySelector('span:last-child');
+          if (arrow) {
+            arrow.textContent = isExpanded ? '▲' : '▼';
+          }
+        });
+
+        // Keyboard activation
+        deviceInfoToggle.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.click();
+          }
+        });
+      }
 
       // Setup advanced layout toggle
       const advancedToggle = document.getElementById('advancedLayoutToggle');
