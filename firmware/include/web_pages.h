@@ -350,6 +350,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       border-color: #667eea;
     }
 
+    .preset-btn.selected {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    }
+
     .advanced-settings {
       margin-top: 20px;
       border-top: 1px solid #e0e0e0;
@@ -1239,6 +1246,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.classList.remove("error");
       input.blur();
 
+      // Highlight the selected preset button if it matches, or clear all if custom station
+      let matched = false;
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        if (btn.dataset.station === code) {
+          btn.classList.add('selected');
+          matched = true;
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
+
       // Clear line and platform filters when station changes
       const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1') {
@@ -1577,6 +1595,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.value = code;
       showToast(`Station set to: ${code}. Click "Apply Station Settings" to apply.`, "info");
       input.blur();
+
+      // Highlight the selected preset button
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        if (btn.dataset.station === code) {
+          btn.classList.add('selected');
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
 
       // Clear line and platform filters when station changes
       const serviceType = document.getElementById('serviceType').value;
@@ -1948,7 +1975,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       serviceTypeSelect.addEventListener("change", () => {
         updateServiceTypeUI();
-        autoApplySettings();
+        // Note: Don't auto-apply - user must click Apply button
 
         // If switching to TFL and a station is already entered, fetch tube lines
         const stationInput = document.getElementById("station");
@@ -1968,16 +1995,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         document.getElementById("currentStation").textContent = stationInput.value;
       }
 
-      // Auto-apply for display settings only (station settings require explicit apply button)
-      const autoApplyFields = ["interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3"];
-      autoApplyFields.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field) {
-          field.addEventListener("change", () => {
-            autoApplySettings();
-          });
-        }
-      });
+      // Note: All settings now require clicking the Apply button - no auto-apply
 
       // Handle TFL line filter changes - populate platform dropdown but don't auto-apply
       const tflLineFilter = document.getElementById('tflLineFilter');
