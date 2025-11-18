@@ -249,12 +249,30 @@ bool TflUndergroundProvider::fetchStationName(const char* stationCode) {
     return false;
   }
 
-  // Read response
+  // Read response with timeout (max 10 seconds total read time)
   String response = "";
-  while (client.available()) {
-    response += client.readString();
+  unsigned long readStart = millis();
+  const unsigned long maxReadTime = 10000;  // 10 second timeout for reading
+
+  while (millis() - readStart < maxReadTime) {
+    if (client.available()) {
+      char c = client.read();
+      response += c;
+
+      // Stop reading once we have the closing brace after commonName
+      if (response.indexOf("\"commonName\"") > 0 && c == '}') {
+        break;  // We have enough data
+      }
+    } else {
+      delay(10);
+    }
   }
   client.stop();
+
+  if (response.length() == 0) {
+    Serial.println("⚠️  No response data received");
+    return false;
+  }
 
   // Find JSON body
   int jsonStart = response.indexOf('{');
@@ -285,8 +303,17 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   // Store station code for use as fallback station name
   currentStationCode = String(stationCode);
 
-  // Fetch proper station name (quick HTTP request)
-  fetchStationName(stationCode);
+  // Only fetch station name if this is a new station (not on every refresh)
+  if (lastFetchedStationCode != String(stationCode)) {
+    Serial.println("🆕 New station detected - fetching station name");
+    if (fetchStationName(stationCode)) {
+      lastFetchedStationCode = String(stationCode);
+    } else {
+      Serial.println("⚠️  Failed to fetch station name, will use code as fallback");
+    }
+  } else {
+    Serial.println("♻️  Using cached station name: " + currentStationName);
+  }
 
   // Build TFL API request
   // GET /StopPoint/{stationCode}/Arrivals

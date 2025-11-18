@@ -79,6 +79,7 @@ private:
   String directionFilter;  // Direction filter ("inbound", "outbound", "" for all)
   String currentStationCode;  // Store current station code for fallback station name
   String currentStationName;  // Store fetched station name
+  String lastFetchedStationCode;  // Track which station code we last fetched name for
 
   // Helper to format ISO timestamp into time string
   String formatTime(const String& isoTimestamp);
