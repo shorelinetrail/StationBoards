@@ -278,17 +278,29 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   }
 
   // Parse arrivals (max 8 services)
-  int maxServices = min(8, (int)arrivals.size());
+  int maxServices = 8;
+  int arrivalsIndex = 0;
 
-  for (int i = 0; i < maxServices; i++) {
-    JsonObject arrival = arrivals[i];
+  while (serviceCount < maxServices && arrivalsIndex < (int)arrivals.size()) {
+    JsonObject arrival = arrivals[arrivalsIndex++];
 
     const char* lineName = arrival["lineName"];
+    const char* lineId = arrival["lineId"];
     const char* towards = arrival["towards"];
     const char* expectedArrival = arrival["expectedArrival"];
     int timeToStation = arrival["timeToStation"] | 0;
 
     if (!lineName || !towards || !expectedArrival) continue;
+
+    // Filter by line if a line filter is set
+    if (lineFilter.length() > 0) {
+      // Compare against lineId (e.g., "northern", "elizabeth")
+      if (lineId && String(lineId) != lineFilter) {
+        continue;  // Skip this arrival, doesn't match filter
+      } else if (!lineId) {
+        continue;  // No lineId, skip it
+      }
+    }
 
     // Format scheduled time from expectedArrival
     String scheduledTime = formatTime(String(expectedArrival));

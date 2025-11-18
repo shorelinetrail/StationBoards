@@ -1521,6 +1521,7 @@ void setupWebServer() {
       // Reinitialize service provider if type changed
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1543,6 +1544,9 @@ void setupWebServer() {
     if (server.hasArg("tflLineFilter")) {
       String lineFilter = server.arg("tflLineFilter");
       safeStrCopy(config.tflLineFilter, lineFilter, sizeof(config.tflLineFilter));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setLineFilter(lineFilter);
+      }
       Serial.printf("  🚇 TFL line filter: %s\n", lineFilter.length() > 0 ? lineFilter.c_str() : "All Lines");
     }
 
