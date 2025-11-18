@@ -1007,9 +1007,12 @@ bool asyncFetchStart() {
   Serial.println("🔌 Connecting to " + String(serviceProvider->getApiHost()) + "...");
   unsigned long connectStart = millis();
 
+  // Set connection timeout (10 seconds for TLS handshake)
+  fetchClient.setTimeout(10);  // 10 seconds in WiFiClient (converted to milliseconds internally)
+
   // Non-blocking connect attempt with display updates
   if (!fetchClient.connect(serviceProvider->getApiHost(), serviceProvider->getApiPort())) {
-    Serial.println("❌ API connection failed");
+    Serial.println("❌ API connection failed (timeout or network error)");
     displayStatus("FAIL");
     return false;
   }
