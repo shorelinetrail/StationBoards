@@ -439,6 +439,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   Serial.println("✅ JSON parsed successfully");
 
   JsonArray arrivals = doc.as<JsonArray>();
+  Serial.println("📋 Found " + String(arrivals.size()) + " arrivals in parsed JSON");
 
   // Extract station name - prefer from arrival data, fall back to cached name, then station code
   bool stationNameSet = false;
@@ -495,6 +496,11 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     int timeToStation = arrival["timeToStation"] | 0;
 
     if (!lineName || !towards || !expectedArrival) continue;
+
+    // Debug logging for first 3 arrivals when filtering for elizabeth
+    if (lineFilter == "elizabeth" && arrivalsIndex <= 3) {
+      Serial.println("🔍 Arrival #" + String(arrivalsIndex) + ": lineId='" + String(lineId ? lineId : "null") + "', lineName='" + String(lineName) + "'");
+    }
 
     // Filter by line if a line filter is set (client-side filtering)
     if (lineFilter.length() > 0) {
