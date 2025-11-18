@@ -401,6 +401,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   // TFL JSON has TONS of fields we don't use: currentLocation, vehicleId, bearing, etc.
   // By filtering, we can use much smaller documents and avoid heap fragmentation
   StaticJsonDocument<200> filter;
+  filter[0]["$type"] = true;          // Required by ArduinoJson for proper parsing
   filter[0]["stationName"] = true;    // Station name (first arrival only)
   filter[0]["lineName"] = true;       // e.g., "Northern"
   filter[0]["lineId"] = true;         // e.g., "northern"
