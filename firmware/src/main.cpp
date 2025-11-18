@@ -1449,7 +1449,10 @@ void setupWebServer() {
       chunk.replace("{EXTRA_SEL_2}", config.extraServices == 2 ? " selected" : "");
       chunk.replace("{EXTRA_SEL_3}", config.extraServices == 3 ? " selected" : "");
       chunk.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
-      chunk.replace("{SCROLL}", String(config.scrollSpeed));
+      chunk.replace("{SCROLL_SEL_10}", config.scrollSpeed == 10 ? " selected" : "");
+      chunk.replace("{SCROLL_SEL_25}", config.scrollSpeed == 25 ? " selected" : "");
+      chunk.replace("{SCROLL_SEL_50}", config.scrollSpeed == 50 ? " selected" : "");
+      chunk.replace("{SCROLL_SEL_100}", config.scrollSpeed == 100 ? " selected" : "");
       chunk.replace("{ROTATION}", String(config.rotationSpeed));
       chunk.replace("{YTOP}", String(config.yPosTop));
       chunk.replace("{Y1}", String(config.yPos1st));

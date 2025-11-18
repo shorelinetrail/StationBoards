@@ -1132,26 +1132,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
               Scroll Speed
               <span class="info-tooltip" title="Controls how fast text scrolls across the display" aria-label="Information: Controls how fast text scrolls across the display">?</span>
             </label>
-
-            <div class="range-slider-group">
-              <div class="range-slider-header">
-                <span class="range-label">🐢 Slower (Smoother)</span>
-                <span class="range-value" id="scrollspeedDisplay">
-                  <input type="number" id="scrollspeed" name="scrollspeed" value="{SCROLL}"
-                         min="10" max="200" required style="width: 55px; padding: 4px 8px; text-align: center; font-weight: 600; border: none; background: transparent;">
-                  <span style="font-size: 12px; color: #666;">ms</span>
-                </span>
-                <span class="range-label">⏩ Faster (Snappier)</span>
-              </div>
-
-              <input type="range" class="range-slider" id="scrollspeedRange"
-                     min="10" max="200" value="{SCROLL}" step="5"
-                     style="width: 100%; margin-top: 8px;">
-            </div>
-
-            <span class="help-text" id="scrollspeed-help">
-              <strong>Recommended:</strong> 50-70ms for readability. Lower values = faster scroll.
-            </span>
+            <select id="scrollspeed" name="scrollspeed" aria-describedby="scrollspeed-help">
+              <option value="10"{SCROLL_SEL_10}>Fast (10ms)</option>
+              <option value="25"{SCROLL_SEL_25}>Medium (25ms)</option>
+              <option value="50"{SCROLL_SEL_50}>Slow (50ms)</option>
+              <option value="100"{SCROLL_SEL_100}>Slower (100ms)</option>
+            </select>
+            <span class="help-text" id="scrollspeed-help">Lower values = faster scroll</span>
           </div>
         </div>
 
@@ -1187,29 +1174,11 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         <div class="form-group">
           <label for="rotationspeed">
-            Bottom Line Rotation Speed
+            Bottom Line Rotation Speed (seconds)
             <span class="info-tooltip" title="How long each service is displayed before rotating to the next" aria-label="Information: How long each service is displayed">?</span>
           </label>
-
-          <div class="range-slider-group">
-            <div class="range-slider-header">
-              <span class="range-label">⚡ Faster</span>
-              <span class="range-value" id="rotationspeedDisplay">
-                <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}"
-                       min="5" max="60" required style="width: 45px; padding: 4px 8px; text-align: center; font-weight: 600; border: none; background: transparent;">
-                <span style="font-size: 12px; color: #666;">sec</span>
-              </span>
-              <span class="range-label">🕐 Slower</span>
-            </div>
-
-            <input type="range" class="range-slider" id="rotationspeedRange"
-                   min="5" max="60" value="{ROTATION}" step="1"
-                   style="width: 100%; margin-top: 8px;">
-          </div>
-
-          <span class="help-text" id="rotationspeed-help">
-            <strong>Recommended:</strong> 12-18 seconds. How often the bottom line alternates between services.
-          </span>
+          <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" required aria-describedby="rotationspeed-help">
+          <span class="help-text" id="rotationspeed-help">Recommended: 12-18 seconds. How often the bottom line alternates between services</span>
         </div>
 
         <!-- Advanced Layout Controls (Collapsible) -->
@@ -2481,41 +2450,19 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         });
       }
 
-      // Setup range slider syncing for scroll speed
-      const scrollspeedInput = document.getElementById('scrollspeed');
-      const scrollspeedRange = document.getElementById('scrollspeedRange');
-
-      if (scrollspeedInput && scrollspeedRange) {
-        // Sync range slider to number input
-        scrollspeedRange.addEventListener('input', (e) => {
-          scrollspeedInput.value = e.target.value;
-          // Trigger auto-apply
+      // Setup auto-apply for scroll speed dropdown
+      const scrollspeedSelect = document.getElementById('scrollspeed');
+      if (scrollspeedSelect) {
+        scrollspeedSelect.addEventListener('change', () => {
           autoApplySettings();
-        });
-
-        // Sync number input to range slider
-        scrollspeedInput.addEventListener('input', (e) => {
-          const value = Math.max(10, Math.min(200, e.target.value));
-          scrollspeedRange.value = value;
         });
       }
 
-      // Setup range slider syncing for rotation speed
+      // Setup auto-apply for rotation speed input
       const rotationspeedInput = document.getElementById('rotationspeed');
-      const rotationspeedRange = document.getElementById('rotationspeedRange');
-
-      if (rotationspeedInput && rotationspeedRange) {
-        // Sync range slider to number input
-        rotationspeedRange.addEventListener('input', (e) => {
-          rotationspeedInput.value = e.target.value;
-          // Trigger auto-apply
+      if (rotationspeedInput) {
+        rotationspeedInput.addEventListener('input', () => {
           autoApplySettings();
-        });
-
-        // Sync number input to range slider
-        rotationspeedInput.addEventListener('input', (e) => {
-          const value = Math.max(5, Math.min(60, e.target.value));
-          rotationspeedRange.value = value;
         });
       }
 
