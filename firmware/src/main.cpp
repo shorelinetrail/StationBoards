@@ -200,7 +200,7 @@ void displayStatus(const char* status);
 // Note: extractTagValue, decodeHTMLEntities, formatETD, generateDeviceId
 // are defined later in this file - no forward declaration needed
 void handleFetchStateMachine();
-bool parseAndDisplayResponse(String response);
+bool parseAndDisplayResponse(const String& response);  // Pass by reference to avoid copying large buffers
 bool asyncFetchStart();
 void setupWebServer();
 bool initializeWiFi();
@@ -1136,7 +1136,7 @@ void handleFetchStateMachine() {
 }
 
 // Parse function - using the WORKING logic from original
-bool parseAndDisplayResponse(String response) {
+bool parseAndDisplayResponse(const String& response) {
   if (!serviceProvider) {
     Serial.println("❌ Service provider not initialized");
     return false;
