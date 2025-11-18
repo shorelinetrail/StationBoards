@@ -38,10 +38,17 @@ inline ValidationResult validateStationCode(const String& code) {
   // Check for TFL NaPTAN format (9-12 alphanumeric characters)
   if (len >= 9 && len <= 12) {
     for (int i = 0; i < len; i++) {
-      if (!isalnum(code[i]) || !isupper(code[i])) {
+      if (!isalnum(code[i])) {
         return ValidationResult::failure(
           ERROR_NONE,
-          "TFL station ID must contain only uppercase letters and numbers"
+          "TFL station ID must contain only letters and numbers"
+        );
+      }
+      // If it's a letter, it must be uppercase
+      if (isalpha(code[i]) && !isupper(code[i])) {
+        return ValidationResult::failure(
+          ERROR_NONE,
+          "TFL station ID letters must be uppercase"
         );
       }
     }
