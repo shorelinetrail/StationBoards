@@ -1571,6 +1571,84 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       });
     };
 
+    // ==================== TFL Line Selection ====================
+
+    /**
+     * Fetch available tube lines for a TFL station
+     */
+    const fetchTflStationLines = async (stationId, stationName = '') => {
+      console.log('fetchTflStationLines called with:', stationId, stationName);
+
+      const tflApiKey = document.getElementById('tflApiKey')?.value || '';
+      const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}${tflApiKey ? '?app_key=' + encodeURIComponent(tflApiKey) : ''}`;
+
+      console.log('Fetching from TFL API:', apiUrl.replace(tflApiKey, 'XXX'));
+
+      try {
+        const response = await fetch(apiUrl);
+        console.log('Response status:', response.status);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Received TFL data');
+
+        // Extract tube lines from lineModeGroups
+        const tubeLines = [];
+
+        if (data.lineModeGroups) {
+          const tubeModeGroup = data.lineModeGroups.find(group => group.modeName === 'tube');
+
+          if (tubeModeGroup && tubeModeGroup.lineIdentifier) {
+            tubeModeGroup.lineIdentifier.forEach(lineId => {
+              // Find the full line information from the lines array
+              const lineInfo = data.lines?.find(line => line.id === lineId);
+              if (lineInfo) {
+                tubeLines.push({
+                  id: lineInfo.id,
+                  name: lineInfo.name
+                });
+              } else {
+                // Fallback: create basic info from just the ID
+                tubeLines.push({
+                  id: lineId,
+                  name: lineId.split('-').map(word =>
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                  ).join(' ')
+                });
+              }
+            });
+          }
+        }
+
+        console.log('Station has', tubeLines.length, 'tube lines:', tubeLines.map(l => l.name));
+        return tubeLines;
+
+      } catch (error) {
+        console.error('Error fetching TFL station lines:', error);
+        showToast('Failed to fetch tube lines: ' + error.message, 'error');
+        return [];
+      }
+    };
+
+    /**
+     * Display tube line selector
+     */
+    const showTflLineSelector = async (stationId) => {
+      const lines = await fetchTflStationLines(stationId);
+
+      if (lines.length === 0) {
+        showToast('No tube lines found for this station', 'warning');
+        return;
+      }
+
+      // For now, just show the lines in a toast
+      const lineNames = lines.map(l => l.name).join(', ');
+      showToast(`Available lines: ${lineNames}`, 'info');
+    };
+
     // ==================== Initialization ====================
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -1602,6 +1680,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       serviceTypeSelect.addEventListener("change", () => {
         updateServiceTypeUI();
         autoApplySettings();
+
+        // If switching to TFL and a station is already entered, fetch tube lines
+        const stationInput = document.getElementById("station");
+        if (serviceTypeSelect.value === "1" && stationInput.value.length >= 9) {
+          setTimeout(() => {
+            showTflLineSelector(stationInput.value.trim());
+          }, 500);
+        }
       });
 
       // Initialize UI on load
@@ -1629,6 +1715,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             field.addEventListener("change", () => {
               if (!autocompleteJustSelected && field.value.length >= 3) {
                 autoApplySettings();
+
+                // Fetch tube lines if service type is TFL
+                const serviceType = document.getElementById('serviceType').value;
+                if (serviceType === '1') {
+                  // Delay to allow settings to apply first
+                  setTimeout(() => {
+                    showTflLineSelector(field.value.trim());
+                  }, 500);
+                }
               }
             });
           } else {
