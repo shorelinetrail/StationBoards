@@ -786,6 +786,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="station-help">Start typing to search for a station</span>
         </div>
 
+        <div class="form-group" id="tflLineFilterGroup" style="display:none;">
+          <label for="tflLineFilter">
+            Filter by Tube Line
+            <span class="info-tooltip" title="Show only arrivals for selected tube line" aria-label="Information: Filter by tube line">?</span>
+          </label>
+          <select id="tflLineFilter" name="tflLineFilter" aria-describedby="tflline-help">
+            <option value="">All Lines</option>
+          </select>
+          <span class="help-text" id="tflline-help">Select a specific tube line to display, or show all lines</span>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label for="interval">
@@ -1063,6 +1074,43 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         });
     };
 
+    // ==================== TFL Station Search ====================
+
+    /**
+     * Search TFL tube stations from the API
+     */
+    const searchTflStations = async (query) => {
+      if (query.length < 2) return [];
+
+      try {
+        const tflApiKey = document.getElementById('tflApiKey')?.value || '';
+        const apiUrl = `https://api.tfl.gov.uk/StopPoint/Search?query=${encodeURIComponent(query)}&modes=tube${tflApiKey ? '&app_key=' + encodeURIComponent(tflApiKey) : ''}`;
+
+        const response = await fetch(apiUrl);
+        if (!response.ok) return [];
+
+        const data = await response.json();
+
+        // Extract station matches
+        const stations = [];
+        if (data.matches) {
+          data.matches.forEach(match => {
+            if (match.modes && match.modes.includes('tube')) {
+              stations.push({
+                name: match.name,
+                code: match.id
+              });
+            }
+          });
+        }
+
+        return stations.slice(0, 10); // Limit to 10 results
+      } catch (error) {
+        console.error('Error searching TFL stations:', error);
+        return [];
+      }
+    };
+
     // ==================== Station Autocomplete ====================
 
     const setupStationAutocomplete = () => {
@@ -1070,18 +1118,38 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const results = document.getElementById("stationAutocomplete");
 
       // Debounced input handler
-      const handleInput = debounce((e) => {
-        const query = e.target.value.toUpperCase().trim();
+      const handleInput = debounce(async (e) => {
+        const query = e.target.value.trim();
+        const serviceType = document.getElementById('serviceType').value;
+        const isTfl = serviceType === '1';
 
-        if (query.length < 2 || !stationDataLoaded) {
+        if (query.length < 2) {
           results.classList.remove("show");
           return;
         }
 
-        const matches = stationData.filter(station =>
-          station.name.toUpperCase().includes(query) ||
-          station.code.includes(query)
-        ).slice(0, 10);
+        // Show loading state
+        results.innerHTML = '<div class="autocomplete-loading">Searching...</div>';
+        results.classList.add("show");
+
+        let matches = [];
+
+        if (isTfl) {
+          // Search TFL stations from API
+          matches = await searchTflStations(query);
+        } else {
+          // Search National Rail stations from local data
+          if (!stationDataLoaded) {
+            results.classList.remove("show");
+            return;
+          }
+
+          const queryUpper = query.toUpperCase();
+          matches = stationData.filter(station =>
+            station.name.toUpperCase().includes(queryUpper) ||
+            station.code.includes(queryUpper)
+          ).slice(0, 10);
+        }
 
         if (matches.length === 0) {
           results.innerHTML = '<div class="autocomplete-no-results">No stations found</div>';
@@ -1120,7 +1188,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.addEventListener("input", handleInput);
 
       input.addEventListener("focus", (e) => {
-        if (e.target.value.length >= 2 && stationDataLoaded) {
+        if (e.target.value.length >= 2) {
           e.target.dispatchEvent(new Event("input"));
         }
       });
@@ -1660,7 +1728,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         return;
       }
 
-      // For now, just show the lines in a toast
+      // Populate the line filter dropdown
+      const lineFilter = document.getElementById('tflLineFilter');
+      lineFilter.innerHTML = '<option value="">All Lines</option>' +
+        lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
+
+      // Show toast with available lines
       const lineNames = lines.map(l => l.name).join(', ');
       showToast(`Available lines: ${lineNames}`, 'info');
     };
@@ -1684,9 +1757,11 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const isUnderground = serviceTypeSelect.value === "1";
         const nationalRailPresets = document.getElementById("nationalRailPresets");
         const tflPresets = document.getElementById("tflPresets");
+        const tflLineFilterGroup = document.getElementById("tflLineFilterGroup");
 
         // Show/hide appropriate elements
         tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+        tflLineFilterGroup.style.display = isUnderground ? "block" : "none";
         nationalRailPresets.style.display = isUnderground ? "none" : "grid";
         tflPresets.style.display = isUnderground ? "grid" : "none";
 
