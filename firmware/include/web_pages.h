@@ -1458,6 +1458,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     };
 
     /**
+     * Decode HTML entities for display
+     */
+    const decodeHtml = (html) => {
+      if (html === null || html === undefined) return '';
+      const txt = document.createElement('textarea');
+      txt.innerHTML = html;
+      return txt.value;
+    };
+
+    /**
      * Debounce function to limit execution frequency
      */
     const debounce = (func, wait) => {
@@ -1768,7 +1778,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             if (data.station) {
               const stationEl = document.getElementById("currentStation");
               if (stationEl) {
-                stationEl.textContent = escapeHtml(data.station);
+                stationEl.textContent = decodeHtml(data.station);
               }
             }
           } else if (data.type === "metrics") {
@@ -1777,7 +1787,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             if (data.stationName) {
               const stationEl = document.getElementById("currentStation");
               if (stationEl) {
-                stationEl.textContent = escapeHtml(data.stationName);
+                stationEl.textContent = decodeHtml(data.stationName);
               }
             }
             updateRSSI(data.rssi);
