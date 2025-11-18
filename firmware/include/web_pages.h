@@ -1559,6 +1559,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         method: "POST",
         body: formData
       })
+      .then(async response => {
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || `HTTP ${response.status}`);
+        }
+        return response;
+      })
       .then(() => {
         showToast("Settings updated!", "success");
 
@@ -1567,7 +1574,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         }
       })
       .catch(error => {
-        showToast("Failed to apply settings", "error");
+        console.error('Apply settings error:', error);
+        showToast("Failed to apply settings: " + error.message, "error");
       });
     };
 
