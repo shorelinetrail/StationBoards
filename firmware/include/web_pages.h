@@ -1532,7 +1532,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       // Fetch tube lines if service type is TFL
       const serviceType = document.getElementById('serviceType').value;
-      if (serviceType === '1' && code.length >= 9) {
+      if (serviceType === '1' && code.length >= 4) {
         setTimeout(() => {
           showTflLineSelector(code.trim());
         }, 500);
@@ -1816,7 +1816,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // If switching to TFL and a station is already entered, fetch tube lines
         const stationInput = document.getElementById("station");
-        if (serviceTypeSelect.value === "1" && stationInput.value.length >= 9) {
+        if (serviceTypeSelect.value === "1" && stationInput.value.length >= 4) {
           setTimeout(() => {
             showTflLineSelector(stationInput.value.trim());
           }, 500);

@@ -1154,14 +1154,17 @@ bool parseAndDisplayResponse(String response) {
   // Update display state
   displayState.serviceCount = newServiceCount;
   displayState.markDirty();
+  displayState.fetchingNewStation = false;  // Clear loading state after successful parse
 
   if (displayState.serviceCount > 0) {
-    displayState.fetchingNewStation = false;
     broadcastTrainUpdate();
     broadcastStatus("Data updated", "success");
+  } else {
+    // Valid response but no services (could be filtered out or genuinely none)
+    broadcastStatus("No services found", "info");
   }
 
-  return displayState.serviceCount > 0;
+  return true;  // Return true for successful parse, even if 0 services
 }
 
 // Animation - smooth easing-based animation

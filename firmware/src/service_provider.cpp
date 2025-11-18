@@ -161,7 +161,11 @@ bool NationalRailProvider::parseResponse(const String& response,
     pos = serviceEnd;
   }
 
-  return serviceCount > 0;
+  if (serviceCount == 0) {
+    Serial.println("⚠️  No train services found in response");
+  }
+
+  return true;  // Return true for valid response, even if 0 services
 }
 
 // ============ TFL Underground Provider Implementation ============
@@ -263,12 +267,8 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   }
 
   JsonArray arrivals = doc.as<JsonArray>();
-  if (arrivals.size() == 0) {
-    Serial.println("❌ No arrivals found");
-    return false;
-  }
 
-  // Extract station name from first arrival
+  // Extract station name from first arrival (if available)
   if (arrivals.size() > 0) {
     const char* stName = arrivals[0]["stationName"];
     if (stName) {
@@ -276,6 +276,8 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       stationName[stationNameSize - 1] = '\0';
       Serial.println("📍 " + String(stName));
     }
+  } else {
+    Serial.println("⚠️  No arrivals in TFL response");
   }
 
   // Parse arrivals (max 8 services)
@@ -330,5 +332,13 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     serviceCount++;
   }
 
-  return serviceCount > 0;
+  if (serviceCount == 0) {
+    if (lineFilter.length() > 0) {
+      Serial.println("⚠️  No arrivals match line filter: " + lineFilter);
+    } else {
+      Serial.println("⚠️  No arrivals found");
+    }
+  }
+
+  return true;  // Return true for valid response, even if 0 services
 }
