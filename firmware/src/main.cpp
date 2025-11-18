@@ -200,7 +200,7 @@ void displayStatus(const char* status);
 // Note: extractTagValue, decodeHTMLEntities, formatETD, generateDeviceId
 // are defined later in this file - no forward declaration needed
 void handleFetchStateMachine();
-bool parseAndDisplayResponse(String response);
+bool parseAndDisplayResponse(const String& response);  // Pass by reference to avoid copying large buffers
 bool asyncFetchStart();
 void setupWebServer();
 bool initializeWiFi();
@@ -971,6 +971,14 @@ void setupOTA() {
 
 // Data Fetching - using service provider abstraction
 bool asyncFetchStart() {
+  // CRITICAL: Prevent overlapping fetches
+  // If a fetch is already in progress, ignore this request to avoid multiple simultaneous API calls
+  // Note: /apply handler should have already canceled in-progress fetches if settings changed
+  if (fetchStateData.isActive()) {
+    Serial.println("⏸️  Fetch already in progress (state=" + String(fetchStateData.state) + ") - ignoring duplicate request");
+    return false;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected");
     displayStatus("OFF");
@@ -985,6 +993,11 @@ bool asyncFetchStart() {
 
   Serial.println("📡 Fetching from " + String(serviceProvider->getProviderName()) + ": " + String(config.stationCode));
 
+  // NOTE: Station name pre-fetch removed for performance
+  // The arrivals response already includes station name, so pre-fetching
+  // was adding 6+ seconds of unnecessary delay (separate HTTPS connection)
+  // Station name now extracted from arrivals data in parseResponse()
+
   // Update display before blocking operations
   unsigned long currentTime = millis();
   handleAlternatingService(currentTime);
@@ -994,9 +1007,12 @@ bool asyncFetchStart() {
   Serial.println("🔌 Connecting to " + String(serviceProvider->getApiHost()) + "...");
   unsigned long connectStart = millis();
 
+  // Set connection timeout (10 seconds for TLS handshake)
+  fetchClient.setTimeout(10);  // 10 seconds in WiFiClient (converted to milliseconds internally)
+
   // Non-blocking connect attempt with display updates
   if (!fetchClient.connect(serviceProvider->getApiHost(), serviceProvider->getApiPort())) {
-    Serial.println("❌ API connection failed");
+    Serial.println("❌ API connection failed (timeout or network error)");
     displayStatus("FAIL");
     return false;
   }
@@ -1129,7 +1145,7 @@ void handleFetchStateMachine() {
 }
 
 // Parse function - using the WORKING logic from original
-bool parseAndDisplayResponse(String response) {
+bool parseAndDisplayResponse(const String& response) {
   if (!serviceProvider) {
     Serial.println("❌ Service provider not initialized");
     return false;
@@ -1154,14 +1170,17 @@ bool parseAndDisplayResponse(String response) {
   // Update display state
   displayState.serviceCount = newServiceCount;
   displayState.markDirty();
+  displayState.fetchingNewStation = false;  // Clear loading state after successful parse
 
   if (displayState.serviceCount > 0) {
-    displayState.fetchingNewStation = false;
     broadcastTrainUpdate();
     broadcastStatus("Data updated", "success");
+  } else {
+    // Valid response but no services (could be filtered out or genuinely none)
+    broadcastStatus("No services found", "info");
   }
 
-  return displayState.serviceCount > 0;
+  return true;  // Return true for successful parse, even if 0 services
 }
 
 // Animation - smooth easing-based animation
@@ -1344,34 +1363,61 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
-    String html = FPSTR(CONFIG_PAGE_TEMPLATE);
-    
-    html.replace("{SSID}", String(config.wifiSSID));
-    html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
-    html.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
-    html.replace("{TFL_API_KEY}", String(config.tflApiKey));
-    html.replace("{STATION}", String(config.stationCode));
-    html.replace("{STATION_NAME}", String(displayState.stationName));
-    html.replace("{INTERVAL}", String(config.refreshInterval));
-    html.replace("{MODE_SEL_0}", config.useCallingAt ? "" : " selected");
-    html.replace("{MODE_SEL_1}", config.useCallingAt ? " selected" : "");
-    html.replace("{SHOWSTATION_SEL_1}", config.showStationName ? " selected" : "");
-    html.replace("{SHOWSTATION_SEL_0}", !config.showStationName ? " selected" : "");
-    html.replace("{EXTRA_SEL_0}", config.extraServices == 0 ? " selected" : "");
-    html.replace("{EXTRA_SEL_1}", config.extraServices == 1 ? " selected" : "");
-    html.replace("{EXTRA_SEL_2}", config.extraServices == 2 ? " selected" : "");
-    html.replace("{EXTRA_SEL_3}", config.extraServices == 3 ? " selected" : "");
-    html.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
-    html.replace("{SCROLL}", String(config.scrollSpeed));
-    html.replace("{ROTATION}", String(config.rotationSpeed));
-    html.replace("{YTOP}", String(config.yPosTop));
-    html.replace("{Y1}", String(config.yPos1st));
-    html.replace("{Y2}", String(config.yPos2nd));
-    html.replace("{Y3}", String(config.yPosAlt));
-    html.replace("{IP}", WiFi.localIP().toString());
-    html.replace("{DEVICE_ID}", config.deviceId);
-    
-    server.send(200, "text/html", html);
+    // Use chunked encoding to avoid loading entire template into memory
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
+
+    // Stream template in chunks with replacements
+    const char* templatePtr = CONFIG_PAGE_TEMPLATE;
+    const size_t chunkSize = 1024;  // Process 1KB at a time
+    char buffer[chunkSize + 1];
+    size_t templateLen = strlen_P(templatePtr);
+    size_t pos = 0;
+
+    while (pos < templateLen) {
+      size_t remaining = templateLen - pos;
+      size_t copySize = (remaining < chunkSize) ? remaining : chunkSize;
+
+      // Copy chunk from PROGMEM
+      memcpy_P(buffer, templatePtr + pos, copySize);
+      buffer[copySize] = '\0';
+
+      String chunk = String(buffer);
+
+      // Do replacements in this chunk
+      chunk.replace("{SSID}", String(config.wifiSSID));
+      chunk.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
+      chunk.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
+      chunk.replace("{TFL_API_KEY}", String(config.tflApiKey));
+      chunk.replace("{STATION}", String(config.stationCode));
+      chunk.replace("{STATION_NAME}", String(displayState.stationName));
+      chunk.replace("{INTERVAL}", String(config.refreshInterval));
+      chunk.replace("{MODE_SEL_0}", config.useCallingAt ? "" : " selected");
+      chunk.replace("{MODE_SEL_1}", config.useCallingAt ? " selected" : "");
+      chunk.replace("{SHOWSTATION_SEL_1}", config.showStationName ? " selected" : "");
+      chunk.replace("{SHOWSTATION_SEL_0}", !config.showStationName ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_0}", config.extraServices == 0 ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_1}", config.extraServices == 1 ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_2}", config.extraServices == 2 ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_3}", config.extraServices == 3 ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
+      chunk.replace("{SCROLL}", String(config.scrollSpeed));
+      chunk.replace("{ROTATION}", String(config.rotationSpeed));
+      chunk.replace("{YTOP}", String(config.yPosTop));
+      chunk.replace("{Y1}", String(config.yPos1st));
+      chunk.replace("{Y2}", String(config.yPos2nd));
+      chunk.replace("{Y3}", String(config.yPosAlt));
+      chunk.replace("{IP}", WiFi.localIP().toString());
+      chunk.replace("{DEVICE_ID}", config.deviceId);
+
+      // Send this chunk
+      server.sendContent(chunk);
+
+      pos += copySize;
+    }
+
+    // End chunked response
+    server.sendContent("");
   });
 
   server.on("/save", HTTP_POST, []() {
@@ -1386,6 +1432,9 @@ void setupWebServer() {
       // Reinitialize service provider if type changed
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
+        tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
+        tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1509,6 +1558,9 @@ void setupWebServer() {
     String oldSSID = String(config.wifiSSID);
     String oldPassword = String(config.wifiPassword);
     String oldStation = String(config.stationCode);
+    String oldLineFilter = String(config.tflLineFilter);
+    String oldDirectionFilter = String(config.tflDirectionFilter);
+    String oldPlatformFilter = String(config.tflPlatformFilter);
     bool oldCallingAt = config.useCallingAt;
     int oldExtraServices = config.extraServices;
 
@@ -1521,6 +1573,9 @@ void setupWebServer() {
       // Reinitialize service provider if type changed
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
+        tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
+        tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1537,6 +1592,36 @@ void setupWebServer() {
         tflUndergroundProvider.setApiKey(apiKey);
         Serial.println("  🔑 TFL API key updated");
       }
+    }
+
+    // Handle TFL Line Filter
+    if (server.hasArg("tflLineFilter")) {
+      String lineFilter = server.arg("tflLineFilter");
+      safeStrCopy(config.tflLineFilter, lineFilter, sizeof(config.tflLineFilter));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setLineFilter(lineFilter);
+      }
+      Serial.printf("  🚇 TFL line filter: %s\n", lineFilter.length() > 0 ? lineFilter.c_str() : "All Lines");
+    }
+
+    // Handle TFL Direction Filter
+    if (server.hasArg("tflDirectionFilter")) {
+      String directionFilter = server.arg("tflDirectionFilter");
+      safeStrCopy(config.tflDirectionFilter, directionFilter, sizeof(config.tflDirectionFilter));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setDirectionFilter(directionFilter);
+      }
+      Serial.printf("  🚇 TFL direction filter: %s\n", directionFilter.length() > 0 ? directionFilter.c_str() : "All Directions");
+    }
+
+    // Handle TFL Platform Filter
+    if (server.hasArg("tflPlatformFilter")) {
+      String platformFilter = server.arg("tflPlatformFilter");
+      safeStrCopy(config.tflPlatformFilter, platformFilter, sizeof(config.tflPlatformFilter));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setPlatformFilter(platformFilter);
+      }
+      Serial.printf("  🚇 TFL platform filter: %s\n", platformFilter.length() > 0 ? platformFilter.c_str() : "All Platforms");
     }
 
     // Validate SSID
@@ -1637,8 +1722,11 @@ void setupWebServer() {
     displayState.callingAtScrollOffset = 0;
     
     config.save();
-    
+
     bool stationChanged = (oldStation != String(config.stationCode));
+    bool lineFilterChanged = (oldLineFilter != String(config.tflLineFilter)) && (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
+    bool directionFilterChanged = (oldDirectionFilter != String(config.tflDirectionFilter)) && (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
+    bool platformFilterChanged = (oldPlatformFilter != String(config.tflPlatformFilter)) && (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
     bool displayModeChanged = (oldCallingAt != config.useCallingAt) || (oldExtraServices != config.extraServices);
     bool switchedToCallingAt = (!oldCallingAt && config.useCallingAt);
 
@@ -1651,8 +1739,11 @@ void setupWebServer() {
       }
       // Force immediate fetch to get calling points
       if (fetchStateData.state != FETCH_IDLE) {
+        Serial.println("⚠️  Canceling in-progress fetch for calling points mode");
         fetchClient.stop();
+        fetchStateData.buffer = "";  // Clear partial data
         fetchStateData.state = FETCH_IDLE;
+        delay(50);  // Brief delay to let connection fully close
       }
       fetchStateData.lastSuccess = 0;
       fetchStateData.lastAttempt = 0;
@@ -1670,22 +1761,35 @@ void setupWebServer() {
     String html = FPSTR(APPLY_SUCCESS_PAGE);
     server.send(200, "text/html", html);
     
-    // Force immediate data fetch when station changes OR when switching to calling at
-    if (stationChanged || switchedToCallingAt) {
+    // Force immediate data fetch when station changes, line filter changes, direction filter changes, platform filter changes, OR when switching to calling at
+    if (stationChanged || lineFilterChanged || directionFilterChanged || platformFilterChanged || switchedToCallingAt) {
       displayState.serviceCount = 0;
       displayState.fetchingNewStation = true;  // Mark that we're loading new station data
-      
+
+      // Cancel any in-progress fetch and wait for cleanup
       if (fetchStateData.state != FETCH_IDLE) {
+        Serial.println("⚠️  Canceling in-progress fetch for new request");
         fetchClient.stop();
+        fetchStateData.buffer = "";  // Clear partial data
         fetchStateData.state = FETCH_IDLE;
+        delay(50);  // Brief delay to let connection fully close
       }
-      
+
       fetchStateData.lastSuccess = 0;
       fetchStateData.lastAttempt = 0;
-      
+
       if (stationChanged) {
         Serial.println("🔄 Station changed to " + String(config.stationCode) + " - fetching immediately");
         broadcastStatus("Station changed - fetching new data...", "info");
+      } else if (lineFilterChanged) {
+        Serial.println("🔄 Line filter changed to " + String(config.tflLineFilter) + " - fetching immediately");
+        broadcastStatus("Line filter changed - fetching new data...", "info");
+      } else if (directionFilterChanged) {
+        Serial.println("🔄 Direction filter changed to " + String(config.tflDirectionFilter) + " - fetching immediately");
+        broadcastStatus("Direction filter changed - fetching new data...", "info");
+      } else if (platformFilterChanged) {
+        Serial.println("🔄 Platform filter changed to " + String(config.tflPlatformFilter) + " - fetching immediately");
+        broadcastStatus("Platform filter changed - fetching new data...", "info");
       } else if (switchedToCallingAt) {
         Serial.println("🔄 Switched to Calling At mode - fetching detailed data...");
         broadcastStatus("Fetching calling points...", "info");
@@ -1786,6 +1890,9 @@ void setup() {
   // Initialize service provider based on config
   if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
     tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+    tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
+    tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
+    tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
     serviceProvider = &tflUndergroundProvider;
     Serial.println("🚇 Using TFL Underground provider");
   } else {
