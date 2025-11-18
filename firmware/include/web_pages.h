@@ -2232,36 +2232,53 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
      * Display tube line selector
      */
     const showTflLineSelector = async (stationId) => {
-      // Clear line filter first
       const lineFilter = document.getElementById('tflLineFilter');
-      lineFilter.innerHTML = '<option value="">All Lines</option>';
-      lineFilter.value = '';
-
-      // Clear platform filter
       const platformFilter = document.getElementById('tflPlatformFilter');
-      platformFilter.innerHTML = '<option value="">All Platforms</option>';
-      platformFilter.value = '';
 
-      const lines = await fetchTflStationLines(stationId);
+      // Show loading state - disable dropdowns and show "Loading..."
+      lineFilter.innerHTML = '<option value="">Loading lines...</option>';
+      lineFilter.disabled = true;
+      platformFilter.innerHTML = '<option value="">Loading platforms...</option>';
+      platformFilter.disabled = true;
 
-      if (lines.length === 0) {
-        showToast('No tube lines found for this station', 'warning');
-        return;
+      try {
+        const lines = await fetchTflStationLines(stationId);
+
+        if (lines.length === 0) {
+          // No lines found - reset to default state
+          lineFilter.innerHTML = '<option value="">All Lines</option>';
+          lineFilter.disabled = false;
+          platformFilter.innerHTML = '<option value="">All Platforms</option>';
+          platformFilter.disabled = false;
+          showToast('No tube lines found for this station', 'warning');
+          return;
+        }
+
+        // Store lines data globally for platform filtering
+        window.tflLinesData = lines;
+
+        // Populate the line filter dropdown and re-enable
+        lineFilter.innerHTML = '<option value="">All Lines</option>' +
+          lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
+        lineFilter.disabled = false;
+
+        // Reset platform filter and re-enable
+        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.disabled = false;
+
+        // Don't auto-select any line - let the user choose
+        lineFilter.value = '';
+
+        // Show toast with available lines
+        const lineNames = lines.map(l => l.name).join(', ');
+        showToast(`Available lines: ${lineNames}`, 'info');
+      } catch (error) {
+        // Error handling - reset to default state
+        lineFilter.innerHTML = '<option value="">All Lines</option>';
+        lineFilter.disabled = false;
+        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.disabled = false;
       }
-
-      // Store lines data globally for platform filtering
-      window.tflLinesData = lines;
-
-      // Populate the line filter dropdown
-      lineFilter.innerHTML = '<option value="">All Lines</option>' +
-        lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
-
-      // Don't auto-select any line - let the user choose
-      lineFilter.value = '';
-
-      // Show toast with available lines
-      const lineNames = lines.map(l => l.name).join(', ');
-      showToast(`Available lines: ${lineNames}`, 'info');
     };
 
     // ==================== Advanced Controls Toggle ====================
@@ -2521,8 +2538,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // Update labels
         if (isUnderground) {
-          stationLabel.textContent = "TFL Station ID";
-          stationTooltip.title = "TFL Station ID (hub codes like HUBSOK or NaPTAN IDs like 940GZZLUPAC)";
+          stationLabel.textContent = "TFL Station";
+          stationTooltip.title = "TFL Station code (e.g., HUBSOK for South Kensington or 940GZZLUPAC for Piccadilly Circus)";
         } else {
           stationLabel.textContent = "Station Code (CRS)";
           stationTooltip.title = "Three-letter National Rail station code";
