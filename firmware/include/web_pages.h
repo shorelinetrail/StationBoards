@@ -763,7 +763,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span id="stationLabel">Station Code (CRS)</span>
             <span class="info-tooltip" id="stationTooltip" title="Three-letter National Rail station code" aria-label="Information: Three-letter National Rail station code">?</span>
           </label>
-          <div class="preset-stations">
+          <div class="preset-stations" id="nationalRailPresets">
             <button type="button" class="preset-btn" data-station="PAD" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
             <button type="button" class="preset-btn" data-station="VIC" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
             <button type="button" class="preset-btn" data-station="WAT" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
@@ -771,8 +771,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <button type="button" class="preset-btn" data-station="EUS" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
             <button type="button" class="preset-btn" data-station="LST" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
           </div>
+          <div class="preset-stations" id="tflPresets" style="display:none;">
+            <button type="button" class="preset-btn" data-station="940GZZLUPAC" aria-label="Select Paddington Underground">940GZZLUPAC<br><small>Paddington</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUVIC" aria-label="Select Victoria Underground">940GZZLUVIC<br><small>Victoria</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUWLO" aria-label="Select Waterloo Underground">940GZZLUWLO<br><small>Waterloo</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUKSX" aria-label="Select Kings Cross Underground">940GZZLUKSX<br><small>King's Cross</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUBST" aria-label="Select Bank Underground">940GZZLUBST<br><small>Bank</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLULVT" aria-label="Select Liverpool Street Underground">940GZZLULVT<br><small>Liverpool St</small></button>
+          </div>
           <div class="autocomplete-wrapper">
-            <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="50" aria-label="Station code or name" aria-describedby="station-help">
+            <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="15" aria-label="Station code or name" aria-describedby="station-help">
             <div id="stationAutocomplete" class="autocomplete-results" role="listbox" aria-label="Station suggestions"></div>
           </div>
           <span class="help-text" id="station-help">Start typing to search for a station</span>
@@ -1674,8 +1682,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       const updateServiceTypeUI = () => {
         const isUnderground = serviceTypeSelect.value === "1";
-        tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+        const nationalRailPresets = document.getElementById("nationalRailPresets");
+        const tflPresets = document.getElementById("tflPresets");
 
+        // Show/hide appropriate elements
+        tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+        nationalRailPresets.style.display = isUnderground ? "none" : "grid";
+        tflPresets.style.display = isUnderground ? "grid" : "none";
+
+        // Update labels
         if (isUnderground) {
           stationLabel.textContent = "TFL Station ID (NaPTAN)";
           stationTooltip.title = "TFL Station NaPTAN ID (e.g., 940GZZLUPAC for Paddington)";
