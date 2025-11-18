@@ -944,40 +944,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <div class="label">Uptime</div>
         <div class="value uptime-counter" id="deviceUptime" aria-live="polite">--:--:--</div>
       </div>
-      <div class="status-item" style="grid-column: span 2;">
-        <div class="device-info-panel">
-          <div class="device-info-toggle" id="deviceInfoToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="deviceInfoContent">
-            <span>📊 Device Information</span>
-            <span style="font-size: 10px;">▼</span>
-          </div>
-          <div class="device-info-content" id="deviceInfoContent">
-            <div class="device-info-row">
-              <span class="device-info-label">Device ID:</span>
-              <span id="deviceIdInfo">{DEVICE_ID}</span>
-            </div>
-            <div class="device-info-row">
-              <span class="device-info-label">IP Address:</span>
-              <span id="ipAddressInfo">{IP}</span>
-            </div>
-            <div class="device-info-row">
-              <span class="device-info-label">WiFi RSSI:</span>
-              <span id="rssiValue">-- dBm</span>
-            </div>
-            <div class="device-info-row">
-              <span class="device-info-label">Firmware:</span>
-              <span>v2.1.0</span>
-            </div>
-            <div class="device-info-row">
-              <span class="device-info-label">Free Memory:</span>
-              <span id="freeMemory">-- KB</span>
-            </div>
-            <div class="device-info-row">
-              <span class="device-info-label">Last Refresh:</span>
-              <span id="lastRefreshTime">Never</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Tabs -->
@@ -1180,74 +1146,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" required aria-describedby="rotationspeed-help">
           <span class="help-text" id="rotationspeed-help">Recommended: 12-18 seconds. How often the bottom line alternates between services</span>
         </div>
-
-        <!-- Advanced Layout Controls (Collapsible) -->
-        <div class="advanced-settings">
-          <div class="advanced-toggle" id="advancedLayoutToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="advancedLayoutContent">
-            <span>⚙️ Advanced Layout Controls</span>
-            <span style="font-size: 12px; color: #999; margin-left: auto;">(For experts only)</span>
-          </div>
-          <div class="advanced-content" id="advancedLayoutContent">
-            <div style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
-              <strong>⚠️ Caution:</strong> These settings control pixel-level positioning. Change only if you understand display coordinates.
-            </div>
-
-            <div class="form-row form-row-three">
-              <div class="form-group">
-                <label for="ytop">
-                  Top Line Y Position
-                  <span class="info-tooltip" title="Vertical pixel offset for top departure when station name is hidden (0-64 pixels)" aria-label="Information about top line position">?</span>
-                </label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                  <input type="number" id="ytop" name="ytop" value="{YTOP}" min="0" max="64" required aria-describedby="ytop-help" style="flex: 1;">
-                  <button type="button" class="btn" style="padding: 8px 12px; background: #6c757d; color: white;" onclick="document.getElementById('ytop').value='12'; autoApplySettings();">Reset</button>
-                </div>
-                <span class="help-text" id="ytop-help">Default: 12px from top</span>
-              </div>
-
-              <div class="form-group">
-                <label for="y1">
-                  First Line Y Position
-                  <span class="info-tooltip" title="Vertical pixel offset for first departure line (0-64 pixels)" aria-label="Information about first line position">?</span>
-                </label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                  <input type="number" id="y1" name="y1" value="{Y1}" min="0" max="64" required aria-describedby="y1-help" style="flex: 1;">
-                  <button type="button" class="btn" style="padding: 8px 12px; background: #6c757d; color: white;" onclick="document.getElementById('y1').value='26'; autoApplySettings();">Reset</button>
-                </div>
-                <span class="help-text" id="y1-help">Default: 26px from top</span>
-              </div>
-
-              <div class="form-group">
-                <label for="y2">
-                  Second Line Y Position
-                  <span class="info-tooltip" title="Vertical pixel offset for second departure line (0-64 pixels)" aria-label="Information about second line position">?</span>
-                </label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                  <input type="number" id="y2" name="y2" value="{Y2}" min="0" max="64" required aria-describedby="y2-help" style="flex: 1;">
-                  <button type="button" class="btn" style="padding: 8px 12px; background: #6c757d; color: white;" onclick="document.getElementById('y2').value='38'; autoApplySettings();">Reset</button>
-                </div>
-                <span class="help-text" id="y2-help">Default: 38px from top</span>
-              </div>
-
-              <div class="form-group">
-                <label for="y3">
-                  Bottom Line Y Position
-                  <span class="info-tooltip" title="Vertical pixel offset for bottom/alternating line (0-64 pixels)" aria-label="Information about bottom line position">?</span>
-                </label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                  <input type="number" id="y3" name="y3" value="{Y3}" min="0" max="64" required aria-describedby="y3-help" style="flex: 1;">
-                  <button type="button" class="btn" style="padding: 8px 12px; background: #6c757d; color: white;" onclick="document.getElementById('y3').value='50'; autoApplySettings();">Reset</button>
-                </div>
-                <span class="help-text" id="y3-help">Default: 50px from top</span>
-              </div>
-            </div>
-
-            <button type="button" class="btn btn-outline" style="width: 100%; margin-top: 10px;" onclick="resetAllPositions()">
-              Reset All to Defaults
-            </button>
-          </div>
-        </div>
-      </div>
 
       <div class="card">
         <div class="button-group">
@@ -2283,18 +2181,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // ==================== Advanced Controls Toggle ====================
 
-    /**
-     * Reset all Y-position values to defaults
-     */
-    function resetAllPositions() {
-      document.getElementById('ytop').value = '12';
-      document.getElementById('y1').value = '26';
-      document.getElementById('y2').value = '38';
-      document.getElementById('y3').value = '50';
-      autoApplySettings();
-      showToast('Layout positions reset to defaults', 'success');
-    }
-
     // ==================== Device Uptime Counter ====================
 
     let deviceStartTime = Date.now();
@@ -2422,50 +2308,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       // Initialize uptime counter
       updateUptime();
-
-      // Setup device info panel toggle
-      const deviceInfoToggle = document.getElementById('deviceInfoToggle');
-      const deviceInfoContent = document.getElementById('deviceInfoContent');
-
-      if (deviceInfoToggle && deviceInfoContent) {
-        deviceInfoToggle.addEventListener('click', function() {
-          const isExpanded = deviceInfoContent.classList.toggle('show');
-          this.setAttribute('aria-expanded', isExpanded);
-          const arrow = this.querySelector('span:last-child');
-          if (arrow) {
-            arrow.textContent = isExpanded ? '▲' : '▼';
-          }
-        });
-
-        // Keyboard activation
-        deviceInfoToggle.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            this.click();
-          }
-        });
-      }
-
-      // Setup advanced layout toggle
-      const advancedToggle = document.getElementById('advancedLayoutToggle');
-      const advancedContent = document.getElementById('advancedLayoutContent');
-
-      if (advancedToggle && advancedContent) {
-        advancedToggle.addEventListener('click', function() {
-          const isExpanded = advancedContent.classList.toggle('show');
-          this.setAttribute('aria-expanded', isExpanded);
-          this.querySelector('span:first-child').textContent =
-            isExpanded ? '🔽 Advanced Layout Controls' : '⚙️ Advanced Layout Controls';
-        });
-
-        // Also handle keyboard activation
-        advancedToggle.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            this.click();
-          }
-        });
-      }
 
       // Setup auto-apply for scroll speed dropdown
       const scrollspeedSelect = document.getElementById('scrollspeed');

@@ -574,16 +574,16 @@ void broadcastDisplaySnapshot() {
   json = "{\"type\":\"display_snapshot\",";
   json += "\"timestamp\":";
   json += millis();
-  json += ",\"displayState.stationName\":\"";
+  json += ",\"stationName\":\"";
   json += displayState.stationName;
   json += "\",\"mode\":\"";
   json += config.useCallingAt ? "calling_at" : "normal";
-  json += "\",\"displayState.serviceCount\":";
+  json += "\",\"serviceCount\":";
   json += displayState.serviceCount;
   json += ",\"services\":[";
 
-  // Send up to 3 services for the preview
-  for (int i = 0; i < min(displayState.serviceCount, 3); i++) {
+  // Send up to 6 services for the preview
+  for (int i = 0; i < min(displayState.serviceCount, 6); i++) {
     if (i > 0) json += ",";
     json += "{\"std\":\"";
     json += displayState.services[i].std;
@@ -616,7 +616,7 @@ void broadcastDisplaySnapshot() {
 
   json += "\"alternatingService\":";
   json += displayState.currentAlternatingService;
-  json += ",\"displayState.isAnimating\":";
+  json += ",\"isAnimating\":";
   json += displayState.isAnimating ? "true" : "false";
   json += "}";
 
