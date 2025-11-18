@@ -1234,11 +1234,18 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.classList.remove("error");
       input.blur();
 
+      // CRITICAL: Clear line filter BEFORE applying settings when station changes
+      // This prevents sending invalid line/station combinations to the firmware
+      const serviceType = document.getElementById('serviceType').value;
+      if (serviceType === '1') {
+        document.getElementById('tflLineFilter').value = '';
+        console.log('Cleared line filter before applying station change');
+      }
+
       console.log('About to call autoApplySettings with code:', code);
       autoApplySettings(code);
 
       // Fetch tube lines if service type is TFL
-      const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1' && code.length >= 4) {
         setTimeout(() => {
           showTflLineSelector(code.trim());
@@ -1566,10 +1573,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       showToast(`Station set to: ${code}`, "success");
       input.blur();
 
+      // CRITICAL: Clear line filter BEFORE applying settings when station changes
+      const serviceType = document.getElementById('serviceType').value;
+      if (serviceType === '1') {
+        document.getElementById('tflLineFilter').value = '';
+        console.log('Cleared line filter before applying station change');
+      }
+
       autoApplySettings(code);
 
       // Fetch tube lines if service type is TFL
-      const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1' && code.length >= 4) {
         setTimeout(() => {
           showTflLineSelector(code.trim());
@@ -1897,10 +1910,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             field.addEventListener("keypress", (e) => {
               if (e.key === "Enter" && field.value.length >= 3) {
                 e.preventDefault();
+
+                // CRITICAL: Clear line filter BEFORE applying settings when station changes
+                const serviceType = document.getElementById('serviceType').value;
+                if (serviceType === '1') {
+                  document.getElementById('tflLineFilter').value = '';
+                  console.log('Cleared line filter before applying station change');
+                }
+
                 autoApplySettings();
 
                 // Fetch tube lines if service type is TFL
-                const serviceType = document.getElementById('serviceType').value;
                 if (serviceType === '1' && field.value.length >= 4) {
                   setTimeout(() => {
                     showTflLineSelector(field.value.trim());
@@ -1911,10 +1931,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
             field.addEventListener("change", () => {
               if (!autocompleteJustSelected && field.value.length >= 3) {
+                // CRITICAL: Clear line filter BEFORE applying settings when station changes
+                const serviceType = document.getElementById('serviceType').value;
+                if (serviceType === '1') {
+                  document.getElementById('tflLineFilter').value = '';
+                  console.log('Cleared line filter before applying station change');
+                }
+
                 autoApplySettings();
 
                 // Fetch tube lines if service type is TFL
-                const serviceType = document.getElementById('serviceType').value;
                 if (serviceType === '1' && field.value.length >= 4) {
                   // Delay to allow settings to apply first
                   setTimeout(() => {
