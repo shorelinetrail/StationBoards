@@ -347,21 +347,39 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   Serial.println("📊 Processing TFL Underground response (" + String(response.length()) + " bytes)");
 
-  // Find JSON array start
-  int jsonStart = response.indexOf('[');
+  // Find where HTTP headers end (blank line)
+  int headerEnd = response.indexOf("\r\n\r\n");
+  if (headerEnd == -1) {
+    headerEnd = response.indexOf("\n\n");  // Try \n\n for non-standard responses
+  }
+
+  int searchStart = (headerEnd != -1) ? headerEnd + 4 : 0;
+  Serial.println("🔍 Searching for JSON from position: " + String(searchStart));
+
+  // Find JSON array start after headers
+  int jsonStart = response.indexOf('[', searchStart);
   if (jsonStart == -1) {
     Serial.println("❌ No JSON array found in response");
+    Serial.println("First 500 chars: " + response.substring(0, 500));
     return false;
   }
 
-  String jsonBody = response.substring(jsonStart);
+  Serial.println("📍 JSON array starts at position: " + String(jsonStart));
+  Serial.println("📏 JSON length will be: " + String(response.length() - jsonStart) + " bytes");
 
-  // Use ArduinoJson for parsing
-  DynamicJsonDocument doc(16384);  // 16KB for JSON parsing
-  DeserializationError error = deserializeJson(doc, jsonBody);
+  // CRITICAL: Don't use substring() on large strings - it causes memory allocation failures
+  // Instead, pass a pointer to the JSON data directly (zero-copy parsing)
+  const char* jsonStart_ptr = response.c_str() + jsonStart;
+  Serial.println("🔤 First 200 chars of JSON: " + String(jsonStart_ptr).substring(0, 200));
+
+  // Increase JSON document size for large TFL responses
+  DynamicJsonDocument doc(32768);  // 32KB for JSON parsing (was 16KB)
+  DeserializationError error = deserializeJson(doc, jsonStart_ptr);
 
   if (error) {
     Serial.println("❌ JSON parse error: " + String(error.c_str()));
+    Serial.println("Error code: " + String((int)error.code()));
+    Serial.println("JSON starts with: " + String(jsonStart_ptr).substring(0, 100));
     return false;
   }
 
