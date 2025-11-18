@@ -321,14 +321,18 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   // to avoid blocking while the API connection is open
 
   // Build TFL API request with optional line filtering
-  // If line filter is set: GET /StopPoint/{stationCode}/Arrivals/{lineId}
-  // If no filter: GET /StopPoint/{stationCode}/Arrivals
-  String path = "/StopPoint/" + String(stationCode) + "/Arrivals";
+  // If line filter is set: GET /Line/{lineId}/Arrivals/{stationCode}  (Line API endpoint)
+  // If no filter: GET /StopPoint/{stationCode}/Arrivals  (StopPoint API endpoint)
+  String path;
 
-  // Add line filter to path for server-side filtering (reduces response from 64KB to ~5KB!)
   if (lineFilter.length() > 0) {
-    path += "/" + lineFilter;
-    Serial.println("🚇 Filtering for line: " + lineFilter);
+    // Use Line API endpoint for filtering: much smaller response
+    path = "/Line/" + lineFilter + "/Arrivals/" + String(stationCode);
+    Serial.println("🚇 Using Line API: /Line/" + lineFilter + "/Arrivals/" + String(stationCode));
+  } else {
+    // Use StopPoint API endpoint for all lines
+    path = "/StopPoint/" + String(stationCode) + "/Arrivals";
+    Serial.println("🚇 Using StopPoint API (all lines)");
   }
 
   // Add API key as query parameter
