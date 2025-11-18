@@ -1847,6 +1847,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const tflPresets = document.getElementById("tflPresets");
         const tflLineFilterGroup = document.getElementById("tflLineFilterGroup");
         const tflDirectionFilterGroup = document.getElementById("tflDirectionFilterGroup");
+        const modeSelect = document.getElementById("mode");
 
         // Show/hide appropriate elements
         tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
@@ -1854,6 +1855,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         tflDirectionFilterGroup.style.display = isUnderground ? "block" : "none";
         nationalRailPresets.style.display = isUnderground ? "none" : "grid";
         tflPresets.style.display = isUnderground ? "grid" : "none";
+
+        // Disable "Calling At Mode" for TFL (option value="1")
+        const callingAtOption = modeSelect.querySelector('option[value="1"]');
+        if (callingAtOption) {
+          callingAtOption.disabled = isUnderground;
+          // If currently on Calling At mode and switching to TFL, change to Standard View
+          if (isUnderground && modeSelect.value === "1") {
+            modeSelect.value = "0";
+          }
+        }
 
         // Update labels
         if (isUnderground) {
