@@ -828,9 +828,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           </div>
         </div>
 
-        <div class="form-group">
-          <button type="button" id="applyStationBtn" class="primary-btn" aria-label="Apply station settings">
-            Apply Station Settings
+        <div class="button-group">
+          <button type="button" id="applyStationBtn" class="btn btn-primary" aria-label="Apply station settings">
+            <span class="btn-text">Apply Station Settings</span>
           </button>
         </div>
       </div>
@@ -1246,6 +1246,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
         document.getElementById('tflPlatformFilter').value = '';
         console.log('Cleared line and platform filters for new station (not yet applied)');
+
+        // Fetch tube lines for the new station (but don't apply yet)
+        if (code.length >= 4) {
+          setTimeout(() => {
+            showTflLineSelector(code.trim());
+          }, 100);
+        }
       }
 
       // Note: Don't auto-apply - user must click the Apply Station Settings button
@@ -1578,6 +1585,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
         document.getElementById('tflPlatformFilter').value = '';
         console.log('Cleared line and platform filters for new station (not yet applied)');
+
+        // Fetch tube lines for the new station (but don't apply yet)
+        if (code.length >= 4) {
+          setTimeout(() => {
+            showTflLineSelector(code.trim());
+          }, 100);
+        }
       }
 
       // Note: Don't auto-apply - user must click the Apply Station Settings button
