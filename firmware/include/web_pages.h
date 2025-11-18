@@ -941,8 +941,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <div class="value" id="currentStation" aria-live="polite">{STATION_NAME}</div>
       </div>
       <div class="status-item">
+        <div class="label">Last Data Fetch</div>
+        <div class="value" id="lastFetchTime" aria-live="polite">Never</div>
+      </div>
+      <div class="status-item">
         <div class="label">Uptime</div>
         <div class="value uptime-counter" id="deviceUptime" aria-live="polite">--:--:--</div>
+      </div>
+      <div class="status-item" style="grid-column: span 2; display: flex; justify-content: center; align-items: center;">
+        <button type="button" id="refreshNowBtn" class="btn" style="padding: 10px 20px; font-size: 14px;" aria-label="Manually refresh departure data now">
+          <span class="btn-text">🔄 Refresh Data Now</span>
+        </button>
       </div>
     </div>
 
@@ -1099,12 +1108,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
               <span class="info-tooltip" title="Controls how fast text scrolls across the display" aria-label="Information: Controls how fast text scrolls across the display">?</span>
             </label>
             <select id="scrollspeed" name="scrollspeed" aria-describedby="scrollspeed-help">
-              <option value="10"{SCROLL_SEL_10}>Fast (10ms)</option>
-              <option value="25"{SCROLL_SEL_25}>Medium (25ms)</option>
-              <option value="50"{SCROLL_SEL_50}>Slow (50ms)</option>
-              <option value="100"{SCROLL_SEL_100}>Slower (100ms)</option>
+              <option value="10"{SCROLL_SEL_10}>10ms (fastest)</option>
+              <option value="25"{SCROLL_SEL_25}>25ms (fast)</option>
+              <option value="50"{SCROLL_SEL_50}>50ms (moderate)</option>
+              <option value="100"{SCROLL_SEL_100}>100ms (smooth)</option>
             </select>
-            <span class="help-text" id="scrollspeed-help">Lower values = faster scroll</span>
+            <span class="help-text" id="scrollspeed-help">Delay between scroll steps - lower is faster, higher is smoother</span>
           </div>
         </div>
 
@@ -1112,30 +1121,30 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <label for="mode">Display Mode</label>
           <select id="mode" name="mode" aria-describedby="mode-help">
             <option value="0"{MODE_SEL_0}>Standard View</option>
-            <option value="1"{MODE_SEL_1}>Calling At Mode (shows stops)</option>
+            <option value="1"{MODE_SEL_1}>Calling At Mode (show all intermediate stops)</option>
           </select>
-          <span class="help-text" id="mode-help">Calling At mode shows detailed stops for the first train</span>
+          <span class="help-text" id="mode-help">Calling At mode displays all intermediate station stops for the first departure</span>
         </div>
 
         <div class="form-group">
           <label for="showstation">Show Station Name at Top</label>
           <select id="showstation" name="showstation" aria-describedby="showstation-help">
             <option value="1"{SHOWSTATION_SEL_1}>Show Station Name</option>
-            <option value="0"{SHOWSTATION_SEL_0}>Hide Station Name (adds extra service line)</option>
+            <option value="0"{SHOWSTATION_SEL_0}>Hide Station Name (frees space for one more departure)</option>
           </select>
-          <span class="help-text" id="showstation-help">Hiding the station name adds an extra service at the top for more trains</span>
+          <span class="help-text" id="showstation-help">Hiding the station name frees up the top line to display an additional departure</span>
         </div>
 
         <div class="form-group">
-          <label for="extra">Extra Services on Bottom Line</label>
+          <label for="extra">Rotating Bottom Line Services</label>
           <select id="extra" name="extra" aria-describedby="extra-help">
-            <option value="0"{EXTRA_SEL_0}>No Extra Services</option>
-            <option value="1"{EXTRA_SEL_1}>1 Extra Service</option>
-            <option value="2"{EXTRA_SEL_2}>2 Extra Services</option>
-            <option value="3"{EXTRA_SEL_3}>3 Extra Services</option>
-            <option value="4"{EXTRA_SEL_4}>4 Extra Services</option>
+            <option value="0"{EXTRA_SEL_0}>No rotation (fixed last service)</option>
+            <option value="1"{EXTRA_SEL_1}>Rotate 1 extra service</option>
+            <option value="2"{EXTRA_SEL_2}>Rotate 2 extra services</option>
+            <option value="3"{EXTRA_SEL_3}>Rotate 3 extra services</option>
+            <option value="4"{EXTRA_SEL_4}>Rotate 4 extra services</option>
           </select>
-          <span class="help-text" id="extra-help">Number of additional services that rotate on the bottom line</span>
+          <span class="help-text" id="extra-help">The bottom line of the display automatically cycles through additional departures at the rotation speed below</span>
         </div>
 
         <div class="form-group">
@@ -1146,6 +1155,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" required aria-describedby="rotationspeed-help">
           <span class="help-text" id="rotationspeed-help">Recommended: 12-18 seconds. How often the bottom line alternates between services</span>
         </div>
+      </div>
 
       <div class="card">
         <div class="button-group">
@@ -1564,6 +1574,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
           if (data.type === "display_snapshot") {
             updateDisplayPreview(data);
+            updateLastFetchTime(); // Update when we get new data
           } else if (data.type === "status") {
             showToast(data.message, data.level);
           } else if (data.type === "train_update") {
@@ -1573,6 +1584,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
                 stationEl.textContent = decodeHtml(data.station);
               }
             }
+            updateLastFetchTime(); // Update when we get new train data
           } else if (data.type === "metrics") {
             updateRSSI(data.rssi);
           } else if (data.type === "state") {
@@ -2229,6 +2241,39 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     // Update uptime every second
     setInterval(updateUptime, 1000);
 
+    /**
+     * Update the last fetch time display
+     */
+    let lastFetchTimestamp = null;
+
+    function updateLastFetchTime() {
+      lastFetchTimestamp = Date.now();
+      const lastFetchEl = document.getElementById('lastFetchTime');
+      if (lastFetchEl) {
+        lastFetchEl.textContent = 'Just now';
+      }
+    }
+
+    // Update "time ago" display for last fetch
+    setInterval(() => {
+      if (!lastFetchTimestamp) return;
+
+      const lastFetchEl = document.getElementById('lastFetchTime');
+      if (!lastFetchEl) return;
+
+      const secondsAgo = Math.floor((Date.now() - lastFetchTimestamp) / 1000);
+
+      if (secondsAgo < 60) {
+        lastFetchEl.textContent = secondsAgo < 10 ? 'Just now' : `${secondsAgo}s ago`;
+      } else if (secondsAgo < 3600) {
+        const minutesAgo = Math.floor(secondsAgo / 60);
+        lastFetchEl.textContent = `${minutesAgo}m ago`;
+      } else {
+        const hoursAgo = Math.floor(secondsAgo / 3600);
+        lastFetchEl.textContent = `${hoursAgo}h ago`;
+      }
+    }, 1000);
+
     // ==================== Recent Stations Management ====================
 
     /**
@@ -2322,6 +2367,19 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       // Initialize uptime counter
       updateUptime();
+
+      // Setup Refresh Now button
+      const refreshNowBtn = document.getElementById('refreshNowBtn');
+      if (refreshNowBtn) {
+        refreshNowBtn.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({command: "refresh"}));
+            showToast("Refreshing departure data...", "info");
+          } else {
+            showToast("Not connected to device", "error");
+          }
+        });
+      }
 
       // Setup auto-apply for scroll speed dropdown
       const scrollspeedSelect = document.getElementById('scrollspeed');
