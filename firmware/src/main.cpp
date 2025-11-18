@@ -1509,6 +1509,7 @@ void setupWebServer() {
     String oldSSID = String(config.wifiSSID);
     String oldPassword = String(config.wifiPassword);
     String oldStation = String(config.stationCode);
+    String oldLineFilter = String(config.tflLineFilter);
     bool oldCallingAt = config.useCallingAt;
     int oldExtraServices = config.extraServices;
 
@@ -1648,8 +1649,9 @@ void setupWebServer() {
     displayState.callingAtScrollOffset = 0;
     
     config.save();
-    
+
     bool stationChanged = (oldStation != String(config.stationCode));
+    bool lineFilterChanged = (oldLineFilter != String(config.tflLineFilter)) && (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
     bool displayModeChanged = (oldCallingAt != config.useCallingAt) || (oldExtraServices != config.extraServices);
     bool switchedToCallingAt = (!oldCallingAt && config.useCallingAt);
 
@@ -1681,22 +1683,25 @@ void setupWebServer() {
     String html = FPSTR(APPLY_SUCCESS_PAGE);
     server.send(200, "text/html", html);
     
-    // Force immediate data fetch when station changes OR when switching to calling at
-    if (stationChanged || switchedToCallingAt) {
+    // Force immediate data fetch when station changes, line filter changes, OR when switching to calling at
+    if (stationChanged || lineFilterChanged || switchedToCallingAt) {
       displayState.serviceCount = 0;
       displayState.fetchingNewStation = true;  // Mark that we're loading new station data
-      
+
       if (fetchStateData.state != FETCH_IDLE) {
         fetchClient.stop();
         fetchStateData.state = FETCH_IDLE;
       }
-      
+
       fetchStateData.lastSuccess = 0;
       fetchStateData.lastAttempt = 0;
-      
+
       if (stationChanged) {
         Serial.println("🔄 Station changed to " + String(config.stationCode) + " - fetching immediately");
         broadcastStatus("Station changed - fetching new data...", "info");
+      } else if (lineFilterChanged) {
+        Serial.println("🔄 Line filter changed to " + String(config.tflLineFilter) + " - fetching immediately");
+        broadcastStatus("Line filter changed - fetching new data...", "info");
       } else if (switchedToCallingAt) {
         Serial.println("🔄 Switched to Calling At mode - fetching detailed data...");
         broadcastStatus("Fetching calling points...", "info");
