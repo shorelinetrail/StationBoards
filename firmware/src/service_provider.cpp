@@ -294,15 +294,7 @@ bool TflUndergroundProvider::fetchStationName(const char* stationCode) {
   return true;
 }
 
-bool TflUndergroundProvider::buildRequest(const char* stationCode, String& request) {
-  if (!isValidStationCode(stationCode)) {
-    Serial.println("❌ Invalid TFL station code: " + String(stationCode));
-    return false;
-  }
-
-  // Store station code for use as fallback station name
-  currentStationCode = String(stationCode);
-
+void TflUndergroundProvider::ensureStationNameCached(const char* stationCode) {
   // Only fetch station name if this is a new station (not on every refresh)
   if (lastFetchedStationCode != String(stationCode)) {
     Serial.println("🆕 New station detected - fetching station name");
@@ -314,6 +306,19 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   } else {
     Serial.println("♻️  Using cached station name: " + currentStationName);
   }
+}
+
+bool TflUndergroundProvider::buildRequest(const char* stationCode, String& request) {
+  if (!isValidStationCode(stationCode)) {
+    Serial.println("❌ Invalid TFL station code: " + String(stationCode));
+    return false;
+  }
+
+  // Store station code for use as fallback station name
+  currentStationCode = String(stationCode);
+
+  // NOTE: Station name is now pre-fetched in main.cpp before opening connection
+  // to avoid blocking while the API connection is open
 
   // Build TFL API request
   // GET /StopPoint/{stationCode}/Arrivals

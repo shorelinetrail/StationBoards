@@ -95,6 +95,7 @@ public:
   void setApiKey(const String& key) { apiKey = key; }
   void setLineFilter(const String& filter) { lineFilter = filter; }
   void setDirectionFilter(const String& direction) { directionFilter = direction; }
+  void ensureStationNameCached(const char* stationCode);  // Pre-fetch station name if not cached
 
   const char* getProviderName() override { return "TFL Underground"; }
   const char* getApiHost() override { return apiHost; }

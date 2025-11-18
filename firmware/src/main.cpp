@@ -985,6 +985,13 @@ bool asyncFetchStart() {
 
   Serial.println("📡 Fetching from " + String(serviceProvider->getProviderName()) + ": " + String(config.stationCode));
 
+  // For TFL, pre-fetch station name BEFORE opening main connection
+  // This prevents the main connection from timing out while we fetch the name
+  if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+    TflUndergroundProvider* tflProvider = static_cast<TflUndergroundProvider*>(serviceProvider);
+    tflProvider->ensureStationNameCached(config.stationCode);
+  }
+
   // Update display before blocking operations
   unsigned long currentTime = millis();
   handleAlternatingService(currentTime);
