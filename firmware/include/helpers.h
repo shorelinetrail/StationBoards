@@ -8,41 +8,70 @@
 // ============ Input Validation Helpers ============
 
 /**
- * Validates a UK railway station code (CRS code)
- * Must be exactly 3 uppercase letters A-Z
+ * Validates a station code (National Rail CRS or TFL identifier)
+ * - National Rail: exactly 3 uppercase letters A-Z
+ * - TFL: 4-12 alphanumeric characters (hub codes like HUBSOK or NaPTAN IDs like 940GZZLUPAC)
  */
 inline ValidationResult validateStationCode(const String& code) {
-  if (code.length() != 3) {
+  int len = code.length();
+
+  if (len == 0) {
     return ValidationResult::failure(
       ERROR_NONE,
-      "Station code must be exactly 3 characters"
+      "Station code cannot be empty"
     );
   }
 
-  for (int i = 0; i < 3; i++) {
-    if (!isalpha(code[i]) || !isupper(code[i])) {
-      return ValidationResult::failure(
-        ERROR_NONE,
-        "Station code must contain only uppercase letters A-Z"
-      );
+  // Check for National Rail format (3 uppercase letters)
+  if (len == 3) {
+    for (int i = 0; i < 3; i++) {
+      if (!isalpha(code[i]) || !isupper(code[i])) {
+        return ValidationResult::failure(
+          ERROR_NONE,
+          "3-character station code must contain only uppercase letters A-Z"
+        );
+      }
     }
+    return ValidationResult::success();
   }
 
-  return ValidationResult::success();
+  // Check for TFL format (4-12 alphanumeric characters)
+  // Supports both hub codes (e.g., HUBSOK) and NaPTAN IDs (e.g., 940GZZLUPAC)
+  if (len >= 4 && len <= 12) {
+    for (int i = 0; i < len; i++) {
+      if (!isalnum(code[i])) {
+        return ValidationResult::failure(
+          ERROR_NONE,
+          "TFL station ID must contain only letters and numbers"
+        );
+      }
+      // If it's a letter, it must be uppercase
+      if (isalpha(code[i]) && !isupper(code[i])) {
+        return ValidationResult::failure(
+          ERROR_NONE,
+          "TFL station ID letters must be uppercase"
+        );
+      }
+    }
+    return ValidationResult::success();
+  }
+
+  return ValidationResult::failure(
+    ERROR_NONE,
+    "Station code must be 3 letters (National Rail) or 4-12 characters (TFL)"
+  );
 }
 
 /**
  * Validates and sanitizes a station code string
- * Extracts 3-letter code from longer strings, converts to uppercase
+ * Trims whitespace and converts to uppercase
+ * Supports both National Rail (3 chars) and TFL NaPTAN (9-12 chars)
  */
 inline String sanitizeStationCode(String code) {
   code.trim();
   code.toUpperCase();
 
-  if (code.length() >= 3) {
-    code = code.substring(0, 3);
-  }
-
+  // Don't truncate - let validation handle length checking
   return code;
 }
 

@@ -75,9 +75,21 @@ class TflUndergroundProvider : public ServiceProvider {
 private:
   const char* apiHost = "api.tfl.gov.uk";
   String apiKey;  // Will be loaded from config
+  String lineFilter;  // Line filter (e.g., "northern", "elizabeth", "" for all)
+  String directionFilter;  // Direction filter ("inbound", "outbound", "" for all)
+  String platformFilter;  // Platform filter (e.g., "Eastbound - Platform 5", "" for all)
+  String currentStationCode;  // Store current station code for fallback station name
+  String currentStationName;  // Store fetched station name
+  String lastFetchedStationCode;  // Track which station code we last fetched name for
 
   // Helper to format ISO timestamp into time string
   String formatTime(const String& isoTimestamp);
+
+  // Clean up station name (remove "Underground Station" suffix)
+  String cleanStationName(const String& name);
+
+  // Fetch station name from TFL API
+  bool fetchStationName(const char* stationCode);
 
   // Extract JSON value (simple parser to avoid ArduinoJson overhead)
   String extractJsonValue(const String& json, const String& key);
@@ -85,11 +97,15 @@ private:
 public:
   TflUndergroundProvider();
   void setApiKey(const String& key) { apiKey = key; }
+  void setLineFilter(const String& filter) { lineFilter = filter; }
+  void setDirectionFilter(const String& direction) { directionFilter = direction; }
+  void setPlatformFilter(const String& platform) { platformFilter = platform; }
+  void ensureStationNameCached(const char* stationCode);  // Pre-fetch station name if not cached
 
   const char* getProviderName() override { return "TFL Underground"; }
   const char* getApiHost() override { return apiHost; }
   int getApiPort() override { return 443; }
-  const char* getStationCodeDescription() override { return "TFL Station NaPTAN ID (e.g., 940GZZLUPAC)"; }
+  const char* getStationCodeDescription() override { return "TFL Station ID (e.g., HUBSOK or 940GZZLUPAC)"; }
 
   bool buildRequest(const char* stationCode, String& request) override;
   bool parseResponse(const String& response,
