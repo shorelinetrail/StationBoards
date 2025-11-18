@@ -1206,12 +1206,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     };
 
     const selectStationFromAutocomplete = (code, name) => {
+      console.log('selectStationFromAutocomplete called with code:', code, 'name:', name);
       const input = document.getElementById("station");
 
       autocompleteJustSelected = true;
       setTimeout(() => { autocompleteJustSelected = false; }, 100);
 
       input.value = code;
+      console.log('Set input.value to:', input.value);
       document.getElementById("stationAutocomplete").classList.remove("show");
       showToast(`Selected: ${escapeHtml(name)} (${escapeHtml(code)})`, "success");
 
@@ -1219,6 +1221,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.classList.remove("error");
       input.blur();
 
+      console.log('About to call autoApplySettings with code:', code);
       autoApplySettings(code);
     };
 
@@ -1542,11 +1545,18 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const stationInput = document.getElementById("station");
       stationInput.addEventListener("input", (e) => {
         const val = e.target.value.trim();
+        const serviceType = document.getElementById('serviceType').value;
+        const isTfl = serviceType === '1';
 
-        if (val.length === 3 && val.toUpperCase() === val) {
+        // National Rail: 3 uppercase letters
+        // TFL: 9-12 alphanumeric characters
+        const isValidNationalRail = val.length === 3 && /^[A-Z]{3}$/.test(val);
+        const isValidTfl = val.length >= 9 && val.length <= 12 && /^[A-Z0-9]+$/.test(val);
+
+        if ((isTfl && isValidTfl) || (!isTfl && isValidNationalRail)) {
           e.target.classList.add("success");
           e.target.classList.remove("error");
-        } else if (val.length > 0 && val.length <= 50) {
+        } else if (val.length > 0) {
           e.target.classList.remove("success");
           e.target.classList.remove("error");
         } else {
@@ -1623,9 +1633,11 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     const autoApplySettings = (stationCodeOverride) => {
       const formData = new URLSearchParams();
       const stationValue = stationCodeOverride || document.getElementById('station').value;
+      console.log('autoApplySettings: stationCodeOverride=', stationCodeOverride, 'station input value=', document.getElementById('station').value, 'final stationValue=', stationValue);
       formData.append('serviceType', document.getElementById('serviceType').value);
       formData.append('tflApiKey', document.getElementById('tflApiKey').value);
       formData.append('station', stationValue);
+      console.log('autoApplySettings: Sending station=', stationValue);
       formData.append('interval', document.getElementById('interval').value);
       formData.append('mode', document.getElementById('mode').value);
       formData.append('showstation', document.getElementById('showstation').value);
