@@ -1223,6 +1223,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       console.log('About to call autoApplySettings with code:', code);
       autoApplySettings(code);
+
+      // Fetch tube lines if service type is TFL
+      const serviceType = document.getElementById('serviceType').value;
+      if (serviceType === '1' && code.length >= 4) {
+        setTimeout(() => {
+          showTflLineSelector(code.trim());
+        }, 500);
+      }
     };
 
     // ==================== Tab Switching ====================
