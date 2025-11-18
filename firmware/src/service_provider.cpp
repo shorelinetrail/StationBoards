@@ -397,14 +397,26 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   // Use zero-copy parsing with pointer to avoid memory allocation
   const char* jsonStart_ptr = response.c_str() + jsonStart;
 
-  // HYBRID approach: choose document size based on response size
-  // Line API (filtered): ~5KB response → 16KB document
-  // StopPoint API (all): ~34KB response → 65KB document
-  size_t docSize = (jsonLength < 10000) ? 16384 : 65536;
-  Serial.println("📦 Allocating " + String(docSize) + " byte JSON document");
+  // Create a filter to only parse fields we need (dramatically reduces memory usage)
+  // TFL JSON has TONS of fields we don't use: platformName, currentLocation, vehicleId, bearing, etc.
+  // By filtering, we can use much smaller documents and avoid heap fragmentation
+  StaticJsonDocument<200> filter;
+  filter[0]["stationName"] = true;    // Station name (first arrival only)
+  filter[0]["lineName"] = true;       // e.g., "Northern"
+  filter[0]["lineId"] = true;         // e.g., "northern"
+  filter[0]["towards"] = true;        // e.g., "Edgware"
+  filter[0]["expectedArrival"] = true; // ISO timestamp
+  filter[0]["direction"] = true;      // "inbound" or "outbound"
+  filter[0]["timeToStation"] = true;  // Seconds until arrival
+
+  // With filtering, we can use much smaller documents:
+  // Line API (filtered): ~5KB response → 8KB document (was 16KB)
+  // StopPoint API (all): ~34KB response → 24KB document (was 65KB)
+  size_t docSize = (jsonLength < 10000) ? 8192 : 24576;
+  Serial.println("📦 Allocating " + String(docSize) + " byte JSON document (filtered parsing)");
 
   DynamicJsonDocument doc(docSize);
-  DeserializationError error = deserializeJson(doc, jsonStart_ptr);
+  DeserializationError error = deserializeJson(doc, jsonStart_ptr, DeserializationOption::Filter(filter));
 
   if (error) {
     Serial.println("❌ JSON parse error: " + String(error.c_str()) + " (code: " + String((int)error.code()) + ")");
