@@ -75,11 +75,11 @@ inline void displayServiceLine(const ServiceData& service, const char* label,
 }
 
 /**
- * Displays the "No trains scheduled" or "Loading..." message
+ * Displays the "No trains scheduled" message
  */
-inline void displayNoServicesMessage(bool fetchingNewStation) {
+inline void displayNoServicesMessage() {
   u8g2.setFont(u8g2_font_helvB10_tr);
-  String msg = fetchingNewStation ? "Loading station data..." : "No trains scheduled";
+  String msg = "No trains scheduled";
   int msgWidth = u8g2.getUTF8Width(msg.c_str());
   u8g2.setCursor((Display::WIDTH - msgWidth) / 2, 35);
   u8g2.print(msg);
@@ -92,8 +92,7 @@ inline void displayNoServicesMessage(bool fetchingNewStation) {
 inline bool displayCallingPoints(const char* callingPoints, int yPos,
                                    int& scrollOffset, unsigned long& lastScroll) {
   if (strlen(callingPoints) == 0) {
-    u8g2.setCursor(1, yPos);
-    u8g2.print("Calling at: Loading stops...");
+    // No loading message - data will appear instantly when available
     scrollOffset = 0;
     return false;
   }

@@ -1196,7 +1196,7 @@ bool parseAndDisplayResponse(const String& response) {
   displayState.serviceCount = fetchBuffer.serviceCount;
 
   displayState.markDirty();
-  displayState.fetchingNewStation = false;  // Clear loading state after successful parse
+  // AGGRESSIVE CACHING: No loading state to clear - instant update complete
 
   if (displayState.serviceCount > 0) {
     broadcastTrainUpdate();
@@ -1305,7 +1305,7 @@ void updateDisplay() {
 
   // 2. Handle no services case
   if (displayState.serviceCount == 0) {
-    displayNoServicesMessage(displayState.fetchingNewStation);
+    displayNoServicesMessage();
   }
   // 3. Handle calling at mode
   else if (config.useCallingAt && displayState.serviceCount > 0) {
@@ -1793,7 +1793,7 @@ void setupWebServer() {
     // Force immediate data fetch when station changes, line filter changes, direction filter changes, platform filter changes, OR when switching to calling at
     if (stationChanged || lineFilterChanged || directionFilterChanged || platformFilterChanged || switchedToCallingAt) {
       displayState.serviceCount = 0;
-      displayState.fetchingNewStation = true;  // Mark that we're loading new station data
+      // AGGRESSIVE CACHING: No loading state - previous data stays visible until instant update
 
       // Cancel any in-progress fetch and wait for cleanup
       if (fetchStateData.state != FETCH_IDLE) {
