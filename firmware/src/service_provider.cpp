@@ -484,12 +484,41 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     }
   }
 
-  // Parse arrivals (max 8 services)
+  // Sort arrivals by timeToStation (TFL API doesn't guarantee order)
+  // Create array of indices sorted by timeToStation
+  const int maxArrivals = arrivals.size();
+  if (maxArrivals > 100) {
+    Serial.println("⚠️  Warning: Too many arrivals (" + String(maxArrivals) + "), limiting to 100");
+  }
+
+  const int arrivalLimit = min(maxArrivals, 100);
+  int sortedIndices[100];  // Max 100 arrivals to sort
+
+  // Initialize indices
+  for (int i = 0; i < arrivalLimit; i++) {
+    sortedIndices[i] = i;
+  }
+
+  // Bubble sort indices by timeToStation (simple but works for small arrays)
+  for (int i = 0; i < arrivalLimit - 1; i++) {
+    for (int j = 0; j < arrivalLimit - i - 1; j++) {
+      int timeA = arrivals[sortedIndices[j]]["timeToStation"] | 0;
+      int timeB = arrivals[sortedIndices[j + 1]]["timeToStation"] | 0;
+      if (timeA > timeB) {
+        // Swap indices
+        int temp = sortedIndices[j];
+        sortedIndices[j] = sortedIndices[j + 1];
+        sortedIndices[j + 1] = temp;
+      }
+    }
+  }
+
+  // Parse arrivals in sorted order (max 8 services)
   int maxServices = 8;
   int arrivalsIndex = 0;
 
-  while (serviceCount < maxServices && arrivalsIndex < (int)arrivals.size()) {
-    JsonObject arrival = arrivals[arrivalsIndex++];
+  while (serviceCount < maxServices && arrivalsIndex < arrivalLimit) {
+    JsonObject arrival = arrivals[sortedIndices[arrivalsIndex++]];
 
     const char* lineName = arrival["lineName"];
     const char* lineId = arrival["lineId"];
