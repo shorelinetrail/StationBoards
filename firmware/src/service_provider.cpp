@@ -401,7 +401,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   JsonArray arrivals = doc.as<JsonArray>();
 
-  // Extract station name - prefer from arrival, fall back to fetched name, then station code
+  // Extract station name - prefer from arrival data, fall back to cached name, then station code
   bool stationNameSet = false;
 
   if (arrivals.size() > 0) {
@@ -409,17 +409,19 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     if (stName) {
       strncpy(stationName, stName, stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
+      // Cache the station name for future zero-arrival responses
+      currentStationName = String(stName);
       Serial.println("📍 " + String(stName) + " (from arrival data)");
       stationNameSet = true;
     }
   }
 
-  // If we didn't get station name from arrivals, use pre-fetched name
+  // If we didn't get station name from arrivals, use cached name from previous fetch
   if (!stationNameSet) {
     if (currentStationName.length() > 0) {
       strncpy(stationName, currentStationName.c_str(), stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
-      Serial.println("📍 " + currentStationName + " (pre-fetched)");
+      Serial.println("📍 " + currentStationName + " (cached from previous fetch)");
       stationNameSet = true;
     } else if (currentStationCode.length() > 0) {
       strncpy(stationName, currentStationCode.c_str(), stationNameSize - 1);
