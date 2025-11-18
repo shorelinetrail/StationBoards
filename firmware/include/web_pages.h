@@ -2020,21 +2020,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           return;
         }
 
-        // Clear line and platform filters if changing stations
-        const serviceType = document.getElementById('serviceType').value;
-        if (serviceType === '1') {
-          // For TFL, apply the settings as-is
-          console.log('Applying TFL station settings');
-        }
-
         autoApplySettings();
 
-        // Fetch tube lines if service type is TFL
-        if (serviceType === '1' && stationInput.value.length >= 4) {
-          setTimeout(() => {
-            showTflLineSelector(stationInput.value.trim());
-          }, 500);
-        }
+        // Note: Don't refetch lines - they're already loaded when station was selected
+        // Refetching would clear the user's line and platform selections
       });
 
       // Tab button event listeners
