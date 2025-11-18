@@ -326,6 +326,105 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       to { transform: rotate(360deg); }
     }
 
+    /* ==================== Transport Branding ==================== */
+
+    /* National Rail Branding */
+    body.national-rail-mode {
+      background: linear-gradient(135deg, #E2231A 0%, #C60C30 100%);
+    }
+
+    body.national-rail-mode .header {
+      background: linear-gradient(135deg, #E2231A 0%, #C60C30 100%);
+      color: white;
+      border: 3px solid white;
+    }
+
+    body.national-rail-mode .header h1 {
+      color: white;
+      font-weight: 700;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    body.national-rail-mode .header .subtitle {
+      color: rgba(255,255,255,0.9);
+      font-weight: 500;
+    }
+
+    body.national-rail-mode .preset-btn:hover {
+      background: #E2231A;
+      border-color: #E2231A;
+      color: white;
+    }
+
+    body.national-rail-mode .tab-button.active {
+      background: #E2231A;
+      color: white;
+      border-bottom-color: #E2231A;
+    }
+
+    /* TFL Underground Branding */
+    body.tfl-mode {
+      background: linear-gradient(135deg, #003688 0%, #0019A8 100%);
+    }
+
+    body.tfl-mode .header {
+      background: #E32017;
+      color: white;
+      border: 3px solid #003688;
+    }
+
+    body.tfl-mode .header h1 {
+      color: white;
+      font-weight: 700;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    body.tfl-mode .header .subtitle {
+      color: rgba(255,255,255,0.9);
+      font-weight: 500;
+    }
+
+    body.tfl-mode .preset-btn:hover {
+      background: #003688;
+      border-color: #003688;
+      color: white;
+    }
+
+    body.tfl-mode .tab-button.active {
+      background: #E32017;
+      color: white;
+      border-bottom-color: #E32017;
+    }
+
+    /* TFL Tube Line Colors */
+    .tube-line-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .tube-line-bakerloo { background-color: #B36305; }
+    .tube-line-central { background-color: #E32017; }
+    .tube-line-circle { background-color: #FFD300; }
+    .tube-line-district { background-color: #00782A; }
+    .tube-line-elizabeth { background-color: #6950A1; }
+    .tube-line-hammersmith-city { background-color: #F3A9BB; }
+    .tube-line-jubilee { background-color: #A0A5A9; }
+    .tube-line-metropolitan { background-color: #9B0056; }
+    .tube-line-northern { background-color: #000000; }
+    .tube-line-piccadilly { background-color: #003688; }
+    .tube-line-victoria { background-color: #0098D4; }
+    .tube-line-waterloo-city { background-color: #95CDBA; }
+
+    /* TFL Line Filter Dropdown Styling */
+    #tflLineFilter option {
+      padding: 8px;
+      font-weight: 500;
+    }
+
     .preset-stations {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -2065,6 +2164,27 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     // ==================== TFL Line Selection ====================
 
     /**
+     * Get tube line CSS class from line ID
+     */
+    const getTubeLineClass = (lineId) => {
+      const lineMap = {
+        'bakerloo': 'bakerloo',
+        'central': 'central',
+        'circle': 'circle',
+        'district': 'district',
+        'elizabeth': 'elizabeth',
+        'hammersmith-city': 'hammersmith-city',
+        'jubilee': 'jubilee',
+        'metropolitan': 'metropolitan',
+        'northern': 'northern',
+        'piccadilly': 'piccadilly',
+        'victoria': 'victoria',
+        'waterloo-city': 'waterloo-city'
+      };
+      return lineMap[lineId] || '';
+    };
+
+    /**
      * Fetch available tube lines and platforms for a TFL station
      */
     const fetchTflStationLines = async (stationId, stationName = '') => {
@@ -2155,9 +2275,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         // Store lines data globally for platform filtering
         window.tflLinesData = lines;
 
-        // Populate the line filter dropdown and re-enable
+        // Populate the line filter dropdown with colored indicators
         lineFilter.innerHTML = '<option value="">All Lines</option>' +
-          lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
+          lines.map(line => {
+            const lineClass = getTubeLineClass(line.id);
+            // Use Unicode colored circle + line name
+            return `<option value="${escapeHtml(line.id)}" data-line="${lineClass}">● ${escapeHtml(line.name)}</option>`;
+          }).join('');
         lineFilter.disabled = false;
 
         // Reset platform filter and re-enable
@@ -2360,6 +2484,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const tflLineFilterGroup = document.getElementById("tflLineFilterGroup");
         const tflPlatformFilterGroup = document.getElementById("tflPlatformFilterGroup");
         const modeSelect = document.getElementById("mode");
+
+        // Apply transport branding - toggle body classes
+        if (isUnderground) {
+          document.body.classList.remove('national-rail-mode');
+          document.body.classList.add('tfl-mode');
+        } else {
+          document.body.classList.remove('tfl-mode');
+          document.body.classList.add('national-rail-mode');
+        }
 
         // Show/hide appropriate elements
         tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
