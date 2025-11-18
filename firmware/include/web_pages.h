@@ -1052,6 +1052,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <button type="button" class="preset-btn" data-station="940GZZLUBST" data-name="Baker Street" aria-label="Select Baker Street Underground">Baker Street</button>
             <button type="button" class="preset-btn" data-station="940GZZLULVT" data-name="Liverpool Street" aria-label="Select Liverpool Street Underground">Liverpool St</button>
           </div>
+
+          <!-- Manual Search Divider -->
+          <div style="text-align: center; margin: 20px 0 15px 0; color: #999; font-size: 13px; position: relative;">
+            <span style="background: white; padding: 0 10px; position: relative; z-index: 1;">OR search manually</span>
+            <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e0e0e0; z-index: 0;"></div>
+          </div>
+
           <div class="autocomplete-wrapper">
             <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="15" aria-label="Station code or name" aria-describedby="station-help">
             <div id="stationAutocomplete" class="autocomplete-results" role="listbox" aria-label="Station suggestions"></div>
@@ -2309,16 +2316,37 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           return;
         }
 
-        container.innerHTML = recent.map(station =>
+        const stationButtons = recent.map(station =>
           `<button type="button" class="preset-btn" data-station="${escapeHtml(station.code)}" aria-label="Select ${escapeHtml(station.name || station.code)} station">
             ${escapeHtml(station.name || station.code)}
           </button>`
         ).join('');
 
-        // Re-attach click handlers
-        container.querySelectorAll('.preset-btn').forEach(btn => {
+        // Add Clear All button
+        const clearButton = `
+          <button type="button" class="preset-btn" id="clearRecentBtn" style="background: #dc3545; color: white; border-color: #dc3545;" aria-label="Clear all recent stations">
+            🗑️ Clear All
+          </button>
+        `;
+
+        container.innerHTML = stationButtons + clearButton;
+
+        // Re-attach click handlers for station buttons
+        container.querySelectorAll('.preset-btn[data-station]').forEach(btn => {
           btn.addEventListener('click', () => setStation(btn.dataset.station));
         });
+
+        // Attach handler for Clear All button
+        const clearBtn = document.getElementById('clearRecentBtn');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', () => {
+            if (confirm('Clear all recently used stations?')) {
+              localStorage.removeItem('recentStations');
+              loadRecentStations(); // Reload to show empty state
+              showToast('Recent stations cleared', 'success');
+            }
+          });
+        }
       } catch (e) {
         console.error('Error loading recent stations:', e);
         container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">Error loading recent stations</div>';
@@ -2544,8 +2572,25 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       // Scan networks button
       document.getElementById('scanNetworksBtn').addEventListener('click', scanNetworks);
+
+      // Update firmware info in footer
+      const firmwareInfo = document.getElementById('firmwareInfo');
+      if (firmwareInfo) {
+        firmwareInfo.textContent = 'v2.1.0';
+      }
     });
   </script>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; background: rgba(255,255,255,0.5); margin-top: 20px;">
+    <div style="margin-bottom: 5px;">
+      <strong>StationBoards</strong> • Firmware <span id="firmwareInfo">v2.1.0</span> • IP <span id="deviceIP">{IP}</span>
+    </div>
+    <div>
+      Device ID: <span id="deviceID">{DEVICE_ID}</span>
+    </div>
+  </div>
+
 </body>
 </html>
 )HTMLCODE";
