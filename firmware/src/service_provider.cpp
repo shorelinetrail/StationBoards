@@ -320,19 +320,15 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   // NOTE: Station name is now pre-fetched in main.cpp before opening connection
   // to avoid blocking while the API connection is open
 
-  // Build TFL API request with optional line filtering
-  // If line filter is set: GET /Line/{lineId}/Arrivals/{stationCode}  (Line API endpoint)
-  // If no filter: GET /StopPoint/{stationCode}/Arrivals  (StopPoint API endpoint)
-  String path;
+  // Build TFL API request
+  // Always use StopPoint endpoint - it's faster than Line endpoint
+  // Do filtering client-side in parseResponse()
+  String path = "/StopPoint/" + String(stationCode) + "/Arrivals";
 
   if (lineFilter.length() > 0) {
-    // Use Line API endpoint for filtering: much smaller response
-    path = "/Line/" + lineFilter + "/Arrivals/" + String(stationCode);
-    Serial.println("🚇 Using Line API: /Line/" + lineFilter + "/Arrivals/" + String(stationCode));
+    Serial.println("🚇 StopPoint API (client-side filter: " + lineFilter + ")");
   } else {
-    // Use StopPoint API endpoint for all lines
-    path = "/StopPoint/" + String(stationCode) + "/Arrivals";
-    Serial.println("🚇 Using StopPoint API (all lines)");
+    Serial.println("🚇 StopPoint API (all lines)");
   }
 
   // Add API key as query parameter
@@ -381,9 +377,10 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   // Use zero-copy parsing with pointer to avoid memory allocation
   const char* jsonStart_ptr = response.c_str() + jsonStart;
 
-  // With server-side line filtering, response is ~5-10KB instead of 64KB
-  // 16KB document size is sufficient for filtered responses
-  DynamicJsonDocument doc(16384);  // 16KB for JSON parsing
+  // Using StopPoint API returns full response (~64KB all lines)
+  // We do client-side filtering which is faster than Line API endpoint
+  // Need larger document size to handle all arrivals
+  DynamicJsonDocument doc(49152);  // 48KB for JSON parsing
   DeserializationError error = deserializeJson(doc, jsonStart_ptr);
 
   if (error) {
@@ -451,10 +448,17 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
     if (!lineName || !towards || !expectedArrival) continue;
 
-    // NOTE: Line filtering is now done server-side in buildRequest()
-    // This reduces response from 64KB to ~5-10KB
+    // Filter by line if a line filter is set (client-side filtering)
+    if (lineFilter.length() > 0) {
+      // Compare against lineId (e.g., "northern", "circle", "elizabeth")
+      if (lineId && String(lineId) != lineFilter) {
+        continue;  // Skip this arrival, doesn't match line filter
+      } else if (!lineId) {
+        continue;  // No lineId, skip it
+      }
+    }
 
-    // Filter by direction if a direction filter is set (must be client-side)
+    // Filter by direction if a direction filter is set (client-side filtering)
     if (directionFilter.length() > 0) {
       // Compare against direction (e.g., "inbound", "outbound")
       if (direction && String(direction) != directionFilter) {
