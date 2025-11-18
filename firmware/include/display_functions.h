@@ -38,13 +38,27 @@ inline void displayStationName(const char* stationName) {
  */
 inline void displayServiceLine(const ServiceData& service, const char* label,
                                 int yPos, U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI& display) {
-  // Build left side: label already has trailing space, only add another space if STD has content
-  // TFL: "1st " + "" = "1st "
-  // National Rail: "1st " + "18:45" + " " = "1st 18:45 "
-  String leftSide = String(label);
-  if (service.std[0] != '\0') {  // STD has content (National Rail)
-    leftSide += String(service.std) + " ";
+  // Build left side differently for TFL vs National Rail
+  String leftSide;
+
+  if (service.std[0] == '\0') {
+    // TFL: Extract just the number from "1st ", "2nd ", etc. and use plain number
+    // "1st " -> "1 ", "2nd " -> "2 ", "3rd " -> "3 "
+    String labelStr = String(label);
+    int numStart = 0;
+    int numEnd = 0;
+    for (int i = 0; i < labelStr.length(); i++) {
+      if (isdigit(labelStr[i])) {
+        if (numEnd == 0) numStart = i;
+        numEnd = i + 1;
+      }
+    }
+    leftSide = labelStr.substring(numStart, numEnd) + " ";
+  } else {
+    // National Rail: Use ordinal label + time
+    leftSide = String(label) + String(service.std) + " ";
   }
+
   String rightSide = formatETD(String(service.etd));
 
   int leftWidth = display.getUTF8Width(leftSide.c_str());
