@@ -1003,23 +1003,71 @@ bool asyncFetchStart() {
   handleAlternatingService(currentTime);
   updateDisplay();
 
-  // Connect with periodic display updates
+  // Connect with retry logic and exponential backoff
   Serial.println("🔌 Connecting to " + String(serviceProvider->getApiHost()) + "...");
-  unsigned long connectStart = millis();
 
-  // Set connection timeout (10 seconds for TLS handshake)
-  fetchClient.setTimeout(10);  // 10 seconds in WiFiClient (converted to milliseconds internally)
+  const int MAX_RETRIES = 4;  // Total of 5 attempts (1 initial + 4 retries)
+  const int INITIAL_TIMEOUT = 15;  // 15 seconds for TLS handshake
+  bool connected = false;
+  unsigned long connectStart = 0;
 
-  // Non-blocking connect attempt with display updates
-  if (!fetchClient.connect(serviceProvider->getApiHost(), serviceProvider->getApiPort())) {
-    Serial.println("❌ API connection failed (timeout or network error)");
+  for (int attempt = 0; attempt <= MAX_RETRIES && !connected; attempt++) {
+    if (attempt > 0) {
+      // Exponential backoff: 2s, 4s, 8s, 16s
+      int backoffMs = 1000 * (1 << attempt);  // 2^attempt seconds
+      Serial.println("⏳ Retry #" + String(attempt) + " after " + String(backoffMs/1000) + "s backoff...");
+
+      // Non-blocking delay with display updates
+      unsigned long backoffStart = millis();
+      while (millis() - backoffStart < backoffMs) {
+        currentTime = millis();
+        handleAlternatingService(currentTime);
+        updateDisplay();
+        delay(100);  // Small delay to prevent tight loop
+      }
+
+      // Close any previous connection attempt
+      fetchClient.stop();
+      delay(100);
+    }
+
+    connectStart = millis();
+
+    // Increase timeout for retries (TLS can be slow on congested networks)
+    int timeout = INITIAL_TIMEOUT + (attempt * 5);  // Add 5s per retry
+    fetchClient.setTimeout(timeout);
+    Serial.println("🔌 Attempt " + String(attempt + 1) + "/" + String(MAX_RETRIES + 1) +
+                   " (timeout: " + String(timeout) + "s)...");
+
+    // Update display during connection attempt
+    currentTime = millis();
+    handleAlternatingService(currentTime);
+    updateDisplay();
+
+    // Attempt connection
+    if (fetchClient.connect(serviceProvider->getApiHost(), serviceProvider->getApiPort())) {
+      connected = true;
+      Serial.println("✅ Connected (" + String(millis() - connectStart) + "ms)");
+    } else {
+      Serial.println("❌ Connection attempt " + String(attempt + 1) + " failed");
+
+      // Check WiFi still connected
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("❌ WiFi disconnected during connection attempt");
+        displayStatus("WIFI");
+        return false;
+      }
+    }
+  }
+
+  if (!connected) {
+    Serial.println("❌ All connection attempts failed after " + String(MAX_RETRIES + 1) + " tries");
+    Serial.println("💡 Troubleshooting: Check WiFi signal, DNS, firewall, or try different station");
     displayStatus("FAIL");
     return false;
   }
 
-  Serial.println("✅ Connected (" + String(millis() - connectStart) + "ms)");
-
-  // Update display after connection
+  // Update display after successful connection
   currentTime = millis();
   handleAlternatingService(currentTime);
   updateDisplay();
