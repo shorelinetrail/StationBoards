@@ -2097,6 +2097,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Note: Don't auto-apply - user must click the Apply Station Settings button
+
+      // Track recent stations
+      addToRecentStations(code, name || code);
     };
 
     // ==================== Form Validation ====================
@@ -2624,26 +2627,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">Error loading recent stations</div>';
       }
     }
-
-    /**
-     * Override setStation to track recent stations
-     */
-    const originalSetStation = setStation;
-    setStation = function(code) {
-      originalSetStation(code);
-
-      // Try to find station name from data if available
-      if (window.stationData) {
-        const stationInfo = stationData.find(s => s.code === code);
-        if (stationInfo) {
-          addToRecentStations(code, stationInfo.name);
-        } else {
-          addToRecentStations(code, code);
-        }
-      } else {
-        addToRecentStations(code, code);
-      }
-    };
 
     /**
      * Display platform selector for a selected tube line
