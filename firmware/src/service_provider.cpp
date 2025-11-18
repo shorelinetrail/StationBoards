@@ -523,8 +523,8 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       etd = String(minutes) + " min";
     }
 
-    // Format destination as "Line → Towards"
-    String destination = String(lineName) + " → " + String(towards);
+    // For TFL: Just show destination (no line name or arrow)
+    String destination = String(towards);
 
     // Populate service data
     scheduledTime.toCharArray(services[serviceCount].std, sizeof(services[serviceCount].std));
