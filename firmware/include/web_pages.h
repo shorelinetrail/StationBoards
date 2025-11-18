@@ -1031,32 +1031,32 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <div class="preset-stations-container">
               <!-- London Stations (default visible) -->
               <div class="preset-stations" id="presets-london">
-                <button type="button" class="preset-btn" data-station="PAD" data-name="Paddington" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
-                <button type="button" class="preset-btn" data-station="VIC" data-name="Victoria" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
-                <button type="button" class="preset-btn" data-station="WAT" data-name="Waterloo" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
-                <button type="button" class="preset-btn" data-station="KGX" data-name="Kings Cross" aria-label="Select Kings Cross station">KGX<br><small>Kings Cross</small></button>
-                <button type="button" class="preset-btn" data-station="EUS" data-name="Euston" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
-                <button type="button" class="preset-btn" data-station="LST" data-name="Liverpool Street" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
+                <button type="button" class="preset-btn" data-station="PAD" data-name="Paddington" aria-label="Select Paddington station">Paddington</button>
+                <button type="button" class="preset-btn" data-station="VIC" data-name="Victoria" aria-label="Select Victoria station">Victoria</button>
+                <button type="button" class="preset-btn" data-station="WAT" data-name="Waterloo" aria-label="Select Waterloo station">Waterloo</button>
+                <button type="button" class="preset-btn" data-station="KGX" data-name="Kings Cross" aria-label="Select Kings Cross station">Kings Cross</button>
+                <button type="button" class="preset-btn" data-station="EUS" data-name="Euston" aria-label="Select Euston station">Euston</button>
+                <button type="button" class="preset-btn" data-station="LST" data-name="Liverpool Street" aria-label="Select Liverpool Street station">Liverpool St</button>
               </div>
 
               <!-- Major Cities (hidden by default) -->
               <div class="preset-stations" id="presets-major" style="display: none;">
-                <button type="button" class="preset-btn" data-station="MAN" data-name="Manchester Piccadilly" aria-label="Select Manchester Piccadilly station">MAN<br><small>Manchester</small></button>
-                <button type="button" class="preset-btn" data-station="BHM" data-name="Birmingham New Street" aria-label="Select Birmingham New Street station">BHM<br><small>Birmingham</small></button>
-                <button type="button" class="preset-btn" data-station="EDB" data-name="Edinburgh Waverley" aria-label="Select Edinburgh Waverley station">EDB<br><small>Edinburgh</small></button>
-                <button type="button" class="preset-btn" data-station="GLC" data-name="Glasgow Central" aria-label="Select Glasgow Central station">GLC<br><small>Glasgow</small></button>
-                <button type="button" class="preset-btn" data-station="LDS" data-name="Leeds" aria-label="Select Leeds station">LDS<br><small>Leeds</small></button>
-                <button type="button" class="preset-btn" data-station="LIV" data-name="Liverpool Lime Street" aria-label="Select Liverpool Lime Street station">LIV<br><small>Liverpool</small></button>
+                <button type="button" class="preset-btn" data-station="MAN" data-name="Manchester Piccadilly" aria-label="Select Manchester Piccadilly station">Manchester</button>
+                <button type="button" class="preset-btn" data-station="BHM" data-name="Birmingham New Street" aria-label="Select Birmingham New Street station">Birmingham</button>
+                <button type="button" class="preset-btn" data-station="EDB" data-name="Edinburgh Waverley" aria-label="Select Edinburgh Waverley station">Edinburgh</button>
+                <button type="button" class="preset-btn" data-station="GLC" data-name="Glasgow Central" aria-label="Select Glasgow Central station">Glasgow</button>
+                <button type="button" class="preset-btn" data-station="LDS" data-name="Leeds" aria-label="Select Leeds station">Leeds</button>
+                <button type="button" class="preset-btn" data-station="LIV" data-name="Liverpool Lime Street" aria-label="Select Liverpool Lime Street station">Liverpool</button>
               </div>
 
               <!-- Airports -->
               <div class="preset-stations" id="presets-airports" style="display: none;">
-                <button type="button" class="preset-btn" data-station="GTW" data-name="Gatwick Airport" aria-label="Select Gatwick Airport station">GTW<br><small>Gatwick</small></button>
-                <button type="button" class="preset-btn" data-station="SRA" data-name="Stansted Airport" aria-label="Select Stansted Airport station">SRA<br><small>Stansted</small></button>
-                <button type="button" class="preset-btn" data-station="LTN" data-name="Luton Airport Parkway" aria-label="Select Luton Airport station">LTN<br><small>Luton</small></button>
-                <button type="button" class="preset-btn" data-station="HWV" data-name="Heathrow Terminals 2 & 3" aria-label="Select Heathrow terminals station">HWV<br><small>Heathrow</small></button>
-                <button type="button" class="preset-btn" data-station="BHX" data-name="Birmingham International" aria-label="Select Birmingham Airport station">BHX<br><small>Birmingham Arpt</small></button>
-                <button type="button" class="preset-btn" data-station="MIA" data-name="Manchester Airport" aria-label="Select Manchester Airport station">MIA<br><small>Manchester Arpt</small></button>
+                <button type="button" class="preset-btn" data-station="GTW" data-name="Gatwick Airport" aria-label="Select Gatwick Airport station">Gatwick</button>
+                <button type="button" class="preset-btn" data-station="SRA" data-name="Stansted Airport" aria-label="Select Stansted Airport station">Stansted</button>
+                <button type="button" class="preset-btn" data-station="LTN" data-name="Luton Airport Parkway" aria-label="Select Luton Airport station">Luton</button>
+                <button type="button" class="preset-btn" data-station="HWV" data-name="Heathrow Terminals 2 & 3" aria-label="Select Heathrow terminals station">Heathrow</button>
+                <button type="button" class="preset-btn" data-station="BHX" data-name="Birmingham International" aria-label="Select Birmingham Airport station">Birmingham Arpt</button>
+                <button type="button" class="preset-btn" data-station="MIA" data-name="Manchester Airport" aria-label="Select Manchester Airport station">Manchester Arpt</button>
               </div>
 
               <!-- Recent Stations (populated from localStorage) -->
@@ -1070,12 +1070,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
           <!-- TFL Underground Presets -->
           <div class="preset-stations" id="tflPresets" style="display:none;">
-            <button type="button" class="preset-btn" data-station="940GZZLUPAC" data-name="Paddington" aria-label="Select Paddington Underground">940GZZLUPAC<br><small>Paddington</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUVIC" data-name="Victoria" aria-label="Select Victoria Underground">940GZZLUVIC<br><small>Victoria</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUWLO" data-name="Waterloo" aria-label="Select Waterloo Underground">940GZZLUWLO<br><small>Waterloo</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUKSX" data-name="King's Cross" aria-label="Select Kings Cross Underground">940GZZLUKSX<br><small>King's Cross</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUBST" data-name="Baker Street" aria-label="Select Baker Street Underground">940GZZLUBST<br><small>Baker Street</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLULVT" data-name="Liverpool Street" aria-label="Select Liverpool Street Underground">940GZZLULVT<br><small>Liverpool St</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUPAC" data-name="Paddington" aria-label="Select Paddington Underground">Paddington</button>
+            <button type="button" class="preset-btn" data-station="940GZZLUVIC" data-name="Victoria" aria-label="Select Victoria Underground">Victoria</button>
+            <button type="button" class="preset-btn" data-station="940GZZLUWLO" data-name="Waterloo" aria-label="Select Waterloo Underground">Waterloo</button>
+            <button type="button" class="preset-btn" data-station="940GZZLUKSX" data-name="King's Cross" aria-label="Select Kings Cross Underground">King's Cross</button>
+            <button type="button" class="preset-btn" data-station="940GZZLUBST" data-name="Baker Street" aria-label="Select Baker Street Underground">Baker Street</button>
+            <button type="button" class="preset-btn" data-station="940GZZLULVT" data-name="Liverpool Street" aria-label="Select Liverpool Street Underground">Liverpool St</button>
           </div>
           <div class="autocomplete-wrapper">
             <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="15" aria-label="Station code or name" aria-describedby="station-help">
@@ -2366,7 +2366,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         container.innerHTML = recent.map(station =>
           `<button type="button" class="preset-btn" data-station="${escapeHtml(station.code)}" aria-label="Select ${escapeHtml(station.name || station.code)} station">
-            ${escapeHtml(station.code)}<br><small>${escapeHtml(station.name || station.code)}</small>
+            ${escapeHtml(station.name || station.code)}
           </button>`
         ).join('');
 
