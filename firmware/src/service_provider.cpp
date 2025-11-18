@@ -320,14 +320,18 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   // NOTE: Station name is now pre-fetched in main.cpp before opening connection
   // to avoid blocking while the API connection is open
 
-  // Build TFL API request
-  // Always use StopPoint endpoint - it's faster than Line endpoint
-  // Do filtering client-side in parseResponse()
-  String path = "/StopPoint/" + String(stationCode) + "/Arrivals";
+  // Build TFL API request - HYBRID approach for best performance
+  // When filter active: Use Line API (small response, reliable parsing)
+  // When no filter: Use StopPoint API (need all lines, bigger response)
+  String path;
 
   if (lineFilter.length() > 0) {
-    Serial.println("🚇 StopPoint API (client-side filter: " + lineFilter + ")");
+    // Use Line API for filtered requests - small response (~5KB)
+    path = "/Line/" + lineFilter + "/Arrivals/" + String(stationCode);
+    Serial.println("🚇 Line API (filtered): /Line/" + lineFilter + "/Arrivals");
   } else {
+    // Use StopPoint API for unfiltered requests - all lines (~34KB)
+    path = "/StopPoint/" + String(stationCode) + "/Arrivals";
     Serial.println("🚇 StopPoint API (all lines)");
   }
 
@@ -377,10 +381,13 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   // Use zero-copy parsing with pointer to avoid memory allocation
   const char* jsonStart_ptr = response.c_str() + jsonStart;
 
-  // Using StopPoint API returns full response (~64KB all lines)
-  // We do client-side filtering which is faster than Line API endpoint
-  // Need larger document size to handle all arrivals
-  DynamicJsonDocument doc(49152);  // 48KB for JSON parsing
+  // HYBRID approach: choose document size based on response size
+  // Line API (filtered): ~5KB response → 16KB document
+  // StopPoint API (all): ~34KB response → 65KB document
+  size_t docSize = (jsonLength < 10000) ? 16384 : 65536;
+  Serial.println("📦 Allocating " + String(docSize) + " byte JSON document");
+
+  DynamicJsonDocument doc(docSize);
   DeserializationError error = deserializeJson(doc, jsonStart_ptr);
 
   if (error) {
