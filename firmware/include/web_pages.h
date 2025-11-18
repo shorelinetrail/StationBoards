@@ -783,7 +783,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <button type="button" class="preset-btn" data-station="940GZZLUVIC" aria-label="Select Victoria Underground">940GZZLUVIC<br><small>Victoria</small></button>
             <button type="button" class="preset-btn" data-station="940GZZLUWLO" aria-label="Select Waterloo Underground">940GZZLUWLO<br><small>Waterloo</small></button>
             <button type="button" class="preset-btn" data-station="940GZZLUKSX" aria-label="Select Kings Cross Underground">940GZZLUKSX<br><small>King's Cross</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUBST" aria-label="Select Bank Underground">940GZZLUBST<br><small>Bank</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUBST" aria-label="Select Baker Street Underground">940GZZLUBST<br><small>Baker Street</small></button>
             <button type="button" class="preset-btn" data-station="940GZZLULVT" aria-label="Select Liverpool Street Underground">940GZZLULVT<br><small>Liverpool St</small></button>
           </div>
           <div class="autocomplete-wrapper">
