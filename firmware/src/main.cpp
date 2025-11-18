@@ -971,6 +971,14 @@ void setupOTA() {
 
 // Data Fetching - using service provider abstraction
 bool asyncFetchStart() {
+  // CRITICAL: Prevent overlapping fetches
+  // If a fetch is already in progress, ignore this request to avoid multiple simultaneous API calls
+  // Note: /apply handler should have already canceled in-progress fetches if settings changed
+  if (fetchStateData.isActive()) {
+    Serial.println("⏸️  Fetch already in progress (state=" + String(fetchStateData.state) + ") - ignoring duplicate request");
+    return false;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected");
     displayStatus("OFF");
@@ -1714,8 +1722,11 @@ void setupWebServer() {
       }
       // Force immediate fetch to get calling points
       if (fetchStateData.state != FETCH_IDLE) {
+        Serial.println("⚠️  Canceling in-progress fetch for calling points mode");
         fetchClient.stop();
+        fetchStateData.buffer = "";  // Clear partial data
         fetchStateData.state = FETCH_IDLE;
+        delay(50);  // Brief delay to let connection fully close
       }
       fetchStateData.lastSuccess = 0;
       fetchStateData.lastAttempt = 0;
@@ -1738,9 +1749,13 @@ void setupWebServer() {
       displayState.serviceCount = 0;
       displayState.fetchingNewStation = true;  // Mark that we're loading new station data
 
+      // Cancel any in-progress fetch and wait for cleanup
       if (fetchStateData.state != FETCH_IDLE) {
+        Serial.println("⚠️  Canceling in-progress fetch for new request");
         fetchClient.stop();
+        fetchStateData.buffer = "";  // Clear partial data
         fetchStateData.state = FETCH_IDLE;
+        delay(50);  // Brief delay to let connection fully close
       }
 
       fetchStateData.lastSuccess = 0;
