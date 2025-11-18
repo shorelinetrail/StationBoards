@@ -1096,8 +1096,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         if (data.matches) {
           data.matches.forEach(match => {
             if (match.modes && match.modes.includes('tube')) {
+              // Remove "Underground Station" suffix
+              let name = match.name;
+              name = name.replace(/ Underground Station$/i, '');
+              name = name.replace(/ Station$/i, '');
+
               stations.push({
-                name: match.name,
+                name: name,
                 code: match.id
               });
             }
@@ -1521,6 +1526,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.blur();
 
       autoApplySettings(code);
+
+      // Fetch tube lines if service type is TFL
+      const serviceType = document.getElementById('serviceType').value;
+      if (serviceType === '1' && code.length >= 9) {
+        setTimeout(() => {
+          showTflLineSelector(code.trim());
+        }, 500);
+      }
     };
 
     // ==================== Form Validation ====================
