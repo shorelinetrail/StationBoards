@@ -338,17 +338,22 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
 
   // Build TFL API request - HYBRID approach for best performance
   // When filter active: Use Line API (small response, reliable parsing)
-  // When no filter: Use StopPoint API (need all lines, bigger response)
+  // When no filter OR Elizabeth line: Use StopPoint API (need all lines, bigger response)
+  // Note: Elizabeth line doesn't work with Line API, needs StopPoint + client filtering
   String path;
 
-  if (lineFilter.length() > 0) {
-    // Use Line API for filtered requests - small response (~5KB)
+  if (lineFilter.length() > 0 && lineFilter != "elizabeth") {
+    // Use Line API for filtered requests (except Elizabeth line) - small response (~5KB)
     path = "/Line/" + lineFilter + "/Arrivals/" + String(stationCode);
     Serial.println("🚇 Line API (filtered): /Line/" + lineFilter + "/Arrivals/" + String(stationCode));
   } else {
-    // Use StopPoint API for unfiltered requests - all lines (~34KB)
+    // Use StopPoint API for unfiltered requests or Elizabeth line - all lines (~40KB)
     path = "/StopPoint/" + String(stationCode) + "/Arrivals";
-    Serial.println("🚇 StopPoint API (all lines): /StopPoint/" + String(stationCode) + "/Arrivals");
+    if (lineFilter.length() > 0) {
+      Serial.println("🚇 StopPoint API (Elizabeth line): /StopPoint/" + String(stationCode) + "/Arrivals + client filter");
+    } else {
+      Serial.println("🚇 StopPoint API (all lines): /StopPoint/" + String(stationCode) + "/Arrivals");
+    }
   }
 
   // Add API key as query parameter
@@ -411,8 +416,9 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   // With filtering, we can use much smaller documents:
   // Line API (filtered): ~5KB response → 8KB document (was 16KB)
-  // StopPoint API (all): ~34KB response → 24KB document (was 65KB)
-  size_t docSize = (jsonLength < 10000) ? 8192 : 24576;
+  // StopPoint API (all): ~40KB response → 32KB document (was 65KB)
+  // Increased to 32KB to handle Liverpool Street's 40KB response
+  size_t docSize = (jsonLength < 10000) ? 8192 : 32768;
   Serial.println("📦 Allocating " + String(docSize) + " byte JSON document (filtered parsing)");
 
   DynamicJsonDocument doc(docSize);
