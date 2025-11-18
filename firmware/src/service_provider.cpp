@@ -156,6 +156,79 @@ bool NationalRailProvider::parseResponse(const String& response,
       services[serviceCount].callingPoints[0] = '\0';
 
       Serial.println("🚂 " + String(serviceCount + 1) + ": " + std + " → " + destination);
+
+      // Parse calling points for first service if in calling at mode
+      if (useCallingAt && serviceCount == 0) {
+        int cpListIdx = block.indexOf("<lt5:subsequentCallingPoints>");
+        if (cpListIdx == -1) cpListIdx = block.indexOf("<lt4:subsequentCallingPoints>");
+
+        if (cpListIdx != -1) {
+          int cpListEndIdx = block.indexOf("</lt5:subsequentCallingPoints>", cpListIdx);
+          if (cpListEndIdx == -1) cpListEndIdx = block.indexOf("</lt4:subsequentCallingPoints>", cpListIdx);
+
+          if (cpListEndIdx != -1) {
+            String cpSection = block.substring(cpListIdx, cpListEndIdx);
+
+            int cpListStart = cpSection.indexOf("<lt4:callingPointList>");
+            if (cpListStart == -1) cpListStart = cpSection.indexOf("<lt5:callingPointList>");
+
+            if (cpListStart != -1) {
+              int cpListEnd = cpSection.indexOf("</lt4:callingPointList>", cpListStart);
+              if (cpListEnd == -1) cpListEnd = cpSection.indexOf("</lt5:callingPointList>", cpListStart);
+
+              if (cpListEnd != -1) {
+                String cpList = cpSection.substring(cpListStart, cpListEnd);
+
+                String cpTag = "<lt4:callingPoint>";
+                String cpEndTag = "</lt4:callingPoint>";
+
+                if (cpList.indexOf(cpTag) == -1) {
+                  cpTag = "<lt5:callingPoint>";
+                  cpEndTag = "</lt5:callingPoint>";
+                }
+
+                String callingPoints = "";
+                int cpPos = 0;
+
+                while ((cpPos = cpList.indexOf(cpTag, cpPos)) != -1) {
+                  int cpEnd = cpList.indexOf(cpEndTag, cpPos);
+                  if (cpEnd == -1) break;
+
+                  String cpBlock = cpList.substring(cpPos, cpEnd);
+
+                  String cpName = extractTagValue(cpBlock, "locationName", "lt4");
+                  if (cpName == "") cpName = extractTagValue(cpBlock, "locationName", "lt5");
+                  cpName = decodeHTMLEntities(cpName);
+
+                  String cpTime = extractTagValue(cpBlock, "st", "lt4");
+                  if (cpTime == "") cpTime = extractTagValue(cpBlock, "st", "lt5");
+
+                  if (cpName != "") {
+                    if (callingPoints != "") callingPoints += ", ";
+                    callingPoints += cpName;
+                    if (cpTime != "") callingPoints += " (" + cpTime + ")";
+                  }
+
+                  cpPos = cpEnd;
+
+                  // Allow other tasks to run during long calling points lists
+                  yield();
+                }
+
+                if (callingPoints != "" && callingPoints.length() < 500) {
+                  callingPoints.toCharArray(services[serviceCount].callingPoints, 500);
+                  Serial.println("  📍 Calling at: " + callingPoints);
+                } else if (callingPoints == "") {
+                  String fallback = "No further stops available";
+                  fallback.toCharArray(services[serviceCount].callingPoints, 500);
+                  Serial.println("  ⚠️  No calling points found");
+                }
+              }
+            }
+          }
+        }
+      }
+
       serviceCount++;
     }
 
