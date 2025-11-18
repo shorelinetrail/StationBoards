@@ -336,24 +336,34 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   JsonArray arrivals = doc.as<JsonArray>();
 
   // Extract station name - prefer from arrival, fall back to fetched name, then station code
+  bool stationNameSet = false;
+
   if (arrivals.size() > 0) {
     const char* stName = arrivals[0]["stationName"];
     if (stName) {
       strncpy(stationName, stName, stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
-      Serial.println("📍 " + String(stName));
+      Serial.println("📍 " + String(stName) + " (from arrival data)");
+      stationNameSet = true;
     }
-  } else {
-    // No arrivals - use pre-fetched station name or station code as fallback
+  }
+
+  // If we didn't get station name from arrivals, use pre-fetched name
+  if (!stationNameSet) {
     if (currentStationName.length() > 0) {
       strncpy(stationName, currentStationName.c_str(), stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
-      Serial.println("📍 " + currentStationName);
+      Serial.println("📍 " + currentStationName + " (pre-fetched)");
+      stationNameSet = true;
     } else if (currentStationCode.length() > 0) {
       strncpy(stationName, currentStationCode.c_str(), stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
-      Serial.println("📍 " + currentStationCode + " (using station code as fallback)");
+      Serial.println("📍 " + currentStationCode + " (station code fallback)");
+      stationNameSet = true;
     }
+  }
+
+  if (arrivals.size() == 0) {
     Serial.println("⚠️  No arrivals in TFL response");
   }
 
