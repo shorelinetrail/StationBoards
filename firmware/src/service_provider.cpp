@@ -413,26 +413,44 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   // With filtering, we can use much smaller documents:
   // Adaptive sizing based on JSON length to handle busy stations
-  // Small response (~5KB): 8KB document
-  // Medium response (~12KB): 12KB document
-  // Large response (~15KB+): 20KB document
-  // Kept as small as possible to avoid heap fragmentation
-  // With 7-field filtering, 20KB handles even 64KB source JSON
+  // Increased sizes to handle very busy stations like King's Cross, Liverpool Street
   size_t docSize;
   if (jsonLength < 8000) {
     docSize = 8192;   // 8KB for small responses
-  } else if (jsonLength < 12000) {
-    docSize = 12288;  // 12KB for medium responses
+  } else if (jsonLength < 15000) {
+    docSize = 16384;  // 16KB for medium responses
+  } else if (jsonLength < 30000) {
+    docSize = 24576;  // 24KB for large responses
+  } else if (jsonLength < 50000) {
+    docSize = 32768;  // 32KB for very large responses
   } else {
-    docSize = 20480;  // 20KB for large responses (handles 15KB-64KB source)
+    docSize = 40960;  // 40KB for extremely busy stations
   }
   Serial.println("📦 Allocating " + String(docSize) + " byte JSON document (filtered parsing)");
 
   DynamicJsonDocument doc(docSize);
   DeserializationError error = deserializeJson(doc, jsonStart_ptr, DeserializationOption::Filter(filter));
 
+  // If IncompleteInput error, retry with larger document size
+  if (error && error.code() == DeserializationError::IncompleteInput) {
+    Serial.println("⚠️  IncompleteInput error - retrying with larger document size");
+    size_t largerDocSize = docSize * 2;
+    if (largerDocSize > 65536) largerDocSize = 65536; // Cap at 64KB
+
+    Serial.println("📦 Retrying with " + String(largerDocSize) + " byte JSON document");
+    DynamicJsonDocument largerDoc(largerDocSize);
+    error = deserializeJson(largerDoc, jsonStart_ptr, DeserializationOption::Filter(filter));
+
+    if (!error) {
+      Serial.println("✅ Retry successful with larger document");
+      // Copy successful parse back to original doc
+      doc = largerDoc;
+    }
+  }
+
   if (error) {
     Serial.println("❌ JSON parse error: " + String(error.c_str()) + " (code: " + String((int)error.code()) + ")");
+    Serial.println("❌ JSON length: " + String(jsonLength) + " bytes, allocated: " + String(docSize) + " bytes");
 
     // Show first 100 chars without String allocation to avoid memory issues
     char preview[101];
