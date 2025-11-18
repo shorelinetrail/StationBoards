@@ -348,6 +348,38 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       background: #667eea;
       color: white;
       border-color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .preset-category-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .preset-category-tab {
+      padding: 8px 16px;
+      background: white;
+      border: 2px solid #e0e0e0;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .preset-category-tab:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+
+    .preset-category-tab.active {
+      background: #667eea;
+      border-color: #667eea;
+      color: white;
     }
 
     .advanced-settings {
@@ -376,6 +408,83 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     .advanced-content.show {
       display: block;
+    }
+
+    .range-slider-group {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      border: 2px solid #e0e0e0;
+      margin-top: 8px;
+    }
+
+    .range-slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    .range-label {
+      font-weight: 500;
+    }
+
+    .range-value {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      background: white;
+      border-radius: 6px;
+      border: 2px solid #667eea;
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .range-slider {
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right, #28a745 0%, #ffc107 50%, #dc3545 100%);
+      outline: none;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .range-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: all 0.2s ease;
+    }
+
+    .range-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .range-slider::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: all 0.2s ease;
+    }
+
+    .range-slider::-moz-range-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
 
     .network-list {
@@ -763,13 +872,53 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span id="stationLabel">Station Code (CRS)</span>
             <span class="info-tooltip" id="stationTooltip" title="Three-letter National Rail station code" aria-label="Information: Three-letter National Rail station code">?</span>
           </label>
-          <div class="preset-stations">
-            <button type="button" class="preset-btn" data-station="PAD" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
-            <button type="button" class="preset-btn" data-station="VIC" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
-            <button type="button" class="preset-btn" data-station="WAT" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
-            <button type="button" class="preset-btn" data-station="KGX" aria-label="Select Kings Cross station">KGX<br><small>Kings Cross</small></button>
-            <button type="button" class="preset-btn" data-station="EUS" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
-            <button type="button" class="preset-btn" data-station="LST" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
+          <!-- Preset Category Tabs -->
+          <div style="margin-bottom: 15px;">
+            <div class="preset-category-tabs">
+              <button type="button" class="preset-category-tab active" data-category="london" aria-label="Show London stations">London</button>
+              <button type="button" class="preset-category-tab" data-category="major" aria-label="Show major city stations">Major Cities</button>
+              <button type="button" class="preset-category-tab" data-category="airports" aria-label="Show airport stations">Airports</button>
+              <button type="button" class="preset-category-tab" data-category="recent" aria-label="Show recently used stations">Recent</button>
+            </div>
+          </div>
+
+          <div class="preset-stations-container">
+            <!-- London Stations (default visible) -->
+            <div class="preset-stations" id="presets-london">
+              <button type="button" class="preset-btn" data-station="PAD" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
+              <button type="button" class="preset-btn" data-station="VIC" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
+              <button type="button" class="preset-btn" data-station="WAT" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
+              <button type="button" class="preset-btn" data-station="KGX" aria-label="Select Kings Cross station">KGX<br><small>Kings Cross</small></button>
+              <button type="button" class="preset-btn" data-station="EUS" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
+              <button type="button" class="preset-btn" data-station="LST" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
+            </div>
+
+            <!-- Major Cities (hidden by default) -->
+            <div class="preset-stations" id="presets-major" style="display: none;">
+              <button type="button" class="preset-btn" data-station="MAN" aria-label="Select Manchester Piccadilly station">MAN<br><small>Manchester</small></button>
+              <button type="button" class="preset-btn" data-station="BHM" aria-label="Select Birmingham New Street station">BHM<br><small>Birmingham</small></button>
+              <button type="button" class="preset-btn" data-station="EDB" aria-label="Select Edinburgh Waverley station">EDB<br><small>Edinburgh</small></button>
+              <button type="button" class="preset-btn" data-station="GLC" aria-label="Select Glasgow Central station">GLC<br><small>Glasgow</small></button>
+              <button type="button" class="preset-btn" data-station="LDS" aria-label="Select Leeds station">LDS<br><small>Leeds</small></button>
+              <button type="button" class="preset-btn" data-station="LIV" aria-label="Select Liverpool Lime Street station">LIV<br><small>Liverpool</small></button>
+            </div>
+
+            <!-- Airports -->
+            <div class="preset-stations" id="presets-airports" style="display: none;">
+              <button type="button" class="preset-btn" data-station="GTW" aria-label="Select Gatwick Airport station">GTW<br><small>Gatwick</small></button>
+              <button type="button" class="preset-btn" data-station="SRA" aria-label="Select Stansted Airport station">SRA<br><small>Stansted</small></button>
+              <button type="button" class="preset-btn" data-station="LTN" aria-label="Select Luton Airport station">LTN<br><small>Luton</small></button>
+              <button type="button" class="preset-btn" data-station="HWV" aria-label="Select Heathrow terminals station">HWV<br><small>Heathrow</small></button>
+              <button type="button" class="preset-btn" data-station="BHX" aria-label="Select Birmingham Airport station">BHX<br><small>Birmingham Arpt</small></button>
+              <button type="button" class="preset-btn" data-station="MIA" aria-label="Select Manchester Airport station">MIA<br><small>Manchester Arpt</small></button>
+            </div>
+
+            <!-- Recent Stations (populated from localStorage) -->
+            <div class="preset-stations" id="presets-recent" style="display: none;">
+              <div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">
+                No recently used stations
+              </div>
+            </div>
           </div>
           <div class="autocomplete-wrapper">
             <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="50" aria-label="Station code or name" aria-describedby="station-help">
@@ -790,11 +939,29 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
           <div class="form-group">
             <label for="scrollspeed">
-              Scroll Speed (ms)
-              <span class="info-tooltip" title="Lower = faster scrolling" aria-label="Information: Lower = faster scrolling">?</span>
+              Scroll Speed
+              <span class="info-tooltip" title="Controls how fast text scrolls across the display" aria-label="Information: Controls how fast text scrolls across the display">?</span>
             </label>
-            <input type="number" id="scrollspeed" name="scrollspeed" value="{SCROLL}" min="10" max="200" required aria-describedby="scrollspeed-help">
-            <span class="help-text" id="scrollspeed-help">Recommended: 50-100ms</span>
+
+            <div class="range-slider-group">
+              <div class="range-slider-header">
+                <span class="range-label">🐢 Slower (Smoother)</span>
+                <span class="range-value" id="scrollspeedDisplay">
+                  <input type="number" id="scrollspeed" name="scrollspeed" value="{SCROLL}"
+                         min="10" max="200" required style="width: 55px; padding: 4px 8px; text-align: center; font-weight: 600; border: none; background: transparent;">
+                  <span style="font-size: 12px; color: #666;">ms</span>
+                </span>
+                <span class="range-label">⏩ Faster (Snappier)</span>
+              </div>
+
+              <input type="range" class="range-slider" id="scrollspeedRange"
+                     min="10" max="200" value="{SCROLL}" step="5"
+                     style="width: 100%; margin-top: 8px;">
+            </div>
+
+            <span class="help-text" id="scrollspeed-help">
+              <strong>Recommended:</strong> 50-70ms for readability. Lower values = faster scroll.
+            </span>
           </div>
         </div>
       </div>
@@ -833,34 +1000,96 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         </div>
 
         <div class="form-group">
-          <label for="rotationspeed">Bottom Line Rotation Speed (seconds)</label>
-          <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" required aria-describedby="rotationspeed-help">
-          <span class="help-text" id="rotationspeed-help">How often the bottom line alternates between services (default: 15 seconds)</span>
+          <label for="rotationspeed">
+            Bottom Line Rotation Speed
+            <span class="info-tooltip" title="How long each service is displayed before rotating to the next" aria-label="Information: How long each service is displayed">?</span>
+          </label>
+
+          <div class="range-slider-group">
+            <div class="range-slider-header">
+              <span class="range-label">⚡ Faster</span>
+              <span class="range-value" id="rotationspeedDisplay">
+                <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}"
+                       min="5" max="60" required style="width: 45px; padding: 4px 8px; text-align: center; font-weight: 600; border: none; background: transparent;">
+                <span style="font-size: 12px; color: #666;">sec</span>
+              </span>
+              <span class="range-label">🕐 Slower</span>
+            </div>
+
+            <input type="range" class="range-slider" id="rotationspeedRange"
+                   min="5" max="60" value="{ROTATION}" step="1"
+                   style="width: 100%; margin-top: 8px;">
+          </div>
+
+          <span class="help-text" id="rotationspeed-help">
+            <strong>Recommended:</strong> 12-18 seconds. How often the bottom line alternates between services.
+          </span>
         </div>
 
-        <div class="form-row form-row-three">
-          <div class="form-group">
-            <label for="ytop">Top Line Position (No Station Name)</label>
-            <input type="number" id="ytop" name="ytop" value="{YTOP}" min="0" max="64" required aria-describedby="ytop-help">
-            <span class="help-text" id="ytop-help">Default 12. Position when station name is hidden.</span>
+        <!-- Advanced Layout Controls (Collapsible) -->
+        <div class="advanced-settings">
+          <div class="advanced-toggle" id="advancedLayoutToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="advancedLayoutContent">
+            <span>⚙️ Advanced Layout Controls</span>
+            <span style="font-size: 12px; color: #999; margin-left: auto;">(For experts only)</span>
           </div>
+          <div class="advanced-content" id="advancedLayoutContent">
+            <div style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+              <strong>⚠️ Caution:</strong> These settings control pixel-level positioning. Change only if you understand display coordinates.
+            </div>
 
-          <div class="form-group">
-            <label for="y1">First Line Vertical Position</label>
-            <input type="number" id="y1" name="y1" value="{Y1}" min="0" max="64" required aria-describedby="y1-help">
-            <span class="help-text" id="y1-help">Default 26. Higher values move the first line lower.</span>
-          </div>
+            <div class="form-row form-row-three">
+              <div class="form-group">
+                <label for="ytop">
+                  Top Line Y Position
+                  <span class="info-tooltip" title="Vertical pixel offset for top departure when station name is hidden (0-64 pixels)" aria-label="Information about top line position">?</span>
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <input type="number" id="ytop" name="ytop" value="{YTOP}" min="0" max="64" required aria-describedby="ytop-help" style="flex: 1;">
+                  <button type="button" class="btn" style="padding: 8px 12px; background: #6c757d; color: white;" onclick="document.getElementById('ytop').value='12'; autoApplySettings();">Reset</button>
+                </div>
+                <span class="help-text" id="ytop-help">Default: 12px from top</span>
+              </div>
 
-          <div class="form-group">
-            <label for="y2">Second Line Vertical Position</label>
-            <input type="number" id="y2" name="y2" value="{Y2}" min="0" max="64" required aria-describedby="y2-help">
-            <span class="help-text" id="y2-help">Default 38. Keep lower than the bottom line for spacing.</span>
-          </div>
+              <div class="form-group">
+                <label for="y1">
+                  First Line Y Position
+                  <span class="info-tooltip" title="Vertical pixel offset for first departure line (0-64 pixels)" aria-label="Information about first line position">?</span>
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <input type="number" id="y1" name="y1" value="{Y1}" min="0" max="64" required aria-describedby="y1-help" style="flex: 1;">
+                  <button type="button" class="btn" style="padding: 8px 12px; background: #6c757d; color: white;" onclick="document.getElementById('y1').value='26'; autoApplySettings();">Reset</button>
+                </div>
+                <span class="help-text" id="y1-help">Default: 26px from top</span>
+              </div>
 
-          <div class="form-group">
-            <label for="y3">Bottom Line Vertical Position</label>
-            <input type="number" id="y3" name="y3" value="{Y3}" min="0" max="64" required aria-describedby="y3-help">
-            <span class="help-text" id="y3-help">Default 50. Controls the alternating services baseline.</span>
+              <div class="form-group">
+                <label for="y2">
+                  Second Line Y Position
+                  <span class="info-tooltip" title="Vertical pixel offset for second departure line (0-64 pixels)" aria-label="Information about second line position">?</span>
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <input type="number" id="y2" name="y2" value="{Y2}" min="0" max="64" required aria-describedby="y2-help" style="flex: 1;">
+                  <button type="button" class="btn" style="padding: 8px 12px; background: #6c757d; color: white;" onclick="document.getElementById('y2').value='38'; autoApplySettings();">Reset</button>
+                </div>
+                <span class="help-text" id="y2-help">Default: 38px from top</span>
+              </div>
+
+              <div class="form-group">
+                <label for="y3">
+                  Bottom Line Y Position
+                  <span class="info-tooltip" title="Vertical pixel offset for bottom/alternating line (0-64 pixels)" aria-label="Information about bottom line position">?</span>
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <input type="number" id="y3" name="y3" value="{Y3}" min="0" max="64" required aria-describedby="y3-help" style="flex: 1;">
+                  <button type="button" class="btn" style="padding: 8px 12px; background: #6c757d; color: white;" onclick="document.getElementById('y3').value='50'; autoApplySettings();">Reset</button>
+                </div>
+                <span class="help-text" id="y3-help">Default: 50px from top</span>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-outline" style="width: 100%; margin-top: 10px;" onclick="resetAllPositions()">
+              Reset All to Defaults
+            </button>
           </div>
         </div>
       </div>
@@ -1649,6 +1878,91 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       showToast(`Available lines: ${lineNames}`, 'info');
     };
 
+    // ==================== Advanced Controls Toggle ====================
+
+    /**
+     * Reset all Y-position values to defaults
+     */
+    function resetAllPositions() {
+      document.getElementById('ytop').value = '12';
+      document.getElementById('y1').value = '26';
+      document.getElementById('y2').value = '38';
+      document.getElementById('y3').value = '50';
+      autoApplySettings();
+      showToast('Layout positions reset to defaults', 'success');
+    }
+
+    // ==================== Recent Stations Management ====================
+
+    /**
+     * Add station to recent stations list
+     */
+    function addToRecentStations(code, name) {
+      try {
+        let recent = JSON.parse(localStorage.getItem('recentStations') || '[]');
+        // Remove duplicates
+        recent = recent.filter(s => s.code !== code);
+        // Add to front
+        recent.unshift({ code, name, timestamp: Date.now() });
+        // Keep last 6
+        recent = recent.slice(0, 6);
+        localStorage.setItem('recentStations', JSON.stringify(recent));
+      } catch (e) {
+        console.error('Error saving recent stations:', e);
+      }
+    }
+
+    /**
+     * Load and display recent stations
+     */
+    function loadRecentStations() {
+      const container = document.getElementById('presets-recent');
+      if (!container) return;
+
+      try {
+        const recent = JSON.parse(localStorage.getItem('recentStations') || '[]');
+
+        if (recent.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">No recently used stations</div>';
+          return;
+        }
+
+        container.innerHTML = recent.map(station =>
+          `<button type="button" class="preset-btn" data-station="${escapeHtml(station.code)}" aria-label="Select ${escapeHtml(station.name || station.code)} station">
+            ${escapeHtml(station.code)}<br><small>${escapeHtml(station.name || station.code)}</small>
+          </button>`
+        ).join('');
+
+        // Re-attach click handlers
+        container.querySelectorAll('.preset-btn').forEach(btn => {
+          btn.addEventListener('click', () => setStation(btn.dataset.station));
+        });
+      } catch (e) {
+        console.error('Error loading recent stations:', e);
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">Error loading recent stations</div>';
+      }
+    }
+
+    /**
+     * Override setStation to track recent stations
+     */
+    const originalSetStation = setStation;
+    setStation = function(code) {
+      originalSetStation(code);
+
+      // Try to find station name from data if available
+      if (window.stationData) {
+        const stationInfo = stationData.find(s => s.code === code);
+        if (stationInfo) {
+          addToRecentStations(code, stationInfo.name);
+        } else {
+          addToRecentStations(code, code);
+        }
+      } else {
+        addToRecentStations(code, code);
+      }
+    };
+
     // ==================== Initialization ====================
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -1656,6 +1970,86 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       loadStationData();
       setupStationAutocomplete();
       setupValidation();
+
+      // Setup advanced layout toggle
+      const advancedToggle = document.getElementById('advancedLayoutToggle');
+      const advancedContent = document.getElementById('advancedLayoutContent');
+
+      if (advancedToggle && advancedContent) {
+        advancedToggle.addEventListener('click', function() {
+          const isExpanded = advancedContent.classList.toggle('show');
+          this.setAttribute('aria-expanded', isExpanded);
+          this.querySelector('span:first-child').textContent =
+            isExpanded ? '🔽 Advanced Layout Controls' : '⚙️ Advanced Layout Controls';
+        });
+
+        // Also handle keyboard activation
+        advancedToggle.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.click();
+          }
+        });
+      }
+
+      // Setup range slider syncing for scroll speed
+      const scrollspeedInput = document.getElementById('scrollspeed');
+      const scrollspeedRange = document.getElementById('scrollspeedRange');
+
+      if (scrollspeedInput && scrollspeedRange) {
+        // Sync range slider to number input
+        scrollspeedRange.addEventListener('input', (e) => {
+          scrollspeedInput.value = e.target.value;
+          // Trigger auto-apply
+          autoApplySettings();
+        });
+
+        // Sync number input to range slider
+        scrollspeedInput.addEventListener('input', (e) => {
+          const value = Math.max(10, Math.min(200, e.target.value));
+          scrollspeedRange.value = value;
+        });
+      }
+
+      // Setup range slider syncing for rotation speed
+      const rotationspeedInput = document.getElementById('rotationspeed');
+      const rotationspeedRange = document.getElementById('rotationspeedRange');
+
+      if (rotationspeedInput && rotationspeedRange) {
+        // Sync range slider to number input
+        rotationspeedRange.addEventListener('input', (e) => {
+          rotationspeedInput.value = e.target.value;
+          // Trigger auto-apply
+          autoApplySettings();
+        });
+
+        // Sync number input to range slider
+        rotationspeedInput.addEventListener('input', (e) => {
+          const value = Math.max(5, Math.min(60, e.target.value));
+          rotationspeedRange.value = value;
+        });
+      }
+
+      // Setup preset category tabs
+      document.querySelectorAll('.preset-category-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+          // Update active tab
+          document.querySelectorAll('.preset-category-tab').forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+
+          // Show corresponding presets
+          const category = this.dataset.category;
+          document.querySelectorAll('.preset-stations').forEach(group => {
+            group.style.display = group.id === `presets-${category}` ? 'grid' : 'none';
+          });
+
+          // Load recent stations if needed
+          if (category === 'recent') {
+            loadRecentStations();
+          }
+        });
+      });
+
       setupForms();
 
       // Service type selection handler
