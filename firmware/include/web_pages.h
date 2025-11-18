@@ -1878,16 +1878,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       lineFilter.innerHTML = '<option value="">All Lines</option>' +
         lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
 
-      // Auto-select the first line
-      if (lines.length > 0) {
-        lineFilter.value = lines[0].id;
-        console.log('Auto-selected first line:', lines[0].name);
-
-        // Show platforms for the selected line
-        showTflPlatformSelector(lines[0].id);
-
-        // Note: Don't auto-apply - user must click Apply Station Settings button
-      }
+      // Don't auto-select any line - let the user choose
+      lineFilter.value = '';
 
       // Show toast with available lines
       const lineNames = lines.map(l => l.name).join(', ');
