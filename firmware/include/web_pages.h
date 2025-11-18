@@ -1743,9 +1743,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       console.log('fetchTflStationLines called with:', stationId, stationName);
 
       const tflApiKey = document.getElementById('tflApiKey')?.value || '';
-      const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}${tflApiKey ? '?app_key=' + encodeURIComponent(tflApiKey) : ''}`;
+      // Use Arrivals endpoint to get lines that actually have services at this station
+      const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}/Arrivals${tflApiKey ? '?app_key=' + encodeURIComponent(tflApiKey) : ''}`;
 
-      console.log('Fetching from TFL API:', apiUrl.replace(tflApiKey, 'XXX'));
+      console.log('Fetching arrivals from TFL API:', apiUrl.replace(tflApiKey, 'XXX'));
 
       try {
         const response = await fetch(apiUrl);
@@ -1755,43 +1756,31 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
-        console.log('Received TFL data');
+        const arrivals = await response.json();
+        console.log('Received TFL arrivals data:', arrivals.length, 'arrivals');
 
-        // Extract tube lines from lineModeGroups
-        const tubeLines = [];
+        // Extract unique tube lines from actual arrivals (only lines with real services)
+        const lineMap = new Map();
 
-        if (data.lineModeGroups) {
-          // Get tube mode lines only (Elizabeth line uses separate station IDs)
-          const tubeModeGroup = data.lineModeGroups.find(group => group.modeName === 'tube');
-
-          const modeGroups = [tubeModeGroup].filter(g => g);
-
-          modeGroups.forEach(modeGroup => {
-            if (modeGroup && modeGroup.lineIdentifier) {
-              modeGroup.lineIdentifier.forEach(lineId => {
-                // Find the full line information from the lines array
-                const lineInfo = data.lines?.find(line => line.id === lineId);
-                if (lineInfo) {
-                  tubeLines.push({
-                    id: lineInfo.id,
-                    name: lineInfo.name
-                  });
-                } else {
-                  // Fallback: create basic info from just the ID
-                  tubeLines.push({
-                    id: lineId,
-                    name: lineId.split('-').map(word =>
-                      word.charAt(0).toUpperCase() + word.slice(1)
-                    ).join(' ')
-                  });
-                }
-              });
+        arrivals.forEach(arrival => {
+          if (arrival.lineId && arrival.lineName && arrival.modeName === 'tube') {
+            // Only include tube mode arrivals (excludes Elizabeth line, which uses separate station IDs)
+            if (!lineMap.has(arrival.lineId)) {
+              lineMap.set(arrival.lineId, arrival.lineName);
             }
-          });
-        }
+          }
+        });
 
-        console.log('Station has', tubeLines.length, 'tube lines:', tubeLines.map(l => l.name));
+        // Convert map to array of objects
+        const tubeLines = Array.from(lineMap.entries()).map(([id, name]) => ({
+          id: id,
+          name: name
+        }));
+
+        // Sort alphabetically by name
+        tubeLines.sort((a, b) => a.name.localeCompare(b.name));
+
+        console.log('Station has', tubeLines.length, 'tube lines with active services:', tubeLines.map(l => l.name));
         return tubeLines;
 
       } catch (error) {
