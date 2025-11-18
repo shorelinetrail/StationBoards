@@ -338,22 +338,17 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
 
   // Build TFL API request - HYBRID approach for best performance
   // When filter active: Use Line API (small response, reliable parsing)
-  // When no filter OR Elizabeth line: Use StopPoint API (need all lines, bigger response)
-  // Note: Elizabeth line doesn't work with Line API, needs StopPoint + client filtering
+  // When no filter: Use StopPoint API (need all lines, bigger response)
   String path;
 
-  if (lineFilter.length() > 0 && lineFilter != "elizabeth") {
-    // Use Line API for filtered requests (except Elizabeth line) - small response (~5KB)
+  if (lineFilter.length() > 0) {
+    // Use Line API for filtered requests - small response (~5KB)
     path = "/Line/" + lineFilter + "/Arrivals/" + String(stationCode);
     Serial.println("🚇 Line API (filtered): /Line/" + lineFilter + "/Arrivals/" + String(stationCode));
   } else {
-    // Use StopPoint API for unfiltered requests or Elizabeth line - all lines (~40KB)
+    // Use StopPoint API for unfiltered requests - all lines (~40KB)
     path = "/StopPoint/" + String(stationCode) + "/Arrivals";
-    if (lineFilter.length() > 0) {
-      Serial.println("🚇 StopPoint API (Elizabeth line): /StopPoint/" + String(stationCode) + "/Arrivals + client filter");
-    } else {
-      Serial.println("🚇 StopPoint API (all lines): /StopPoint/" + String(stationCode) + "/Arrivals");
-    }
+    Serial.println("🚇 StopPoint API (all lines): /StopPoint/" + String(stationCode) + "/Arrivals");
   }
 
   // Add API key as query parameter
@@ -439,7 +434,6 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   Serial.println("✅ JSON parsed successfully");
 
   JsonArray arrivals = doc.as<JsonArray>();
-  Serial.println("📋 Found " + String(arrivals.size()) + " arrivals in parsed JSON");
 
   // Extract station name - prefer from arrival data, fall back to cached name, then station code
   bool stationNameSet = false;
@@ -497,14 +491,9 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
     if (!lineName || !towards || !expectedArrival) continue;
 
-    // Debug logging for first 3 arrivals when filtering for elizabeth
-    if (lineFilter == "elizabeth" && arrivalsIndex <= 3) {
-      Serial.println("🔍 Arrival #" + String(arrivalsIndex) + ": lineId='" + String(lineId ? lineId : "null") + "', lineName='" + String(lineName) + "'");
-    }
-
     // Filter by line if a line filter is set (client-side filtering)
     if (lineFilter.length() > 0) {
-      // Compare against lineId (e.g., "northern", "circle", "elizabeth")
+      // Compare against lineId (e.g., "northern", "circle")
       if (lineId && String(lineId) != lineFilter) {
         continue;  // Skip this arrival, doesn't match line filter
       } else if (!lineId) {
@@ -522,8 +511,8 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       }
     }
 
-    // For TFL: Use simple numbers (1, 2, 3) instead of times
-    String scheduledTime = String(serviceCount + 1);
+    // For TFL: Leave STD field empty (display layer adds "1st", "2nd", "3rd" labels)
+    String scheduledTime = "";
 
     // Format ETD (estimated time in minutes)
     String etd;
