@@ -1859,6 +1859,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
               if (e.key === "Enter" && field.value.length >= 3) {
                 e.preventDefault();
                 autoApplySettings();
+
+                // Fetch tube lines if service type is TFL
+                const serviceType = document.getElementById('serviceType').value;
+                if (serviceType === '1' && field.value.length >= 4) {
+                  setTimeout(() => {
+                    showTflLineSelector(field.value.trim());
+                  }, 500);
+                }
               }
             });
 
@@ -1868,7 +1876,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
                 // Fetch tube lines if service type is TFL
                 const serviceType = document.getElementById('serviceType').value;
-                if (serviceType === '1') {
+                if (serviceType === '1' && field.value.length >= 4) {
                   // Delay to allow settings to apply first
                   setTimeout(() => {
                     showTflLineSelector(field.value.trim());
