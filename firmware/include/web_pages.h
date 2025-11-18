@@ -545,7 +545,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     .toast {
       position: fixed;
-      top: 20px;
       right: 20px;
       padding: 15px 20px;
       background: white;
@@ -557,6 +556,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       gap: 12px;
       min-width: 300px;
       animation: slideInRight 0.3s ease;
+      transition: top 0.3s ease, transform 0.3s ease;
     }
 
     @keyframes slideInRight {
@@ -1423,6 +1423,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // ==================== Toast Notifications ====================
 
+    const updateToastPositions = () => {
+      const toasts = document.querySelectorAll('.toast');
+      let topOffset = 20;
+      toasts.forEach(toast => {
+        toast.style.top = topOffset + 'px';
+        topOffset += toast.offsetHeight + 10; // 10px gap between toasts
+      });
+    };
+
     const showToast = (message, level = "info") => {
       const icons = {
         info: "ℹ️",
@@ -1450,10 +1459,18 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       document.body.appendChild(toast);
 
-      setTimeout(() => {
+      // Calculate and set initial position
+      setTimeout(() => updateToastPositions(), 10);
+
+      const removeToast = () => {
         toast.style.animation = "slideInRight 0.3s ease reverse";
-        setTimeout(() => { toast.remove(); }, 300);
-      }, 3000);
+        setTimeout(() => {
+          toast.remove();
+          updateToastPositions(); // Reposition remaining toasts
+        }, 300);
+      };
+
+      setTimeout(removeToast, 3000);
     };
 
     // ==================== Network Scanning ====================
