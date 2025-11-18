@@ -1990,7 +1990,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         document.getElementById("currentStation").textContent = stationInput.value;
       }
 
-      // Note: All settings now require clicking the Apply button - no auto-apply
+      // Auto-apply for display options only (station settings require Apply button)
+      const autoApplyFields = ["interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3"];
+      autoApplyFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+          field.addEventListener("change", () => {
+            autoApplySettings();
+          });
+        }
+      });
 
       // Handle TFL line filter changes - populate platform dropdown but don't auto-apply
       const tflLineFilter = document.getElementById('tflLineFilter');
