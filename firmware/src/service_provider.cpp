@@ -344,11 +344,11 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   if (lineFilter.length() > 0) {
     // Use Line API for filtered requests - small response (~5KB)
     path = "/Line/" + lineFilter + "/Arrivals/" + String(stationCode);
-    Serial.println("🚇 Line API (filtered): /Line/" + lineFilter + "/Arrivals");
+    Serial.println("🚇 Line API (filtered): /Line/" + lineFilter + "/Arrivals/" + String(stationCode));
   } else {
     // Use StopPoint API for unfiltered requests - all lines (~34KB)
     path = "/StopPoint/" + String(stationCode) + "/Arrivals";
-    Serial.println("🚇 StopPoint API (all lines)");
+    Serial.println("🚇 StopPoint API (all lines): /StopPoint/" + String(stationCode) + "/Arrivals");
   }
 
   // Add API key as query parameter
@@ -466,7 +466,11 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   }
 
   if (arrivals.size() == 0) {
-    Serial.println("⚠️  No arrivals in TFL response");
+    if (lineFilter.length() > 0) {
+      Serial.println("⚠️  No arrivals in TFL response - line '" + lineFilter + "' may not serve this station");
+    } else {
+      Serial.println("⚠️  No arrivals in TFL response");
+    }
   }
 
   // Parse arrivals (max 8 services)
@@ -534,9 +538,9 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   if (serviceCount == 0) {
     if (lineFilter.length() > 0) {
-      Serial.println("⚠️  No arrivals match line filter: " + lineFilter);
+      Serial.println("⚠️  No arrivals for line '" + lineFilter + "' - this line may not serve " + String(stationName));
     } else {
-      Serial.println("⚠️  No arrivals found");
+      Serial.println("⚠️  No arrivals found for " + String(stationName));
     }
   }
 
