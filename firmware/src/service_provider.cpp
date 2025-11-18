@@ -1,5 +1,6 @@
 #include "service_provider.h"
 #include <ArduinoJson.h>
+#include <WiFiClientSecure.h>
 
 // ============ National Rail Provider Implementation ============
 
@@ -161,7 +162,11 @@ bool NationalRailProvider::parseResponse(const String& response,
     pos = serviceEnd;
   }
 
-  return serviceCount > 0;
+  if (serviceCount == 0) {
+    Serial.println("⚠️  No train services found in response");
+  }
+
+  return true;  // Return true for valid response, even if 0 services
 }
 
 // ============ TFL Underground Provider Implementation ============
@@ -186,6 +191,20 @@ String TflUndergroundProvider::formatTime(const String& isoTimestamp) {
   return hours + ":" + minutes;
 }
 
+String TflUndergroundProvider::cleanStationName(const String& name) {
+  // Remove "Underground Station" suffix from TFL station names
+  // E.g., "King's Cross St. Pancras Underground Station" → "King's Cross St. Pancras"
+  String cleaned = name;
+
+  // Check for " Underground Station" suffix
+  int suffixPos = cleaned.indexOf(" Underground Station");
+  if (suffixPos != -1) {
+    cleaned = cleaned.substring(0, suffixPos);
+  }
+
+  return cleaned;
+}
+
 String TflUndergroundProvider::extractJsonValue(const String& json, const String& key) {
   // Simple JSON value extractor for strings
   String searchKey = "\"" + key + "\":\"";
@@ -203,11 +222,106 @@ bool TflUndergroundProvider::isValidStationCode(const char* code) {
   if (!code) return false;
 
   int len = strlen(code);
-  // TFL NaPTAN IDs are typically 9-12 characters
-  // Format: 940GZZLU + 3-4 letter code (e.g., 940GZZLUPAC for Paddington)
-  if (len < 9 || len > 12) return false;
+  // TFL accepts various formats:
+  // - Hub codes: 6 characters (e.g., HUBSOK for South Kenton)
+  // - NaPTAN IDs: 9-12 characters (e.g., 940GZZLUPAC for Paddington)
+  if (len < 4 || len > 12) return false;
 
   return true;
+}
+
+bool TflUndergroundProvider::fetchStationName(const char* stationCode) {
+  // Quick fetch of station name from TFL API
+  WiFiClientSecure client;
+  client.setInsecure();  // Skip cert validation for speed
+
+  if (!client.connect(apiHost, 443)) {
+    Serial.println("⚠️  Failed to connect for station name fetch");
+    return false;
+  }
+
+  // Build station info request
+  String path = "/StopPoint/" + String(stationCode);
+  if (apiKey.length() > 0) {
+    path += "?app_key=" + apiKey;
+  }
+
+  String req = "GET " + path + " HTTP/1.1\r\n";
+  req += "Host: " + String(apiHost) + "\r\n";
+  req += "Connection: close\r\n\r\n";
+
+  client.print(req);
+
+  // Wait for response with timeout
+  unsigned long start = millis();
+  while (!client.available() && millis() - start < 5000) {
+    delay(10);
+  }
+
+  if (!client.available()) {
+    client.stop();
+    return false;
+  }
+
+  // Read response with timeout (max 10 seconds total read time)
+  String response = "";
+  unsigned long readStart = millis();
+  const unsigned long maxReadTime = 10000;  // 10 second timeout for reading
+
+  while (millis() - readStart < maxReadTime) {
+    if (client.available()) {
+      char c = client.read();
+      response += c;
+
+      // Stop reading once we have the closing brace after commonName
+      if (response.indexOf("\"commonName\"") > 0 && c == '}') {
+        break;  // We have enough data
+      }
+    } else {
+      delay(10);
+    }
+  }
+  client.stop();
+
+  if (response.length() == 0) {
+    Serial.println("⚠️  No response data received");
+    return false;
+  }
+
+  // Find JSON body
+  int jsonStart = response.indexOf('{');
+  if (jsonStart == -1) return false;
+
+  String jsonBody = response.substring(jsonStart);
+
+  // Parse for commonName using simple string search
+  int nameStart = jsonBody.indexOf("\"commonName\":\"");
+  if (nameStart == -1) return false;
+
+  nameStart += 14;  // Length of "commonName":"
+  int nameEnd = jsonBody.indexOf("\"", nameStart);
+  if (nameEnd == -1) return false;
+
+  // Clean up station name (remove "Underground Station" suffix)
+  String rawName = jsonBody.substring(nameStart, nameEnd);
+  currentStationName = cleanStationName(rawName);
+  Serial.println("📍 Fetched station name: " + currentStationName);
+
+  return true;
+}
+
+void TflUndergroundProvider::ensureStationNameCached(const char* stationCode) {
+  // Only fetch station name if this is a new station (not on every refresh)
+  if (lastFetchedStationCode != String(stationCode)) {
+    Serial.println("🆕 New station detected - fetching station name");
+    if (fetchStationName(stationCode)) {
+      lastFetchedStationCode = String(stationCode);
+    } else {
+      Serial.println("⚠️  Failed to fetch station name, will use code as fallback");
+    }
+  } else {
+    Serial.println("♻️  Using cached station name: " + currentStationName);
+  }
 }
 
 bool TflUndergroundProvider::buildRequest(const char* stationCode, String& request) {
@@ -216,11 +330,28 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
     return false;
   }
 
-  // Build TFL API request
-  // GET /StopPoint/{stationCode}/Arrivals
-  String path = "/StopPoint/" + String(stationCode) + "/Arrivals";
+  // Store station code for use as fallback station name
+  currentStationCode = String(stationCode);
 
-  // Add API key if configured
+  // NOTE: Station name is now pre-fetched in main.cpp before opening connection
+  // to avoid blocking while the API connection is open
+
+  // Build TFL API request - HYBRID approach for best performance
+  // When filter active: Use Line API (small response, reliable parsing)
+  // When no filter: Use StopPoint API (need all lines, bigger response)
+  String path;
+
+  if (lineFilter.length() > 0) {
+    // Use Line API for filtered requests - small response (~5KB)
+    path = "/Line/" + lineFilter + "/Arrivals/" + String(stationCode);
+    Serial.println("🚇 Line API (filtered): /Line/" + lineFilter + "/Arrivals/" + String(stationCode));
+  } else {
+    // Use StopPoint API for unfiltered requests - all lines (~40KB)
+    path = "/StopPoint/" + String(stationCode) + "/Arrivals";
+    Serial.println("🚇 StopPoint API (all lines): /StopPoint/" + String(stationCode) + "/Arrivals");
+  }
+
+  // Add API key as query parameter
   if (apiKey.length() > 0) {
     path += "?app_key=" + apiKey;
   }
@@ -243,55 +374,195 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   Serial.println("📊 Processing TFL Underground response (" + String(response.length()) + " bytes)");
 
-  // Find JSON array start
-  int jsonStart = response.indexOf('[');
+  // Find where HTTP headers end (blank line)
+  int headerEnd = response.indexOf("\r\n\r\n");
+  if (headerEnd == -1) {
+    headerEnd = response.indexOf("\n\n");  // Try \n\n for non-standard responses
+  }
+
+  int searchStart = (headerEnd != -1) ? headerEnd + 4 : 0;
+  Serial.println("🔍 Searching for JSON from position: " + String(searchStart));
+
+  // Find JSON array start after headers
+  int jsonStart = response.indexOf('[', searchStart);
   if (jsonStart == -1) {
     Serial.println("❌ No JSON array found in response");
+    Serial.println("First 500 chars: " + response.substring(0, 500));
     return false;
   }
 
-  String jsonBody = response.substring(jsonStart);
+  size_t jsonLength = response.length() - jsonStart;
+  Serial.println("📍 JSON starts at position: " + String(jsonStart) + ", length: " + String(jsonLength) + " bytes");
 
-  // Use ArduinoJson for parsing
-  DynamicJsonDocument doc(16384);  // 16KB for JSON parsing
-  DeserializationError error = deserializeJson(doc, jsonBody);
+  // Use zero-copy parsing with pointer to avoid memory allocation
+  const char* jsonStart_ptr = response.c_str() + jsonStart;
+
+  // Create a filter to only parse fields we need (dramatically reduces memory usage)
+  // TFL JSON has TONS of fields we don't use: currentLocation, vehicleId, bearing, etc.
+  // By filtering, we can use much smaller documents and avoid heap fragmentation
+  StaticJsonDocument<200> filter;
+  filter[0]["stationName"] = true;    // Station name (first arrival only)
+  filter[0]["lineName"] = true;       // e.g., "Northern"
+  filter[0]["lineId"] = true;         // e.g., "northern"
+  filter[0]["towards"] = true;        // e.g., "Edgware"
+  filter[0]["expectedArrival"] = true; // ISO timestamp
+  filter[0]["direction"] = true;      // "inbound" or "outbound"
+  filter[0]["timeToStation"] = true;  // Seconds until arrival
+  filter[0]["platformName"] = true;   // e.g., "Eastbound - Platform 5"
+
+  // With filtering, we can use much smaller documents:
+  // Adaptive sizing based on JSON length to handle busy stations
+  // Small response (~5KB): 8KB document
+  // Medium response (~12KB): 12KB document
+  // Large response (~15KB+): 20KB document
+  // Kept as small as possible to avoid heap fragmentation
+  // With 7-field filtering, 20KB handles even 64KB source JSON
+  size_t docSize;
+  if (jsonLength < 8000) {
+    docSize = 8192;   // 8KB for small responses
+  } else if (jsonLength < 12000) {
+    docSize = 12288;  // 12KB for medium responses
+  } else {
+    docSize = 20480;  // 20KB for large responses (handles 15KB-64KB source)
+  }
+  Serial.println("📦 Allocating " + String(docSize) + " byte JSON document (filtered parsing)");
+
+  DynamicJsonDocument doc(docSize);
+  DeserializationError error = deserializeJson(doc, jsonStart_ptr, DeserializationOption::Filter(filter));
 
   if (error) {
-    Serial.println("❌ JSON parse error: " + String(error.c_str()));
+    Serial.println("❌ JSON parse error: " + String(error.c_str()) + " (code: " + String((int)error.code()) + ")");
+
+    // Show first 100 chars without String allocation to avoid memory issues
+    char preview[101];
+    strncpy(preview, jsonStart_ptr, 100);
+    preview[100] = '\0';
+    Serial.println("❌ JSON preview: " + String(preview));
     return false;
   }
+
+  Serial.println("✅ JSON parsed successfully");
 
   JsonArray arrivals = doc.as<JsonArray>();
-  if (arrivals.size() == 0) {
-    Serial.println("❌ No arrivals found");
-    return false;
-  }
 
-  // Extract station name from first arrival
+  // Extract station name - prefer from arrival data, fall back to cached name, then station code
+  bool stationNameSet = false;
+
   if (arrivals.size() > 0) {
     const char* stName = arrivals[0]["stationName"];
     if (stName) {
-      strncpy(stationName, stName, stationNameSize - 1);
+      // Clean up station name (remove "Underground Station" suffix)
+      String cleanedName = cleanStationName(String(stName));
+      strncpy(stationName, cleanedName.c_str(), stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
-      Serial.println("📍 " + String(stName));
+      // Cache the cleaned station name for future zero-arrival responses
+      currentStationName = cleanedName;
+      Serial.println("📍 " + cleanedName + " (from arrival data)");
+      stationNameSet = true;
     }
   }
 
-  // Parse arrivals (max 8 services)
-  int maxServices = min(8, (int)arrivals.size());
+  // If we didn't get station name from arrivals, use cached name from previous fetch
+  if (!stationNameSet) {
+    if (currentStationName.length() > 0) {
+      strncpy(stationName, currentStationName.c_str(), stationNameSize - 1);
+      stationName[stationNameSize - 1] = '\0';
+      Serial.println("📍 " + currentStationName + " (cached from previous fetch)");
+      stationNameSet = true;
+    } else if (currentStationCode.length() > 0) {
+      strncpy(stationName, currentStationCode.c_str(), stationNameSize - 1);
+      stationName[stationNameSize - 1] = '\0';
+      Serial.println("📍 " + currentStationCode + " (station code fallback)");
+      stationNameSet = true;
+    }
+  }
 
-  for (int i = 0; i < maxServices; i++) {
-    JsonObject arrival = arrivals[i];
+  if (arrivals.size() == 0) {
+    if (lineFilter.length() > 0) {
+      Serial.println("⚠️  No arrivals in TFL response - line '" + lineFilter + "' may not serve this station");
+    } else {
+      Serial.println("⚠️  No arrivals in TFL response");
+    }
+  }
+
+  // Sort arrivals by timeToStation (TFL API doesn't guarantee order)
+  // Create array of indices sorted by timeToStation
+  const int maxArrivals = arrivals.size();
+  if (maxArrivals > 100) {
+    Serial.println("⚠️  Warning: Too many arrivals (" + String(maxArrivals) + "), limiting to 100");
+  }
+
+  const int arrivalLimit = min(maxArrivals, 100);
+  int sortedIndices[100];  // Max 100 arrivals to sort
+
+  // Initialize indices
+  for (int i = 0; i < arrivalLimit; i++) {
+    sortedIndices[i] = i;
+  }
+
+  // Bubble sort indices by timeToStation (simple but works for small arrays)
+  for (int i = 0; i < arrivalLimit - 1; i++) {
+    for (int j = 0; j < arrivalLimit - i - 1; j++) {
+      int timeA = arrivals[sortedIndices[j]]["timeToStation"] | 0;
+      int timeB = arrivals[sortedIndices[j + 1]]["timeToStation"] | 0;
+      if (timeA > timeB) {
+        // Swap indices
+        int temp = sortedIndices[j];
+        sortedIndices[j] = sortedIndices[j + 1];
+        sortedIndices[j + 1] = temp;
+      }
+    }
+  }
+
+  // Parse arrivals in sorted order (max 8 services)
+  int maxServices = 8;
+  int arrivalsIndex = 0;
+
+  while (serviceCount < maxServices && arrivalsIndex < arrivalLimit) {
+    JsonObject arrival = arrivals[sortedIndices[arrivalsIndex++]];
 
     const char* lineName = arrival["lineName"];
+    const char* lineId = arrival["lineId"];
     const char* towards = arrival["towards"];
     const char* expectedArrival = arrival["expectedArrival"];
+    const char* direction = arrival["direction"];
+    const char* platformName = arrival["platformName"];
     int timeToStation = arrival["timeToStation"] | 0;
 
     if (!lineName || !towards || !expectedArrival) continue;
 
-    // Format scheduled time from expectedArrival
-    String scheduledTime = formatTime(String(expectedArrival));
+    // Filter by line if a line filter is set (client-side filtering)
+    if (lineFilter.length() > 0) {
+      // Compare against lineId (e.g., "northern", "circle")
+      if (lineId && String(lineId) != lineFilter) {
+        continue;  // Skip this arrival, doesn't match line filter
+      } else if (!lineId) {
+        continue;  // No lineId, skip it
+      }
+    }
+
+    // Filter by direction if a direction filter is set (client-side filtering)
+    if (directionFilter.length() > 0) {
+      // Compare against direction (e.g., "inbound", "outbound")
+      if (direction && String(direction) != directionFilter) {
+        continue;  // Skip this arrival, doesn't match filter
+      } else if (!direction) {
+        continue;  // No direction, skip it
+      }
+    }
+
+    // Filter by platform if a platform filter is set (client-side filtering)
+    if (platformFilter.length() > 0) {
+      // Compare against platformName (e.g., "Eastbound - Platform 5")
+      if (platformName && String(platformName) != platformFilter) {
+        continue;  // Skip this arrival, doesn't match platform filter
+      } else if (!platformName) {
+        continue;  // No platformName, skip it
+      }
+    }
+
+    // For TFL: Leave STD field empty (display layer adds "1st", "2nd", "3rd" labels)
+    String scheduledTime = "";
 
     // Format ETD (estimated time in minutes)
     String etd;
@@ -304,8 +575,8 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       etd = String(minutes) + " min";
     }
 
-    // Format destination as "Line → Towards"
-    String destination = String(lineName) + " → " + String(towards);
+    // For TFL: Just show destination (no line name or arrow)
+    String destination = String(towards);
 
     // Populate service data
     scheduledTime.toCharArray(services[serviceCount].std, sizeof(services[serviceCount].std));
@@ -313,9 +584,17 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     destination.toCharArray(services[serviceCount].destination, sizeof(services[serviceCount].destination));
     services[serviceCount].callingPoints[0] = '\0';
 
-    Serial.println("🚇 " + String(serviceCount + 1) + ": " + scheduledTime + " " + destination + " (" + etd + ")");
+    Serial.println("🚇 " + String(serviceCount + 1) + ": " + destination + " (" + etd + ")");
     serviceCount++;
   }
 
-  return serviceCount > 0;
+  if (serviceCount == 0) {
+    if (lineFilter.length() > 0) {
+      Serial.println("⚠️  No arrivals for line '" + lineFilter + "' - this line may not serve " + String(stationName));
+    } else {
+      Serial.println("⚠️  No arrivals found for " + String(stationName));
+    }
+  }
+
+  return true;  // Return true for valid response, even if 0 services
 }

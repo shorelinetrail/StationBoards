@@ -20,6 +20,9 @@ public:
   // Service Settings
   int serviceType = SERVICE_NATIONAL_RAIL;
   char tflApiKey[128] = "";  // TFL API key (optional but recommended)
+  char tflLineFilter[32] = "";  // TFL line filter (e.g., "northern", "elizabeth", "" for all)
+  char tflDirectionFilter[16] = "";  // TFL direction filter ("inbound", "outbound", "" for all)
+  char tflPlatformFilter[64] = "";  // TFL platform filter (e.g., "Eastbound - Platform 5", "" for all)
 
   // Station Settings
   char stationCode[16] = "PAD";  // Increased size for TFL NaPTAN IDs
@@ -95,6 +98,30 @@ public:
     } else {
       tflApiKey[0] = '\0';
     }
+    if (doc.containsKey("tflLineFilter")) {
+      String filter = doc["tflLineFilter"].as<String>();
+      filter.trim();
+      strncpy(tflLineFilter, filter.c_str(), sizeof(tflLineFilter) - 1);
+      tflLineFilter[sizeof(tflLineFilter) - 1] = '\0';
+    } else {
+      tflLineFilter[0] = '\0';
+    }
+    if (doc.containsKey("tflDirectionFilter")) {
+      String direction = doc["tflDirectionFilter"].as<String>();
+      direction.trim();
+      strncpy(tflDirectionFilter, direction.c_str(), sizeof(tflDirectionFilter) - 1);
+      tflDirectionFilter[sizeof(tflDirectionFilter) - 1] = '\0';
+    } else {
+      tflDirectionFilter[0] = '\0';
+    }
+    if (doc.containsKey("tflPlatformFilter")) {
+      String platform = doc["tflPlatformFilter"].as<String>();
+      platform.trim();
+      strncpy(tflPlatformFilter, platform.c_str(), sizeof(tflPlatformFilter) - 1);
+      tflPlatformFilter[sizeof(tflPlatformFilter) - 1] = '\0';
+    } else {
+      tflPlatformFilter[0] = '\0';
+    }
 
     // Load Station
     if (doc.containsKey("stationCode")) {
@@ -148,6 +175,9 @@ public:
     // Save Service Settings
     doc["serviceType"] = serviceType;
     doc["tflApiKey"] = tflApiKey;
+    doc["tflLineFilter"] = tflLineFilter;
+    doc["tflDirectionFilter"] = tflDirectionFilter;
+    doc["tflPlatformFilter"] = tflPlatformFilter;
 
     // Save Station
     doc["stationCode"] = stationCode;

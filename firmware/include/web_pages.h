@@ -545,7 +545,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     .toast {
       position: fixed;
-      top: 20px;
       right: 20px;
       padding: 15px 20px;
       background: white;
@@ -557,6 +556,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       gap: 12px;
       min-width: 300px;
       animation: slideInRight 0.3s ease;
+      transition: top 0.3s ease, transform 0.3s ease;
     }
 
     @keyframes slideInRight {
@@ -763,7 +763,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span id="stationLabel">Station Code (CRS)</span>
             <span class="info-tooltip" id="stationTooltip" title="Three-letter National Rail station code" aria-label="Information: Three-letter National Rail station code">?</span>
           </label>
-          <div class="preset-stations">
+          <div class="preset-stations" id="nationalRailPresets">
             <button type="button" class="preset-btn" data-station="PAD" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
             <button type="button" class="preset-btn" data-station="VIC" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
             <button type="button" class="preset-btn" data-station="WAT" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
@@ -771,11 +771,41 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <button type="button" class="preset-btn" data-station="EUS" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
             <button type="button" class="preset-btn" data-station="LST" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
           </div>
+          <div class="preset-stations" id="tflPresets" style="display:none;">
+            <button type="button" class="preset-btn" data-station="940GZZLUPAC" aria-label="Select Paddington Underground">940GZZLUPAC<br><small>Paddington</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUVIC" aria-label="Select Victoria Underground">940GZZLUVIC<br><small>Victoria</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUWLO" aria-label="Select Waterloo Underground">940GZZLUWLO<br><small>Waterloo</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUKSX" aria-label="Select Kings Cross Underground">940GZZLUKSX<br><small>King's Cross</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUBST" aria-label="Select Bank Underground">940GZZLUBST<br><small>Bank</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLULVT" aria-label="Select Liverpool Street Underground">940GZZLULVT<br><small>Liverpool St</small></button>
+          </div>
           <div class="autocomplete-wrapper">
-            <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="50" aria-label="Station code or name" aria-describedby="station-help">
+            <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="15" aria-label="Station code or name" aria-describedby="station-help">
             <div id="stationAutocomplete" class="autocomplete-results" role="listbox" aria-label="Station suggestions"></div>
           </div>
           <span class="help-text" id="station-help">Start typing to search for a station</span>
+        </div>
+
+        <div class="form-group" id="tflLineFilterGroup" style="display:none;">
+          <label for="tflLineFilter">
+            Filter by Tube Line
+            <span class="info-tooltip" title="Show only arrivals for selected tube line" aria-label="Information: Filter by tube line">?</span>
+          </label>
+          <select id="tflLineFilter" name="tflLineFilter" aria-describedby="tflline-help">
+            <option value="">All Lines</option>
+          </select>
+          <span class="help-text" id="tflline-help">Select a specific tube line to display, or show all lines</span>
+        </div>
+
+        <div class="form-group" id="tflPlatformFilterGroup" style="display:none;">
+          <label for="tflPlatformFilter">
+            Filter by Platform
+            <span class="info-tooltip" title="Show only arrivals for selected platform" aria-label="Information: Filter by platform">?</span>
+          </label>
+          <select id="tflPlatformFilter" name="tflPlatformFilter" aria-describedby="tflplatform-help">
+            <option value="">All Platforms</option>
+          </select>
+          <span class="help-text" id="tflplatform-help">Select a specific platform to display, or show all platforms</span>
         </div>
 
         <div class="form-row">
@@ -1055,6 +1085,49 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         });
     };
 
+    // ==================== TFL Station Search ====================
+
+    /**
+     * Search TFL tube stations from the API
+     */
+    const searchTflStations = async (query) => {
+      if (query.length < 2) return [];
+
+      try {
+        const tflApiKey = document.getElementById('tflApiKey')?.value || '';
+        const apiUrl = `https://api.tfl.gov.uk/StopPoint/Search?query=${encodeURIComponent(query)}&modes=tube,elizabeth-line${tflApiKey ? '&app_key=' + encodeURIComponent(tflApiKey) : ''}`;
+
+        const response = await fetch(apiUrl);
+        if (!response.ok) return [];
+
+        const data = await response.json();
+
+        // Extract station matches (both tube and Elizabeth line)
+        const stations = [];
+        if (data.matches) {
+          data.matches.forEach(match => {
+            if (match.modes && (match.modes.includes('tube') || match.modes.includes('elizabeth-line'))) {
+              // Remove station type suffixes
+              let name = match.name;
+              name = name.replace(/ Underground Station$/i, '');
+              name = name.replace(/ Station$/i, '');
+              name = name.replace(/ Rail Station$/i, '');
+
+              stations.push({
+                name: name,
+                code: match.id
+              });
+            }
+          });
+        }
+
+        return stations.slice(0, 10); // Limit to 10 results
+      } catch (error) {
+        console.error('Error searching TFL stations:', error);
+        return [];
+      }
+    };
+
     // ==================== Station Autocomplete ====================
 
     const setupStationAutocomplete = () => {
@@ -1062,18 +1135,38 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const results = document.getElementById("stationAutocomplete");
 
       // Debounced input handler
-      const handleInput = debounce((e) => {
-        const query = e.target.value.toUpperCase().trim();
+      const handleInput = debounce(async (e) => {
+        const query = e.target.value.trim();
+        const serviceType = document.getElementById('serviceType').value;
+        const isTfl = serviceType === '1';
 
-        if (query.length < 2 || !stationDataLoaded) {
+        if (query.length < 2) {
           results.classList.remove("show");
           return;
         }
 
-        const matches = stationData.filter(station =>
-          station.name.toUpperCase().includes(query) ||
-          station.code.includes(query)
-        ).slice(0, 10);
+        // Show loading state
+        results.innerHTML = '<div class="autocomplete-loading">Searching...</div>';
+        results.classList.add("show");
+
+        let matches = [];
+
+        if (isTfl) {
+          // Search TFL stations from API
+          matches = await searchTflStations(query);
+        } else {
+          // Search National Rail stations from local data
+          if (!stationDataLoaded) {
+            results.classList.remove("show");
+            return;
+          }
+
+          const queryUpper = query.toUpperCase();
+          matches = stationData.filter(station =>
+            station.name.toUpperCase().includes(queryUpper) ||
+            station.code.includes(queryUpper)
+          ).slice(0, 10);
+        }
 
         if (matches.length === 0) {
           results.innerHTML = '<div class="autocomplete-no-results">No stations found</div>';
@@ -1112,7 +1205,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.addEventListener("input", handleInput);
 
       input.addEventListener("focus", (e) => {
-        if (e.target.value.length >= 2 && stationDataLoaded) {
+        if (e.target.value.length >= 2) {
           e.target.dispatchEvent(new Event("input"));
         }
       });
@@ -1125,12 +1218,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     };
 
     const selectStationFromAutocomplete = (code, name) => {
+      console.log('selectStationFromAutocomplete called with code:', code, 'name:', name);
       const input = document.getElementById("station");
 
       autocompleteJustSelected = true;
       setTimeout(() => { autocompleteJustSelected = false; }, 100);
 
       input.value = code;
+      console.log('Set input.value to:', input.value);
       document.getElementById("stationAutocomplete").classList.remove("show");
       showToast(`Selected: ${escapeHtml(name)} (${escapeHtml(code)})`, "success");
 
@@ -1138,7 +1233,25 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.classList.remove("error");
       input.blur();
 
+      // CRITICAL: Clear line and platform filters BEFORE applying settings when station changes
+      // This prevents sending invalid line/station/platform combinations to the firmware
+      const serviceType = document.getElementById('serviceType').value;
+      if (serviceType === '1') {
+        document.getElementById('tflLineFilter').value = '';
+        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
+        document.getElementById('tflPlatformFilter').value = '';
+        console.log('Cleared line and platform filters before applying station change');
+      }
+
+      console.log('About to call autoApplySettings with code:', code);
       autoApplySettings(code);
+
+      // Fetch tube lines if service type is TFL
+      if (serviceType === '1' && code.length >= 4) {
+        setTimeout(() => {
+          showTflLineSelector(code.trim());
+        }, 500);
+      }
     };
 
     // ==================== Tab Switching ====================
@@ -1339,6 +1452,15 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // ==================== Toast Notifications ====================
 
+    const updateToastPositions = () => {
+      const toasts = document.querySelectorAll('.toast');
+      let topOffset = 20;
+      toasts.forEach(toast => {
+        toast.style.top = topOffset + 'px';
+        topOffset += toast.offsetHeight + 10; // 10px gap between toasts
+      });
+    };
+
     const showToast = (message, level = "info") => {
       const icons = {
         info: "ℹ️",
@@ -1366,10 +1488,18 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       document.body.appendChild(toast);
 
-      setTimeout(() => {
+      // Calculate and set initial position
+      setTimeout(() => updateToastPositions(), 10);
+
+      const removeToast = () => {
         toast.style.animation = "slideInRight 0.3s ease reverse";
-        setTimeout(() => { toast.remove(); }, 300);
-      }, 3000);
+        setTimeout(() => {
+          toast.remove();
+          updateToastPositions(); // Reposition remaining toasts
+        }, 300);
+      };
+
+      setTimeout(removeToast, 3000);
     };
 
     // ==================== Network Scanning ====================
@@ -1444,7 +1574,23 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       showToast(`Station set to: ${code}`, "success");
       input.blur();
 
+      // CRITICAL: Clear line and platform filters BEFORE applying settings when station changes
+      const serviceType = document.getElementById('serviceType').value;
+      if (serviceType === '1') {
+        document.getElementById('tflLineFilter').value = '';
+        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
+        document.getElementById('tflPlatformFilter').value = '';
+        console.log('Cleared line and platform filters before applying station change');
+      }
+
       autoApplySettings(code);
+
+      // Fetch tube lines if service type is TFL
+      if (serviceType === '1' && code.length >= 4) {
+        setTimeout(() => {
+          showTflLineSelector(code.trim());
+        }, 500);
+      }
     };
 
     // ==================== Form Validation ====================
@@ -1453,11 +1599,18 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const stationInput = document.getElementById("station");
       stationInput.addEventListener("input", (e) => {
         const val = e.target.value.trim();
+        const serviceType = document.getElementById('serviceType').value;
+        const isTfl = serviceType === '1';
 
-        if (val.length === 3 && val.toUpperCase() === val) {
+        // National Rail: 3 uppercase letters
+        // TFL: 4-12 alphanumeric characters (hub codes or NaPTAN IDs)
+        const isValidNationalRail = val.length === 3 && /^[A-Z]{3}$/.test(val);
+        const isValidTfl = val.length >= 4 && val.length <= 12 && /^[A-Z0-9]+$/.test(val);
+
+        if ((isTfl && isValidTfl) || (!isTfl && isValidNationalRail)) {
           e.target.classList.add("success");
           e.target.classList.remove("error");
-        } else if (val.length > 0 && val.length <= 50) {
+        } else if (val.length > 0) {
           e.target.classList.remove("success");
           e.target.classList.remove("error");
         } else {
@@ -1534,9 +1687,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     const autoApplySettings = (stationCodeOverride) => {
       const formData = new URLSearchParams();
       const stationValue = stationCodeOverride || document.getElementById('station').value;
+      console.log('autoApplySettings: stationCodeOverride=', stationCodeOverride, 'station input value=', document.getElementById('station').value, 'final stationValue=', stationValue);
       formData.append('serviceType', document.getElementById('serviceType').value);
       formData.append('tflApiKey', document.getElementById('tflApiKey').value);
+      formData.append('tflLineFilter', document.getElementById('tflLineFilter').value);
+      formData.append('tflPlatformFilter', document.getElementById('tflPlatformFilter').value);
       formData.append('station', stationValue);
+      console.log('autoApplySettings: Sending station=', stationValue, 'tflLineFilter=', document.getElementById('tflLineFilter').value, 'tflPlatformFilter=', document.getElementById('tflPlatformFilter').value);
       formData.append('interval', document.getElementById('interval').value);
       formData.append('mode', document.getElementById('mode').value);
       formData.append('showstation', document.getElementById('showstation').value);
@@ -1559,6 +1716,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         method: "POST",
         body: formData
       })
+      .then(async response => {
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || `HTTP ${response.status}`);
+        }
+        return response;
+      })
       .then(() => {
         showToast("Settings updated!", "success");
 
@@ -1567,22 +1731,24 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         }
       })
       .catch(error => {
-        showToast("Failed to apply settings", "error");
+        console.error('Apply settings error:', error);
+        showToast("Failed to apply settings: " + error.message, "error");
       });
     };
 
     // ==================== TFL Line Selection ====================
 
     /**
-     * Fetch available tube lines for a TFL station
+     * Fetch available tube lines and platforms for a TFL station
      */
     const fetchTflStationLines = async (stationId, stationName = '') => {
       console.log('fetchTflStationLines called with:', stationId, stationName);
 
       const tflApiKey = document.getElementById('tflApiKey')?.value || '';
-      const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}${tflApiKey ? '?app_key=' + encodeURIComponent(tflApiKey) : ''}`;
+      // Use Arrivals endpoint to get lines that actually have services at this station
+      const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}/Arrivals${tflApiKey ? '?app_key=' + encodeURIComponent(tflApiKey) : ''}`;
 
-      console.log('Fetching from TFL API:', apiUrl.replace(tflApiKey, 'XXX'));
+      console.log('Fetching arrivals from TFL API:', apiUrl.replace(tflApiKey, 'XXX'));
 
       try {
         const response = await fetch(apiUrl);
@@ -1592,38 +1758,39 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
-        console.log('Received TFL data');
+        const arrivals = await response.json();
+        console.log('Received TFL arrivals data:', arrivals.length, 'arrivals');
 
-        // Extract tube lines from lineModeGroups
-        const tubeLines = [];
+        // Extract unique tube lines and platforms per line from actual arrivals
+        const lineMap = new Map();
+        const platformsByLine = new Map();
 
-        if (data.lineModeGroups) {
-          const tubeModeGroup = data.lineModeGroups.find(group => group.modeName === 'tube');
+        arrivals.forEach(arrival => {
+          if (arrival.lineId && arrival.lineName && arrival.modeName === 'tube') {
+            // Only include tube mode arrivals (excludes Elizabeth line, which uses separate station IDs)
+            if (!lineMap.has(arrival.lineId)) {
+              lineMap.set(arrival.lineId, arrival.lineName);
+              platformsByLine.set(arrival.lineId, new Set());
+            }
 
-          if (tubeModeGroup && tubeModeGroup.lineIdentifier) {
-            tubeModeGroup.lineIdentifier.forEach(lineId => {
-              // Find the full line information from the lines array
-              const lineInfo = data.lines?.find(line => line.id === lineId);
-              if (lineInfo) {
-                tubeLines.push({
-                  id: lineInfo.id,
-                  name: lineInfo.name
-                });
-              } else {
-                // Fallback: create basic info from just the ID
-                tubeLines.push({
-                  id: lineId,
-                  name: lineId.split('-').map(word =>
-                    word.charAt(0).toUpperCase() + word.slice(1)
-                  ).join(' ')
-                });
-              }
-            });
+            // Add platform to this line's set if it exists
+            if (arrival.platformName) {
+              platformsByLine.get(arrival.lineId).add(arrival.platformName);
+            }
           }
-        }
+        });
 
-        console.log('Station has', tubeLines.length, 'tube lines:', tubeLines.map(l => l.name));
+        // Convert map to array of objects with platforms
+        const tubeLines = Array.from(lineMap.entries()).map(([id, name]) => ({
+          id: id,
+          name: name,
+          platforms: Array.from(platformsByLine.get(id) || []).sort()
+        }));
+
+        // Sort alphabetically by name
+        tubeLines.sort((a, b) => a.name.localeCompare(b.name));
+
+        console.log('Station has', tubeLines.length, 'tube lines with active services:', tubeLines.map(l => `${l.name} (${l.platforms.length} platforms)`));
         return tubeLines;
 
       } catch (error) {
@@ -1637,6 +1804,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
      * Display tube line selector
      */
     const showTflLineSelector = async (stationId) => {
+      // Clear line filter first
+      const lineFilter = document.getElementById('tflLineFilter');
+      lineFilter.innerHTML = '<option value="">All Lines</option>';
+      lineFilter.value = '';
+
+      // Clear platform filter
+      const platformFilter = document.getElementById('tflPlatformFilter');
+      platformFilter.innerHTML = '<option value="">All Platforms</option>';
+      platformFilter.value = '';
+
       const lines = await fetchTflStationLines(stationId);
 
       if (lines.length === 0) {
@@ -1644,9 +1821,62 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         return;
       }
 
-      // For now, just show the lines in a toast
+      // Store lines data globally for platform filtering
+      window.tflLinesData = lines;
+
+      // Populate the line filter dropdown
+      lineFilter.innerHTML = '<option value="">All Lines</option>' +
+        lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
+
+      // Auto-select the first line
+      if (lines.length > 0) {
+        lineFilter.value = lines[0].id;
+        console.log('Auto-selected first line:', lines[0].name);
+
+        // Show platforms for the selected line
+        showTflPlatformSelector(lines[0].id);
+
+        // Auto-apply settings with the selected line
+        setTimeout(() => {
+          autoApplySettings();
+        }, 100);
+      }
+
+      // Show toast with available lines
       const lineNames = lines.map(l => l.name).join(', ');
       showToast(`Available lines: ${lineNames}`, 'info');
+    };
+
+    /**
+     * Display platform selector for a selected tube line
+     */
+    const showTflPlatformSelector = (lineId) => {
+      const platformFilter = document.getElementById('tflPlatformFilter');
+
+      // Clear platform filter first
+      platformFilter.innerHTML = '<option value="">All Platforms</option>';
+      platformFilter.value = '';
+
+      // If no line selected or no lines data, return
+      if (!lineId || !window.tflLinesData) {
+        return;
+      }
+
+      // Find the selected line
+      const selectedLine = window.tflLinesData.find(line => line.id === lineId);
+
+      if (!selectedLine || !selectedLine.platforms || selectedLine.platforms.length === 0) {
+        console.log('No platforms found for line:', lineId);
+        return;
+      }
+
+      // Populate platform dropdown
+      platformFilter.innerHTML = '<option value="">All Platforms</option>' +
+        selectedLine.platforms.map(platform =>
+          `<option value="${escapeHtml(platform)}">${escapeHtml(platform)}</option>`
+        ).join('');
+
+      console.log('Populated', selectedLine.platforms.length, 'platforms for', selectedLine.name);
     };
 
     // ==================== Initialization ====================
@@ -1666,11 +1896,33 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       const updateServiceTypeUI = () => {
         const isUnderground = serviceTypeSelect.value === "1";
-        tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+        const nationalRailPresets = document.getElementById("nationalRailPresets");
+        const tflPresets = document.getElementById("tflPresets");
+        const tflLineFilterGroup = document.getElementById("tflLineFilterGroup");
+        const tflPlatformFilterGroup = document.getElementById("tflPlatformFilterGroup");
+        const modeSelect = document.getElementById("mode");
 
+        // Show/hide appropriate elements
+        tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
+        tflLineFilterGroup.style.display = isUnderground ? "block" : "none";
+        tflPlatformFilterGroup.style.display = isUnderground ? "block" : "none";
+        nationalRailPresets.style.display = isUnderground ? "none" : "grid";
+        tflPresets.style.display = isUnderground ? "grid" : "none";
+
+        // Disable "Calling At Mode" for TFL (option value="1")
+        const callingAtOption = modeSelect.querySelector('option[value="1"]');
+        if (callingAtOption) {
+          callingAtOption.disabled = isUnderground;
+          // If currently on Calling At mode and switching to TFL, change to Standard View
+          if (isUnderground && modeSelect.value === "1") {
+            modeSelect.value = "0";
+          }
+        }
+
+        // Update labels
         if (isUnderground) {
-          stationLabel.textContent = "TFL Station ID (NaPTAN)";
-          stationTooltip.title = "TFL Station NaPTAN ID (e.g., 940GZZLUPAC for Paddington)";
+          stationLabel.textContent = "TFL Station ID";
+          stationTooltip.title = "TFL Station ID (hub codes like HUBSOK or NaPTAN IDs like 940GZZLUPAC)";
         } else {
           stationLabel.textContent = "Station Code (CRS)";
           stationTooltip.title = "Three-letter National Rail station code";
@@ -1683,7 +1935,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // If switching to TFL and a station is already entered, fetch tube lines
         const stationInput = document.getElementById("station");
-        if (serviceTypeSelect.value === "1" && stationInput.value.length >= 9) {
+        if (serviceTypeSelect.value === "1" && stationInput.value.length >= 4) {
           setTimeout(() => {
             showTflLineSelector(stationInput.value.trim());
           }, 500);
@@ -1700,7 +1952,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Auto-apply for all settings except WiFi
-      const autoApplyFields = ["station", "interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3"];
+      const autoApplyFields = ["station", "interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3", "tflLineFilter", "tflPlatformFilter"];
       autoApplyFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
@@ -1708,23 +1960,64 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             field.addEventListener("keypress", (e) => {
               if (e.key === "Enter" && field.value.length >= 3) {
                 e.preventDefault();
+
+                // CRITICAL: Clear line and platform filters BEFORE applying settings when station changes
+                const serviceType = document.getElementById('serviceType').value;
+                if (serviceType === '1') {
+                  document.getElementById('tflLineFilter').value = '';
+                  document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
+                  document.getElementById('tflPlatformFilter').value = '';
+                  console.log('Cleared line and platform filters before applying station change');
+                }
+
                 autoApplySettings();
+
+                // Fetch tube lines if service type is TFL
+                if (serviceType === '1' && field.value.length >= 4) {
+                  setTimeout(() => {
+                    showTflLineSelector(field.value.trim());
+                  }, 500);
+                }
               }
             });
 
             field.addEventListener("change", () => {
               if (!autocompleteJustSelected && field.value.length >= 3) {
+                // CRITICAL: Clear line and platform filters BEFORE applying settings when station changes
+                const serviceType = document.getElementById('serviceType').value;
+                if (serviceType === '1') {
+                  document.getElementById('tflLineFilter').value = '';
+                  document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
+                  document.getElementById('tflPlatformFilter').value = '';
+                  console.log('Cleared line and platform filters before applying station change');
+                }
+
                 autoApplySettings();
 
                 // Fetch tube lines if service type is TFL
-                const serviceType = document.getElementById('serviceType').value;
-                if (serviceType === '1') {
+                if (serviceType === '1' && field.value.length >= 4) {
                   // Delay to allow settings to apply first
                   setTimeout(() => {
                     showTflLineSelector(field.value.trim());
                   }, 500);
                 }
               }
+            });
+          } else if (fieldId === "tflLineFilter") {
+            field.addEventListener("change", () => {
+              const lineId = field.value;
+
+              // Clear and repopulate platform dropdown when line changes
+              if (lineId) {
+                showTflPlatformSelector(lineId);
+              } else {
+                // Clear platform filter if no line selected
+                const platformFilter = document.getElementById('tflPlatformFilter');
+                platformFilter.innerHTML = '<option value="">All Platforms</option>';
+                platformFilter.value = '';
+              }
+
+              autoApplySettings();
             });
           } else {
             field.addEventListener("change", () => {

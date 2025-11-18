@@ -38,7 +38,28 @@ inline void displayStationName(const char* stationName) {
  */
 inline void displayServiceLine(const ServiceData& service, const char* label,
                                 int yPos, U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI& display) {
-  String leftSide = String(label) + String(service.std) + " ";
+  // Build left side differently for TFL vs National Rail
+  String leftSide;
+
+  if (service.std[0] == '\0') {
+    // TFL: Extract just the leading digits from "1st ", "2nd ", "3rd ", etc.
+    // Find where the digits end
+    String labelStr = String(label);
+    int digitEnd = 0;
+    for (int i = 0; i < labelStr.length(); i++) {
+      if (isdigit(labelStr[i])) {
+        digitEnd = i + 1;
+      } else {
+        break;  // Stop at first non-digit
+      }
+    }
+    // Extract just the digits and add one space
+    leftSide = labelStr.substring(0, digitEnd) + " ";
+  } else {
+    // National Rail: Use ordinal label + time
+    leftSide = String(label) + String(service.std) + " ";
+  }
+
   String rightSide = formatETD(String(service.etd));
 
   int leftWidth = display.getUTF8Width(leftSide.c_str());
@@ -129,8 +150,24 @@ inline void displayAlternatingServices(const ServiceData& serviceA, const Servic
   int descent = u8g2.getDescent();
   int textHeight = ascent - descent;
 
-  // Build service A
-  String leftA = String(labelA) + String(serviceA.std) + " ";
+  // Build service A (TFL-aware: extract digits if STD is empty)
+  String leftA;
+  if (serviceA.std[0] == '\0') {
+    // TFL: Extract digits from label
+    String labelStr = String(labelA);
+    int digitEnd = 0;
+    for (int i = 0; i < labelStr.length(); i++) {
+      if (isdigit(labelStr[i])) {
+        digitEnd = i + 1;
+      } else {
+        break;
+      }
+    }
+    leftA = labelStr.substring(0, digitEnd) + " ";
+  } else {
+    // National Rail: Use full label + time
+    leftA = String(labelA) + String(serviceA.std) + " ";
+  }
   String rightA = formatETD(String(serviceA.etd));
   int leftAWidth = u8g2.getUTF8Width(leftA.c_str());
   int rightAWidth = u8g2.getUTF8Width(rightA.c_str());
@@ -147,8 +184,24 @@ inline void displayAlternatingServices(const ServiceData& serviceA, const Servic
     u8g2.setCursor(Display::ETD_RIGHT_X - rightAWidth, baselineY - animOffset);
     u8g2.print(rightA);
 
-    // Draw next service scrolling up from below
-    String leftB = String(labelB) + String(serviceB.std) + " ";
+    // Draw next service scrolling up from below (TFL-aware)
+    String leftB;
+    if (serviceB.std[0] == '\0') {
+      // TFL: Extract digits from label
+      String labelStr = String(labelB);
+      int digitEnd = 0;
+      for (int i = 0; i < labelStr.length(); i++) {
+        if (isdigit(labelStr[i])) {
+          digitEnd = i + 1;
+        } else {
+          break;
+        }
+      }
+      leftB = labelStr.substring(0, digitEnd) + " ";
+    } else {
+      // National Rail: Use full label + time
+      leftB = String(labelB) + String(serviceB.std) + " ";
+    }
     String rightB = formatETD(String(serviceB.etd));
     int leftBWidth = u8g2.getUTF8Width(leftB.c_str());
     int rightBWidth = u8g2.getUTF8Width(rightB.c_str());
