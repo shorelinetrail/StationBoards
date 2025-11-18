@@ -1792,8 +1792,8 @@ void setupWebServer() {
     
     // Force immediate data fetch when station changes, line filter changes, direction filter changes, platform filter changes, OR when switching to calling at
     if (stationChanged || lineFilterChanged || directionFilterChanged || platformFilterChanged || switchedToCallingAt) {
-      displayState.serviceCount = 0;
-      // AGGRESSIVE CACHING: No loading state - previous data stays visible until instant update
+      // AGGRESSIVE CACHING: Don't clear display data - keep showing previous station/data
+      // until new data arrives via instant atomic swap. No "No trains scheduled" flash!
 
       // Cancel any in-progress fetch and wait for cleanup
       if (fetchStateData.state != FETCH_IDLE) {
