@@ -410,18 +410,21 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   filter[0]["timeToStation"] = true;  // Seconds until arrival
 
   // With filtering, we can use much smaller documents:
-  // Adaptive sizing based on JSON length to handle busy lines like Central
+  // Adaptive sizing based on JSON length to handle busy stations
   // Small response (~5KB): 8KB document
   // Medium response (~12KB): 12KB document
-  // Large response (~20KB+): 16KB document
-  // Kept small to avoid heap fragmentation - we only parse first 8 services anyway
+  // Large response (~20KB): 16KB document
+  // Very large response (~64KB+): 20KB document
+  // Kept as small as possible to avoid heap fragmentation
   size_t docSize;
   if (jsonLength < 8000) {
     docSize = 8192;   // 8KB for small responses
   } else if (jsonLength < 15000) {
     docSize = 12288;  // 12KB for medium responses
-  } else {
+  } else if (jsonLength < 30000) {
     docSize = 16384;  // 16KB for large responses
+  } else {
+    docSize = 20480;  // 20KB for very large responses (busy stations like King's Cross)
   }
   Serial.println("📦 Allocating " + String(docSize) + " byte JSON document (filtered parsing)");
 
