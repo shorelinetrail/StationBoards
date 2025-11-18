@@ -1880,10 +1880,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         // Show platforms for the selected line
         showTflPlatformSelector(lines[0].id);
 
-        // Auto-apply settings with the selected line
-        setTimeout(() => {
-          autoApplySettings();
-        }, 100);
+        // Note: Don't auto-apply - user must click Apply Station Settings button
       }
 
       // Show toast with available lines
