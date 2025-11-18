@@ -509,8 +509,8 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       }
     }
 
-    // Format scheduled time from expectedArrival
-    String scheduledTime = formatTime(String(expectedArrival));
+    // For TFL: Use simple numbers (1, 2, 3) instead of times
+    String scheduledTime = String(serviceCount + 1);
 
     // Format ETD (estimated time in minutes)
     String etd;
@@ -532,7 +532,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     destination.toCharArray(services[serviceCount].destination, sizeof(services[serviceCount].destination));
     services[serviceCount].callingPoints[0] = '\0';
 
-    Serial.println("🚇 " + String(serviceCount + 1) + ": " + scheduledTime + " " + destination + " (" + etd + ")");
+    Serial.println("🚇 " + String(serviceCount + 1) + ": " + destination + " (" + etd + ")");
     serviceCount++;
   }
 
