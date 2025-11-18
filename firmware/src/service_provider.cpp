@@ -45,15 +45,16 @@ bool NationalRailProvider::buildRequest(const char* stationCode, String& request
   }
 
   // Build SOAP request
+  // Use GetDepBoardWithDetailsRequest to include calling points (subsequentCallingPoints)
   String soapRequest;
   soapRequest.reserve(512);
   soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
   soapRequest += "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">";
   soapRequest += "<soap:Header><AccessToken xmlns=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\">";
   soapRequest += "<TokenValue>" + String(apiToken) + "</TokenValue></AccessToken></soap:Header>";
-  soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
+  soapRequest += "<soap:Body><GetDepBoardWithDetailsRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
   soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
-  soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
+  soapRequest += "</GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
 
   // Build HTTP request
   request = "POST " + String(apiPath) + " HTTP/1.1\r\n";
