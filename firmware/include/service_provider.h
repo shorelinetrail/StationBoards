@@ -84,6 +84,9 @@ private:
   // Helper to format ISO timestamp into time string
   String formatTime(const String& isoTimestamp);
 
+  // Clean up station name (remove "Underground Station" suffix)
+  String cleanStationName(const String& name);
+
   // Fetch station name from TFL API
   bool fetchStationName(const char* stationCode);
 

@@ -191,6 +191,20 @@ String TflUndergroundProvider::formatTime(const String& isoTimestamp) {
   return hours + ":" + minutes;
 }
 
+String TflUndergroundProvider::cleanStationName(const String& name) {
+  // Remove "Underground Station" suffix from TFL station names
+  // E.g., "King's Cross St. Pancras Underground Station" → "King's Cross St. Pancras"
+  String cleaned = name;
+
+  // Check for " Underground Station" suffix
+  int suffixPos = cleaned.indexOf(" Underground Station");
+  if (suffixPos != -1) {
+    cleaned = cleaned.substring(0, suffixPos);
+  }
+
+  return cleaned;
+}
+
 String TflUndergroundProvider::extractJsonValue(const String& json, const String& key) {
   // Simple JSON value extractor for strings
   String searchKey = "\"" + key + "\":\"";
@@ -288,7 +302,9 @@ bool TflUndergroundProvider::fetchStationName(const char* stationCode) {
   int nameEnd = jsonBody.indexOf("\"", nameStart);
   if (nameEnd == -1) return false;
 
-  currentStationName = jsonBody.substring(nameStart, nameEnd);
+  // Clean up station name (remove "Underground Station" suffix)
+  String rawName = jsonBody.substring(nameStart, nameEnd);
+  currentStationName = cleanStationName(rawName);
   Serial.println("📍 Fetched station name: " + currentStationName);
 
   return true;
@@ -411,11 +427,13 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   if (arrivals.size() > 0) {
     const char* stName = arrivals[0]["stationName"];
     if (stName) {
-      strncpy(stationName, stName, stationNameSize - 1);
+      // Clean up station name (remove "Underground Station" suffix)
+      String cleanedName = cleanStationName(String(stName));
+      strncpy(stationName, cleanedName.c_str(), stationNameSize - 1);
       stationName[stationNameSize - 1] = '\0';
-      // Cache the station name for future zero-arrival responses
-      currentStationName = String(stName);
-      Serial.println("📍 " + String(stName) + " (from arrival data)");
+      // Cache the cleaned station name for future zero-arrival responses
+      currentStationName = cleanedName;
+      Serial.println("📍 " + cleanedName + " (from arrival data)");
       stationNameSet = true;
     }
   }
