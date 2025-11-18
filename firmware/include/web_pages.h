@@ -771,20 +771,20 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="info-tooltip" id="stationTooltip" title="Three-letter National Rail station code" aria-label="Information: Three-letter National Rail station code">?</span>
           </label>
           <div class="preset-stations" id="nationalRailPresets">
-            <button type="button" class="preset-btn" data-station="PAD" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
-            <button type="button" class="preset-btn" data-station="VIC" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
-            <button type="button" class="preset-btn" data-station="WAT" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
-            <button type="button" class="preset-btn" data-station="KGX" aria-label="Select Kings Cross station">KGX<br><small>Kings Cross</small></button>
-            <button type="button" class="preset-btn" data-station="EUS" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
-            <button type="button" class="preset-btn" data-station="LST" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
+            <button type="button" class="preset-btn" data-station="PAD" data-name="Paddington" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
+            <button type="button" class="preset-btn" data-station="VIC" data-name="Victoria" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
+            <button type="button" class="preset-btn" data-station="WAT" data-name="Waterloo" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
+            <button type="button" class="preset-btn" data-station="KGX" data-name="Kings Cross" aria-label="Select Kings Cross station">KGX<br><small>Kings Cross</small></button>
+            <button type="button" class="preset-btn" data-station="EUS" data-name="Euston" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
+            <button type="button" class="preset-btn" data-station="LST" data-name="Liverpool Street" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
           </div>
           <div class="preset-stations" id="tflPresets" style="display:none;">
-            <button type="button" class="preset-btn" data-station="940GZZLUPAC" aria-label="Select Paddington Underground">940GZZLUPAC<br><small>Paddington</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUVIC" aria-label="Select Victoria Underground">940GZZLUVIC<br><small>Victoria</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUWLO" aria-label="Select Waterloo Underground">940GZZLUWLO<br><small>Waterloo</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUKSX" aria-label="Select Kings Cross Underground">940GZZLUKSX<br><small>King's Cross</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUBST" aria-label="Select Baker Street Underground">940GZZLUBST<br><small>Baker Street</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLULVT" aria-label="Select Liverpool Street Underground">940GZZLULVT<br><small>Liverpool St</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUPAC" data-name="Paddington" aria-label="Select Paddington Underground">940GZZLUPAC<br><small>Paddington</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUVIC" data-name="Victoria" aria-label="Select Victoria Underground">940GZZLUVIC<br><small>Victoria</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUWLO" data-name="Waterloo" aria-label="Select Waterloo Underground">940GZZLUWLO<br><small>Waterloo</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUKSX" data-name="King's Cross" aria-label="Select Kings Cross Underground">940GZZLUKSX<br><small>King's Cross</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUBST" data-name="Baker Street" aria-label="Select Baker Street Underground">940GZZLUBST<br><small>Baker Street</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLULVT" data-name="Liverpool Street" aria-label="Select Liverpool Street Underground">940GZZLULVT<br><small>Liverpool St</small></button>
           </div>
           <div class="autocomplete-wrapper">
             <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="15" aria-label="Station code or name" aria-describedby="station-help">
@@ -1237,10 +1237,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       autocompleteJustSelected = true;
       setTimeout(() => { autocompleteJustSelected = false; }, 100);
 
-      input.value = code;
-      console.log('Set input.value to:', input.value);
+      // Store the code in a data attribute and show the name in the input
+      input.dataset.stationCode = code;
+      input.value = name;
+      console.log('Set input.value to:', input.value, 'stored code:', code);
       document.getElementById("stationAutocomplete").classList.remove("show");
-      showToast(`Selected: ${escapeHtml(name)} (${escapeHtml(code)}). Click "Apply Station Settings" to apply.`, "info");
+      showToast(`Selected: ${escapeHtml(name)}. Click "Apply Station Settings" to apply.`, "info");
 
       input.classList.add("success");
       input.classList.remove("error");
@@ -1586,14 +1588,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // ==================== Station Presets ====================
 
-    const setStation = (code) => {
+    const setStation = (code, name) => {
       const input = document.getElementById("station");
 
       autocompleteJustSelected = true;
       setTimeout(() => { autocompleteJustSelected = false; }, 100);
 
-      input.value = code;
-      showToast(`Station set to: ${code}. Click "Apply Station Settings" to apply.`, "info");
+      // Store the code in a data attribute and show the name in the input
+      input.dataset.stationCode = code;
+      input.value = name || code; // Fallback to code if name not provided
+      showToast(`Station set to: ${name || code}. Click "Apply Station Settings" to apply.`, "info");
       input.blur();
 
       // Highlight the selected preset button
@@ -1716,7 +1720,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     // ==================== Auto-Apply Settings ====================
 
     const autoApplySettings = (stationCodeOverride) => {
-      const stationValue = stationCodeOverride || document.getElementById('station').value;
+      const stationInput = document.getElementById('station');
+      // Get station code from data attribute if set, otherwise from input value or override
+      const stationValue = stationCodeOverride || stationInput.dataset.stationCode || stationInput.value;
       const serviceType = document.getElementById('serviceType').value;
       const isTfl = serviceType === '1';
 
@@ -1726,12 +1732,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       if ((isTfl && !isValidTfl) || (!isTfl && !isValidNationalRail)) {
         console.log('autoApplySettings: Skipping - invalid station code:', stationValue);
-        showToast("Please enter a valid station code before applying settings", "warning");
+        showToast("Please select a valid station before applying settings", "warning");
         return;
       }
 
       const formData = new URLSearchParams();
-      console.log('autoApplySettings: stationCodeOverride=', stationCodeOverride, 'station input value=', document.getElementById('station').value, 'final stationValue=', stationValue);
+      console.log('autoApplySettings: stationCodeOverride=', stationCodeOverride, 'station name=', stationInput.value, 'station code=', stationValue);
       formData.append('serviceType', serviceType);
       formData.append('tflApiKey', document.getElementById('tflApiKey').value);
       formData.append('tflLineFilter', document.getElementById('tflLineFilter').value);
@@ -2046,7 +2052,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       // Preset station buttons
       document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => setStation(btn.dataset.station));
+        btn.addEventListener('click', () => setStation(btn.dataset.station, btn.dataset.name));
       });
 
       // Reset button
