@@ -827,6 +827,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="help-text" id="scrollspeed-help">Recommended: 50-100ms</span>
           </div>
         </div>
+
+        <div class="form-group">
+          <button type="button" id="applyStationBtn" class="primary-btn" aria-label="Apply station settings">
+            Apply Station Settings
+          </button>
+        </div>
       </div>
 
       <div class="card">
@@ -1227,31 +1233,22 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.value = code;
       console.log('Set input.value to:', input.value);
       document.getElementById("stationAutocomplete").classList.remove("show");
-      showToast(`Selected: ${escapeHtml(name)} (${escapeHtml(code)})`, "success");
+      showToast(`Selected: ${escapeHtml(name)} (${escapeHtml(code)}). Click "Apply Station Settings" to apply.`, "info");
 
       input.classList.add("success");
       input.classList.remove("error");
       input.blur();
 
-      // CRITICAL: Clear line and platform filters BEFORE applying settings when station changes
-      // This prevents sending invalid line/station/platform combinations to the firmware
+      // Clear line and platform filters when station changes
       const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1') {
         document.getElementById('tflLineFilter').value = '';
         document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
         document.getElementById('tflPlatformFilter').value = '';
-        console.log('Cleared line and platform filters before applying station change');
+        console.log('Cleared line and platform filters for new station (not yet applied)');
       }
 
-      console.log('About to call autoApplySettings with code:', code);
-      autoApplySettings(code);
-
-      // Fetch tube lines if service type is TFL
-      if (serviceType === '1' && code.length >= 4) {
-        setTimeout(() => {
-          showTflLineSelector(code.trim());
-        }, 500);
-      }
+      // Note: Don't auto-apply - user must click the Apply Station Settings button
     };
 
     // ==================== Tab Switching ====================
@@ -1571,26 +1568,19 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       setTimeout(() => { autocompleteJustSelected = false; }, 100);
 
       input.value = code;
-      showToast(`Station set to: ${code}`, "success");
+      showToast(`Station set to: ${code}. Click "Apply Station Settings" to apply.`, "info");
       input.blur();
 
-      // CRITICAL: Clear line and platform filters BEFORE applying settings when station changes
+      // Clear line and platform filters when station changes
       const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1') {
         document.getElementById('tflLineFilter').value = '';
         document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
         document.getElementById('tflPlatformFilter').value = '';
-        console.log('Cleared line and platform filters before applying station change');
+        console.log('Cleared line and platform filters for new station (not yet applied)');
       }
 
-      autoApplySettings(code);
-
-      // Fetch tube lines if service type is TFL
-      if (serviceType === '1' && code.length >= 4) {
-        setTimeout(() => {
-          showTflLineSelector(code.trim());
-        }, 500);
-      }
+      // Note: Don't auto-apply - user must click the Apply Station Settings button
     };
 
     // ==================== Form Validation ====================
@@ -1685,10 +1675,23 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     // ==================== Auto-Apply Settings ====================
 
     const autoApplySettings = (stationCodeOverride) => {
-      const formData = new URLSearchParams();
       const stationValue = stationCodeOverride || document.getElementById('station').value;
+      const serviceType = document.getElementById('serviceType').value;
+      const isTfl = serviceType === '1';
+
+      // Validate station code before sending
+      const isValidNationalRail = stationValue.length === 3 && /^[A-Z]{3}$/.test(stationValue);
+      const isValidTfl = stationValue.length >= 4 && stationValue.length <= 12 && /^[A-Z0-9]+$/.test(stationValue);
+
+      if ((isTfl && !isValidTfl) || (!isTfl && !isValidNationalRail)) {
+        console.log('autoApplySettings: Skipping - invalid station code:', stationValue);
+        showToast("Please enter a valid station code before applying settings", "warning");
+        return;
+      }
+
+      const formData = new URLSearchParams();
       console.log('autoApplySettings: stationCodeOverride=', stationCodeOverride, 'station input value=', document.getElementById('station').value, 'final stationValue=', stationValue);
-      formData.append('serviceType', document.getElementById('serviceType').value);
+      formData.append('serviceType', serviceType);
       formData.append('tflApiKey', document.getElementById('tflApiKey').value);
       formData.append('tflLineFilter', document.getElementById('tflLineFilter').value);
       formData.append('tflPlatformFilter', document.getElementById('tflPlatformFilter').value);
@@ -1951,79 +1954,59 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         document.getElementById("currentStation").textContent = stationInput.value;
       }
 
-      // Auto-apply for all settings except WiFi
-      const autoApplyFields = ["station", "interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3", "tflLineFilter", "tflPlatformFilter"];
+      // Auto-apply for display settings only (station settings require explicit apply button)
+      const autoApplyFields = ["interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3"];
       autoApplyFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
-          if (fieldId === "station") {
-            field.addEventListener("keypress", (e) => {
-              if (e.key === "Enter" && field.value.length >= 3) {
-                e.preventDefault();
+          field.addEventListener("change", () => {
+            autoApplySettings();
+          });
+        }
+      });
 
-                // CRITICAL: Clear line and platform filters BEFORE applying settings when station changes
-                const serviceType = document.getElementById('serviceType').value;
-                if (serviceType === '1') {
-                  document.getElementById('tflLineFilter').value = '';
-                  document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
-                  document.getElementById('tflPlatformFilter').value = '';
-                  console.log('Cleared line and platform filters before applying station change');
-                }
+      // Handle TFL line filter changes - populate platform dropdown but don't auto-apply
+      const tflLineFilter = document.getElementById('tflLineFilter');
+      if (tflLineFilter) {
+        tflLineFilter.addEventListener("change", () => {
+          const lineId = tflLineFilter.value;
 
-                autoApplySettings();
-
-                // Fetch tube lines if service type is TFL
-                if (serviceType === '1' && field.value.length >= 4) {
-                  setTimeout(() => {
-                    showTflLineSelector(field.value.trim());
-                  }, 500);
-                }
-              }
-            });
-
-            field.addEventListener("change", () => {
-              if (!autocompleteJustSelected && field.value.length >= 3) {
-                // CRITICAL: Clear line and platform filters BEFORE applying settings when station changes
-                const serviceType = document.getElementById('serviceType').value;
-                if (serviceType === '1') {
-                  document.getElementById('tflLineFilter').value = '';
-                  document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
-                  document.getElementById('tflPlatformFilter').value = '';
-                  console.log('Cleared line and platform filters before applying station change');
-                }
-
-                autoApplySettings();
-
-                // Fetch tube lines if service type is TFL
-                if (serviceType === '1' && field.value.length >= 4) {
-                  // Delay to allow settings to apply first
-                  setTimeout(() => {
-                    showTflLineSelector(field.value.trim());
-                  }, 500);
-                }
-              }
-            });
-          } else if (fieldId === "tflLineFilter") {
-            field.addEventListener("change", () => {
-              const lineId = field.value;
-
-              // Clear and repopulate platform dropdown when line changes
-              if (lineId) {
-                showTflPlatformSelector(lineId);
-              } else {
-                // Clear platform filter if no line selected
-                const platformFilter = document.getElementById('tflPlatformFilter');
-                platformFilter.innerHTML = '<option value="">All Platforms</option>';
-                platformFilter.value = '';
-              }
-
-              autoApplySettings();
-            });
+          // Clear and repopulate platform dropdown when line changes
+          if (lineId) {
+            showTflPlatformSelector(lineId);
           } else {
-            field.addEventListener("change", () => {
-              autoApplySettings();
-            });
+            // Clear platform filter if no line selected
+            const platformFilter = document.getElementById('tflPlatformFilter');
+            platformFilter.innerHTML = '<option value="">All Platforms</option>';
+            platformFilter.value = '';
           }
+          // Note: Don't auto-apply - wait for user to click Apply button
+        });
+      }
+
+      // Apply Station Settings button handler
+      document.getElementById('applyStationBtn').addEventListener('click', () => {
+        const stationInput = document.getElementById('station');
+
+        if (stationInput.value.length < 3) {
+          showToast("Station code must be at least 3 characters", "error");
+          return;
+        }
+
+        // Clear line and platform filters if changing stations
+        const serviceType = document.getElementById('serviceType').value;
+        if (serviceType === '1') {
+          // For TFL, apply the settings as-is
+          console.log('Applying TFL station settings');
+        }
+
+        autoApplySettings();
+
+        // Fetch tube lines if service type is TFL
+        if (serviceType === '1' && stationInput.value.length >= 4) {
+          setTimeout(() => {
+            showTflLineSelector(stationInput.value.trim());
+          }, 500);
         }
       });
 
