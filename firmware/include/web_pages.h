@@ -797,6 +797,19 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="tflline-help">Select a specific tube line to display, or show all lines</span>
         </div>
 
+        <div class="form-group" id="tflDirectionFilterGroup" style="display:none;">
+          <label for="tflDirectionFilter">
+            Filter by Direction
+            <span class="info-tooltip" title="Show only trains heading toward or away from Central London" aria-label="Information: Filter by direction">?</span>
+          </label>
+          <select id="tflDirectionFilter" name="tflDirectionFilter" aria-describedby="tfldirection-help">
+            <option value="">All Directions</option>
+            <option value="inbound">Inbound (Toward Central London)</option>
+            <option value="outbound">Outbound (Away from Central London)</option>
+          </select>
+          <span class="help-text" id="tfldirection-help">Filter trains by direction relative to Central London</span>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label for="interval">
@@ -1662,6 +1675,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       formData.append('serviceType', document.getElementById('serviceType').value);
       formData.append('tflApiKey', document.getElementById('tflApiKey').value);
       formData.append('tflLineFilter', document.getElementById('tflLineFilter').value);
+      formData.append('tflDirectionFilter', document.getElementById('tflDirectionFilter').value);
       formData.append('station', stationValue);
       console.log('autoApplySettings: Sending station=', stationValue, 'tflLineFilter=', document.getElementById('tflLineFilter').value);
       formData.append('interval', document.getElementById('interval').value);
@@ -1818,10 +1832,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const nationalRailPresets = document.getElementById("nationalRailPresets");
         const tflPresets = document.getElementById("tflPresets");
         const tflLineFilterGroup = document.getElementById("tflLineFilterGroup");
+        const tflDirectionFilterGroup = document.getElementById("tflDirectionFilterGroup");
 
         // Show/hide appropriate elements
         tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
         tflLineFilterGroup.style.display = isUnderground ? "block" : "none";
+        tflDirectionFilterGroup.style.display = isUnderground ? "block" : "none";
         nationalRailPresets.style.display = isUnderground ? "none" : "grid";
         tflPresets.style.display = isUnderground ? "grid" : "none";
 
@@ -1858,7 +1874,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Auto-apply for all settings except WiFi
-      const autoApplyFields = ["station", "interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3", "tflLineFilter"];
+      const autoApplyFields = ["station", "interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3", "tflLineFilter", "tflDirectionFilter"];
       autoApplyFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {

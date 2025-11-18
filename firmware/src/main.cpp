@@ -1416,6 +1416,8 @@ void setupWebServer() {
       // Reinitialize service provider if type changed
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+        tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
+        tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1540,6 +1542,7 @@ void setupWebServer() {
     String oldPassword = String(config.wifiPassword);
     String oldStation = String(config.stationCode);
     String oldLineFilter = String(config.tflLineFilter);
+    String oldDirectionFilter = String(config.tflDirectionFilter);
     bool oldCallingAt = config.useCallingAt;
     int oldExtraServices = config.extraServices;
 
@@ -1553,6 +1556,7 @@ void setupWebServer() {
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
         tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
+        tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1692,6 +1696,7 @@ void setupWebServer() {
 
     bool stationChanged = (oldStation != String(config.stationCode));
     bool lineFilterChanged = (oldLineFilter != String(config.tflLineFilter)) && (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
+    bool directionFilterChanged = (oldDirectionFilter != String(config.tflDirectionFilter)) && (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
     bool displayModeChanged = (oldCallingAt != config.useCallingAt) || (oldExtraServices != config.extraServices);
     bool switchedToCallingAt = (!oldCallingAt && config.useCallingAt);
 
@@ -1723,8 +1728,8 @@ void setupWebServer() {
     String html = FPSTR(APPLY_SUCCESS_PAGE);
     server.send(200, "text/html", html);
     
-    // Force immediate data fetch when station changes, line filter changes, OR when switching to calling at
-    if (stationChanged || lineFilterChanged || switchedToCallingAt) {
+    // Force immediate data fetch when station changes, line filter changes, direction filter changes, OR when switching to calling at
+    if (stationChanged || lineFilterChanged || directionFilterChanged || switchedToCallingAt) {
       displayState.serviceCount = 0;
       displayState.fetchingNewStation = true;  // Mark that we're loading new station data
 
@@ -1742,6 +1747,9 @@ void setupWebServer() {
       } else if (lineFilterChanged) {
         Serial.println("🔄 Line filter changed to " + String(config.tflLineFilter) + " - fetching immediately");
         broadcastStatus("Line filter changed - fetching new data...", "info");
+      } else if (directionFilterChanged) {
+        Serial.println("🔄 Direction filter changed to " + String(config.tflDirectionFilter) + " - fetching immediately");
+        broadcastStatus("Direction filter changed - fetching new data...", "info");
       } else if (switchedToCallingAt) {
         Serial.println("🔄 Switched to Calling At mode - fetching detailed data...");
         broadcastStatus("Fetching calling points...", "info");
@@ -1842,6 +1850,8 @@ void setup() {
   // Initialize service provider based on config
   if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
     tflUndergroundProvider.setApiKey(String(config.tflApiKey));
+    tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
+    tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
     serviceProvider = &tflUndergroundProvider;
     Serial.println("🚇 Using TFL Underground provider");
   } else {
