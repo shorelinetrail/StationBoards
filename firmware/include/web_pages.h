@@ -901,65 +901,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       font-weight: 600;
     }
 
-    /* Undo/Snapshot Controls */
-    .settings-snapshot-bar {
-      background: #fff3cd;
-      border-left: 4px solid #ffc107;
-      border-radius: 8px;
-      padding: 12px 15px;
-      margin-bottom: 15px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 13px;
-    }
-
-    .settings-snapshot-bar .snapshot-icon {
-      font-size: 20px;
-    }
-
-    .settings-snapshot-bar .snapshot-text {
-      flex: 1;
-      color: #856404;
-    }
-
-    .settings-snapshot-bar .snapshot-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .btn-snapshot {
-      padding: 6px 12px;
-      background: white;
-      border: 2px solid #ffc107;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #856404;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .btn-snapshot:hover {
-      background: #ffc107;
-      color: white;
-    }
-
-    .btn-snapshot.btn-undo {
-      border-color: #667eea;
-      color: #667eea;
-    }
-
-    .btn-snapshot.btn-undo:hover {
-      background: #667eea;
-      color: white;
-    }
-
-    .btn-snapshot:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
     /* Focus visible for accessibility */
     *:focus-visible {
       outline: 2px solid #667eea;
@@ -978,11 +919,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     <!-- Status Bar -->
     <div class="status-bar">
       <div class="status-item">
-        <div class="label">Device Status</div>
+        <div class="label">Status</div>
         <div class="value">
           <span class="status-badge online">Online</span>
         </div>
-        <div style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;" id="wifiStrength" aria-live="polite">
+      </div>
+      <div class="status-item">
+        <div class="label">WiFi Signal</div>
+        <div class="value" style="display: flex; align-items: center; justify-content: center; gap: 8px;" id="wifiStrength" aria-live="polite">
           <div class="signal-bars" id="signalBars" aria-label="WiFi signal strength">
             <span class="signal-bar"></span>
             <span class="signal-bar"></span>
@@ -1045,25 +989,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       <!-- Tab 1: Station Board Configuration -->
       <div class="tab-content active" id="tab-0" role="tabpanel" aria-labelledby="tab-btn-0">
-        <!-- Settings Snapshot/Undo Bar -->
-        <div class="settings-snapshot-bar" id="snapshotBar" style="display: none;">
-          <span class="snapshot-icon" aria-hidden="true">📸</span>
-          <div class="snapshot-text">
-            <strong>Changes made</strong> - Settings auto-saved
-          </div>
-          <div class="snapshot-actions">
-            <button type="button" class="btn-snapshot btn-undo" id="undoButton" onclick="undoSettings()" disabled aria-label="Undo recent changes">
-              ↶ Undo
-            </button>
-            <button type="button" class="btn-snapshot" id="snapshotButton" onclick="saveSnapshot()" aria-label="Save current settings snapshot">
-              💾 Save Snapshot
-            </button>
-            <button type="button" class="btn-snapshot" id="viewHistoryButton" onclick="viewHistory()" aria-label="View settings history">
-              📋 History
-            </button>
-          </div>
-        </div>
-
         <div id="configForm">
       <div class="card">
         <h2>🚉 Station Configuration</h2>
@@ -2193,14 +2118,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     };
 
     const confirmReset = () => {
-      // Save a snapshot before factory reset
-      try {
-        saveSnapshot();
-        showToast("Settings backed up before reset", "info");
-      } catch (e) {
-        console.error("Failed to backup settings:", e);
-      }
-
       hideResetModal();
       showToast("Resetting device...", "warning");
 
@@ -2212,9 +2129,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     // ==================== Auto-Apply Settings ====================
 
     const autoApplySettings = (stationCodeOverride) => {
-      // Auto-snapshot before applying changes
-      autoSnapshot();
-
       const stationInput = document.getElementById('station');
       // Get station code from data attribute if set, otherwise from input value or override
       const stationValue = stationCodeOverride || stationInput.dataset.stationCode || stationInput.value;
@@ -2428,164 +2342,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // Update uptime every second
     setInterval(updateUptime, 1000);
-
-    // ==================== Settings Snapshot & Undo ====================
-
-    let settingsHistory = [];
-    let currentSettingsSnapshot = null;
-    const MAX_HISTORY = 10;
-
-    /**
-     * Get current form settings as object
-     */
-    function getCurrentSettings() {
-      return {
-        serviceType: document.getElementById('serviceType')?.value,
-        tflApiKey: document.getElementById('tflApiKey')?.value,
-        station: document.getElementById('station')?.value,
-        interval: document.getElementById('interval')?.value,
-        scrollspeed: document.getElementById('scrollspeed')?.value,
-        mode: document.getElementById('mode')?.value,
-        showstation: document.getElementById('showstation')?.value,
-        extra: document.getElementById('extra')?.value,
-        rotationspeed: document.getElementById('rotationspeed')?.value,
-        ytop: document.getElementById('ytop')?.value,
-        y1: document.getElementById('y1')?.value,
-        y2: document.getElementById('y2')?.value,
-        y3: document.getElementById('y3')?.value,
-        timestamp: Date.now()
-      };
-    }
-
-    /**
-     * Apply settings from snapshot
-     */
-    function applySettings(settings) {
-      if (!settings) return;
-
-      Object.keys(settings).forEach(key => {
-        const element = document.getElementById(key);
-        if (element && key !== 'timestamp') {
-          element.value = settings[key];
-        }
-      });
-
-      // Sync range sliders
-      const scrollspeedRange = document.getElementById('scrollspeedRange');
-      if (scrollspeedRange) scrollspeedRange.value = settings.scrollspeed;
-
-      const rotationspeedRange = document.getElementById('rotationspeedRange');
-      if (rotationspeedRange) rotationspeedRange.value = settings.rotationspeed;
-    }
-
-    /**
-     * Auto-snapshot before applying changes
-     */
-    function autoSnapshot() {
-      const current = getCurrentSettings();
-
-      // Only create snapshot if settings have changed
-      if (!currentSettingsSnapshot || JSON.stringify(current) !== JSON.stringify(currentSettingsSnapshot)) {
-        currentSettingsSnapshot = current;
-
-        // Show snapshot bar
-        const snapshotBar = document.getElementById('snapshotBar');
-        if (snapshotBar) {
-          snapshotBar.style.display = 'flex';
-        }
-
-        // Enable undo button
-        const undoBtn = document.getElementById('undoButton');
-        if (undoBtn) {
-          undoBtn.disabled = false;
-        }
-      }
-    }
-
-    /**
-     * Undo to previous settings
-     */
-    function undoSettings() {
-      try {
-        const history = JSON.parse(localStorage.getItem('settingsHistory') || '[]');
-        if (history.length === 0) {
-          showToast('No previous settings to restore', 'warning');
-          return;
-        }
-
-        // Get the most recent snapshot
-        const previousSettings = history[history.length - 1];
-        applySettings(previousSettings);
-
-        // Apply to device
-        autoApplySettings();
-
-        // Remove from history
-        history.pop();
-        localStorage.setItem('settingsHistory', JSON.stringify(history));
-
-        // Update UI
-        const undoBtn = document.getElementById('undoButton');
-        if (undoBtn && history.length === 0) {
-          undoBtn.disabled = true;
-        }
-
-        showToast('Settings restored to previous state', 'success');
-      } catch (e) {
-        console.error('Error undoing settings:', e);
-        showToast('Failed to restore previous settings', 'error');
-      }
-    }
-
-    /**
-     * Save current settings as named snapshot
-     */
-    function saveSnapshot() {
-      try {
-        const current = getCurrentSettings();
-        let history = JSON.parse(localStorage.getItem('settingsHistory') || '[]');
-
-        // Add to history
-        history.push(current);
-
-        // Keep only last MAX_HISTORY items
-        if (history.length > MAX_HISTORY) {
-          history = history.slice(-MAX_HISTORY);
-        }
-
-        localStorage.setItem('settingsHistory', JSON.stringify(history));
-        showToast('Settings snapshot saved!', 'success');
-      } catch (e) {
-        console.error('Error saving snapshot:', e);
-        showToast('Failed to save snapshot', 'error');
-      }
-    }
-
-    /**
-     * View settings history
-     */
-    function viewHistory() {
-      try {
-        const history = JSON.parse(localStorage.getItem('settingsHistory') || '[]');
-
-        if (history.length === 0) {
-          showToast('No saved snapshots yet', 'info');
-          return;
-        }
-
-        // Create a simple history display
-        let historyText = `You have ${history.length} saved snapshot(s):\n\n`;
-        history.forEach((snapshot, index) => {
-          const date = new Date(snapshot.timestamp);
-          historyText += `${index + 1}. ${date.toLocaleString()} - Station: ${snapshot.station}\n`;
-        });
-
-        alert(historyText + '\nUse "Undo" to restore the most recent snapshot.');
-      } catch (e) {
-        console.error('Error viewing history:', e);
-        showToast('Failed to load history', 'error');
-      }
-    }
 
     // ==================== Recent Stations Management ====================
 
