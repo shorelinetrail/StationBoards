@@ -203,9 +203,10 @@ bool TflUndergroundProvider::isValidStationCode(const char* code) {
   if (!code) return false;
 
   int len = strlen(code);
-  // TFL NaPTAN IDs are typically 9-12 characters
-  // Format: 940GZZLU + 3-4 letter code (e.g., 940GZZLUPAC for Paddington)
-  if (len < 9 || len > 12) return false;
+  // TFL accepts various formats:
+  // - Hub codes: 6 characters (e.g., HUBSOK for South Kenton)
+  // - NaPTAN IDs: 9-12 characters (e.g., 940GZZLUPAC for Paddington)
+  if (len < 4 || len > 12) return false;
 
   return true;
 }

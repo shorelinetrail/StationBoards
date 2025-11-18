@@ -1549,9 +1549,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const isTfl = serviceType === '1';
 
         // National Rail: 3 uppercase letters
-        // TFL: 9-12 alphanumeric characters
+        // TFL: 4-12 alphanumeric characters (hub codes or NaPTAN IDs)
         const isValidNationalRail = val.length === 3 && /^[A-Z]{3}$/.test(val);
-        const isValidTfl = val.length >= 9 && val.length <= 12 && /^[A-Z0-9]+$/.test(val);
+        const isValidTfl = val.length >= 4 && val.length <= 12 && /^[A-Z0-9]+$/.test(val);
 
         if ((isTfl && isValidTfl) || (!isTfl && isValidNationalRail)) {
           e.target.classList.add("success");
@@ -1802,8 +1802,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // Update labels
         if (isUnderground) {
-          stationLabel.textContent = "TFL Station ID (NaPTAN)";
-          stationTooltip.title = "TFL Station NaPTAN ID (e.g., 940GZZLUPAC for Paddington)";
+          stationLabel.textContent = "TFL Station ID";
+          stationTooltip.title = "TFL Station ID (hub codes like HUBSOK or NaPTAN IDs like 940GZZLUPAC)";
         } else {
           stationLabel.textContent = "Station Code (CRS)";
           stationTooltip.title = "Three-letter National Rail station code";

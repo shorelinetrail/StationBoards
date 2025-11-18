@@ -8,9 +8,9 @@
 // ============ Input Validation Helpers ============
 
 /**
- * Validates a station code (National Rail CRS or TFL NaPTAN ID)
+ * Validates a station code (National Rail CRS or TFL identifier)
  * - National Rail: exactly 3 uppercase letters A-Z
- * - TFL NaPTAN: 9-12 characters (e.g., 940GZZLUPAC)
+ * - TFL: 4-12 alphanumeric characters (hub codes like HUBSOK or NaPTAN IDs like 940GZZLUPAC)
  */
 inline ValidationResult validateStationCode(const String& code) {
   int len = code.length();
@@ -35,8 +35,9 @@ inline ValidationResult validateStationCode(const String& code) {
     return ValidationResult::success();
   }
 
-  // Check for TFL NaPTAN format (9-12 alphanumeric characters)
-  if (len >= 9 && len <= 12) {
+  // Check for TFL format (4-12 alphanumeric characters)
+  // Supports both hub codes (e.g., HUBSOK) and NaPTAN IDs (e.g., 940GZZLUPAC)
+  if (len >= 4 && len <= 12) {
     for (int i = 0; i < len; i++) {
       if (!isalnum(code[i])) {
         return ValidationResult::failure(
@@ -57,7 +58,7 @@ inline ValidationResult validateStationCode(const String& code) {
 
   return ValidationResult::failure(
     ERROR_NONE,
-    "Station code must be 3 letters (National Rail) or 9-12 characters (TFL)"
+    "Station code must be 3 letters (National Rail) or 4-12 characters (TFL)"
   );
 }
 

@@ -91,7 +91,7 @@ public:
   const char* getProviderName() override { return "TFL Underground"; }
   const char* getApiHost() override { return apiHost; }
   int getApiPort() override { return 443; }
-  const char* getStationCodeDescription() override { return "TFL Station NaPTAN ID (e.g., 940GZZLUPAC)"; }
+  const char* getStationCodeDescription() override { return "TFL Station ID (e.g., HUBSOK or 940GZZLUPAC)"; }
 
   bool buildRequest(const char* stationCode, String& request) override;
   bool parseResponse(const String& response,
