@@ -42,18 +42,19 @@ inline void displayServiceLine(const ServiceData& service, const char* label,
   String leftSide;
 
   if (service.std[0] == '\0') {
-    // TFL: Extract just the number from "1st ", "2nd ", etc. and use plain number
-    // "1st " -> "1 ", "2nd " -> "2 ", "3rd " -> "3 "
+    // TFL: Extract just the leading digits from "1st ", "2nd ", "3rd ", etc.
+    // Result: "1 ", "2 ", "3 "
     String labelStr = String(label);
-    int numStart = 0;
-    int numEnd = 0;
+    String digits = "";
     for (int i = 0; i < labelStr.length(); i++) {
       if (isdigit(labelStr[i])) {
-        if (numEnd == 0) numStart = i;
-        numEnd = i + 1;
+        digits += labelStr[i];
+      } else if (digits.length() > 0) {
+        // Found non-digit after digits, stop
+        break;
       }
     }
-    leftSide = labelStr.substring(numStart, numEnd) + " ";
+    leftSide = digits + " ";
   } else {
     // National Rail: Use ordinal label + time
     leftSide = String(label) + String(service.std) + " ";
