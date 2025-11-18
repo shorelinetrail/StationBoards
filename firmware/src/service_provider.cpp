@@ -291,6 +291,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     const char* lineId = arrival["lineId"];
     const char* towards = arrival["towards"];
     const char* expectedArrival = arrival["expectedArrival"];
+    const char* direction = arrival["direction"];
     int timeToStation = arrival["timeToStation"] | 0;
 
     if (!lineName || !towards || !expectedArrival) continue;
@@ -302,6 +303,16 @@ bool TflUndergroundProvider::parseResponse(const String& response,
         continue;  // Skip this arrival, doesn't match filter
       } else if (!lineId) {
         continue;  // No lineId, skip it
+      }
+    }
+
+    // Filter by direction if a direction filter is set
+    if (directionFilter.length() > 0) {
+      // Compare against direction (e.g., "inbound", "outbound")
+      if (direction && String(direction) != directionFilter) {
+        continue;  // Skip this arrival, doesn't match filter
+      } else if (!direction) {
+        continue;  // No direction, skip it
       }
     }
 

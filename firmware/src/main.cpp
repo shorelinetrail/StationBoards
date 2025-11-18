@@ -1347,34 +1347,61 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
-    String html = FPSTR(CONFIG_PAGE_TEMPLATE);
-    
-    html.replace("{SSID}", String(config.wifiSSID));
-    html.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
-    html.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
-    html.replace("{TFL_API_KEY}", String(config.tflApiKey));
-    html.replace("{STATION}", String(config.stationCode));
-    html.replace("{STATION_NAME}", String(displayState.stationName));
-    html.replace("{INTERVAL}", String(config.refreshInterval));
-    html.replace("{MODE_SEL_0}", config.useCallingAt ? "" : " selected");
-    html.replace("{MODE_SEL_1}", config.useCallingAt ? " selected" : "");
-    html.replace("{SHOWSTATION_SEL_1}", config.showStationName ? " selected" : "");
-    html.replace("{SHOWSTATION_SEL_0}", !config.showStationName ? " selected" : "");
-    html.replace("{EXTRA_SEL_0}", config.extraServices == 0 ? " selected" : "");
-    html.replace("{EXTRA_SEL_1}", config.extraServices == 1 ? " selected" : "");
-    html.replace("{EXTRA_SEL_2}", config.extraServices == 2 ? " selected" : "");
-    html.replace("{EXTRA_SEL_3}", config.extraServices == 3 ? " selected" : "");
-    html.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
-    html.replace("{SCROLL}", String(config.scrollSpeed));
-    html.replace("{ROTATION}", String(config.rotationSpeed));
-    html.replace("{YTOP}", String(config.yPosTop));
-    html.replace("{Y1}", String(config.yPos1st));
-    html.replace("{Y2}", String(config.yPos2nd));
-    html.replace("{Y3}", String(config.yPosAlt));
-    html.replace("{IP}", WiFi.localIP().toString());
-    html.replace("{DEVICE_ID}", config.deviceId);
-    
-    server.send(200, "text/html", html);
+    // Use chunked encoding to avoid loading entire template into memory
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
+
+    // Stream template in chunks with replacements
+    const char* templatePtr = CONFIG_PAGE_TEMPLATE;
+    const size_t chunkSize = 1024;  // Process 1KB at a time
+    char buffer[chunkSize + 1];
+    size_t templateLen = strlen_P(templatePtr);
+    size_t pos = 0;
+
+    while (pos < templateLen) {
+      size_t remaining = templateLen - pos;
+      size_t copySize = (remaining < chunkSize) ? remaining : chunkSize;
+
+      // Copy chunk from PROGMEM
+      memcpy_P(buffer, templatePtr + pos, copySize);
+      buffer[copySize] = '\0';
+
+      String chunk = String(buffer);
+
+      // Do replacements in this chunk
+      chunk.replace("{SSID}", String(config.wifiSSID));
+      chunk.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
+      chunk.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
+      chunk.replace("{TFL_API_KEY}", String(config.tflApiKey));
+      chunk.replace("{STATION}", String(config.stationCode));
+      chunk.replace("{STATION_NAME}", String(displayState.stationName));
+      chunk.replace("{INTERVAL}", String(config.refreshInterval));
+      chunk.replace("{MODE_SEL_0}", config.useCallingAt ? "" : " selected");
+      chunk.replace("{MODE_SEL_1}", config.useCallingAt ? " selected" : "");
+      chunk.replace("{SHOWSTATION_SEL_1}", config.showStationName ? " selected" : "");
+      chunk.replace("{SHOWSTATION_SEL_0}", !config.showStationName ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_0}", config.extraServices == 0 ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_1}", config.extraServices == 1 ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_2}", config.extraServices == 2 ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_3}", config.extraServices == 3 ? " selected" : "");
+      chunk.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
+      chunk.replace("{SCROLL}", String(config.scrollSpeed));
+      chunk.replace("{ROTATION}", String(config.rotationSpeed));
+      chunk.replace("{YTOP}", String(config.yPosTop));
+      chunk.replace("{Y1}", String(config.yPos1st));
+      chunk.replace("{Y2}", String(config.yPos2nd));
+      chunk.replace("{Y3}", String(config.yPosAlt));
+      chunk.replace("{IP}", WiFi.localIP().toString());
+      chunk.replace("{DEVICE_ID}", config.deviceId);
+
+      // Send this chunk
+      server.sendContent(chunk);
+
+      pos += copySize;
+    }
+
+    // End chunked response
+    server.sendContent("");
   });
 
   server.on("/save", HTTP_POST, []() {
@@ -1552,6 +1579,16 @@ void setupWebServer() {
         tflUndergroundProvider.setLineFilter(lineFilter);
       }
       Serial.printf("  🚇 TFL line filter: %s\n", lineFilter.length() > 0 ? lineFilter.c_str() : "All Lines");
+    }
+
+    // Handle TFL Direction Filter
+    if (server.hasArg("tflDirectionFilter")) {
+      String directionFilter = server.arg("tflDirectionFilter");
+      safeStrCopy(config.tflDirectionFilter, directionFilter, sizeof(config.tflDirectionFilter));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setDirectionFilter(directionFilter);
+      }
+      Serial.printf("  🚇 TFL direction filter: %s\n", directionFilter.length() > 0 ? directionFilter.c_str() : "All Directions");
     }
 
     // Validate SSID

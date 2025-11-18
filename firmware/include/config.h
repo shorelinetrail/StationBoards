@@ -21,6 +21,7 @@ public:
   int serviceType = SERVICE_NATIONAL_RAIL;
   char tflApiKey[128] = "";  // TFL API key (optional but recommended)
   char tflLineFilter[32] = "";  // TFL line filter (e.g., "northern", "elizabeth", "" for all)
+  char tflDirectionFilter[16] = "";  // TFL direction filter ("inbound", "outbound", "" for all)
 
   // Station Settings
   char stationCode[16] = "PAD";  // Increased size for TFL NaPTAN IDs
@@ -104,6 +105,14 @@ public:
     } else {
       tflLineFilter[0] = '\0';
     }
+    if (doc.containsKey("tflDirectionFilter")) {
+      String direction = doc["tflDirectionFilter"].as<String>();
+      direction.trim();
+      strncpy(tflDirectionFilter, direction.c_str(), sizeof(tflDirectionFilter) - 1);
+      tflDirectionFilter[sizeof(tflDirectionFilter) - 1] = '\0';
+    } else {
+      tflDirectionFilter[0] = '\0';
+    }
 
     // Load Station
     if (doc.containsKey("stationCode")) {
@@ -158,6 +167,7 @@ public:
     doc["serviceType"] = serviceType;
     doc["tflApiKey"] = tflApiKey;
     doc["tflLineFilter"] = tflLineFilter;
+    doc["tflDirectionFilter"] = tflDirectionFilter;
 
     // Save Station
     doc["stationCode"] = stationCode;

@@ -76,6 +76,7 @@ private:
   const char* apiHost = "api.tfl.gov.uk";
   String apiKey;  // Will be loaded from config
   String lineFilter;  // Line filter (e.g., "northern", "elizabeth", "" for all)
+  String directionFilter;  // Direction filter ("inbound", "outbound", "" for all)
 
   // Helper to format ISO timestamp into time string
   String formatTime(const String& isoTimestamp);
@@ -87,6 +88,7 @@ public:
   TflUndergroundProvider();
   void setApiKey(const String& key) { apiKey = key; }
   void setLineFilter(const String& filter) { lineFilter = filter; }
+  void setDirectionFilter(const String& direction) { directionFilter = direction; }
 
   const char* getProviderName() override { return "TFL Underground"; }
   const char* getApiHost() override { return apiHost; }
