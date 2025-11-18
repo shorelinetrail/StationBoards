@@ -398,7 +398,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   const char* jsonStart_ptr = response.c_str() + jsonStart;
 
   // Create a filter to only parse fields we need (dramatically reduces memory usage)
-  // TFL JSON has TONS of fields we don't use: platformName, currentLocation, vehicleId, bearing, etc.
+  // TFL JSON has TONS of fields we don't use: currentLocation, vehicleId, bearing, etc.
   // By filtering, we can use much smaller documents and avoid heap fragmentation
   StaticJsonDocument<200> filter;
   filter[0]["stationName"] = true;    // Station name (first arrival only)
@@ -408,6 +408,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   filter[0]["expectedArrival"] = true; // ISO timestamp
   filter[0]["direction"] = true;      // "inbound" or "outbound"
   filter[0]["timeToStation"] = true;  // Seconds until arrival
+  filter[0]["platformName"] = true;   // e.g., "Eastbound - Platform 5"
 
   // With filtering, we can use much smaller documents:
   // Adaptive sizing based on JSON length to handle busy stations
@@ -525,6 +526,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     const char* towards = arrival["towards"];
     const char* expectedArrival = arrival["expectedArrival"];
     const char* direction = arrival["direction"];
+    const char* platformName = arrival["platformName"];
     int timeToStation = arrival["timeToStation"] | 0;
 
     if (!lineName || !towards || !expectedArrival) continue;
@@ -546,6 +548,16 @@ bool TflUndergroundProvider::parseResponse(const String& response,
         continue;  // Skip this arrival, doesn't match filter
       } else if (!direction) {
         continue;  // No direction, skip it
+      }
+    }
+
+    // Filter by platform if a platform filter is set (client-side filtering)
+    if (platformFilter.length() > 0) {
+      // Compare against platformName (e.g., "Eastbound - Platform 5")
+      if (platformName && String(platformName) != platformFilter) {
+        continue;  // Skip this arrival, doesn't match platform filter
+      } else if (!platformName) {
+        continue;  // No platformName, skip it
       }
     }
 

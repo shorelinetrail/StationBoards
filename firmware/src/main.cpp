@@ -1434,6 +1434,7 @@ void setupWebServer() {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
         tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
         tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
+        tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1573,6 +1574,7 @@ void setupWebServer() {
         tflUndergroundProvider.setApiKey(String(config.tflApiKey));
         tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
         tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
+        tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
         serviceProvider = &tflUndergroundProvider;
         Serial.println("  🚇 Switched to TFL Underground provider");
       } else {
@@ -1609,6 +1611,16 @@ void setupWebServer() {
         tflUndergroundProvider.setDirectionFilter(directionFilter);
       }
       Serial.printf("  🚇 TFL direction filter: %s\n", directionFilter.length() > 0 ? directionFilter.c_str() : "All Directions");
+    }
+
+    // Handle TFL Platform Filter
+    if (server.hasArg("tflPlatformFilter")) {
+      String platformFilter = server.arg("tflPlatformFilter");
+      safeStrCopy(config.tflPlatformFilter, platformFilter, sizeof(config.tflPlatformFilter));
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
+        tflUndergroundProvider.setPlatformFilter(platformFilter);
+      }
+      Serial.printf("  🚇 TFL platform filter: %s\n", platformFilter.length() > 0 ? platformFilter.c_str() : "All Platforms");
     }
 
     // Validate SSID
@@ -1875,6 +1887,7 @@ void setup() {
     tflUndergroundProvider.setApiKey(String(config.tflApiKey));
     tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
     tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
+    tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
     serviceProvider = &tflUndergroundProvider;
     Serial.println("🚇 Using TFL Underground provider");
   } else {

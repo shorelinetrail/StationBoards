@@ -77,6 +77,7 @@ private:
   String apiKey;  // Will be loaded from config
   String lineFilter;  // Line filter (e.g., "northern", "elizabeth", "" for all)
   String directionFilter;  // Direction filter ("inbound", "outbound", "" for all)
+  String platformFilter;  // Platform filter (e.g., "Eastbound - Platform 5", "" for all)
   String currentStationCode;  // Store current station code for fallback station name
   String currentStationName;  // Store fetched station name
   String lastFetchedStationCode;  // Track which station code we last fetched name for
@@ -98,6 +99,7 @@ public:
   void setApiKey(const String& key) { apiKey = key; }
   void setLineFilter(const String& filter) { lineFilter = filter; }
   void setDirectionFilter(const String& direction) { directionFilter = direction; }
+  void setPlatformFilter(const String& platform) { platformFilter = platform; }
   void ensureStationNameCached(const char* stationCode);  // Pre-fetch station name if not cached
 
   const char* getProviderName() override { return "TFL Underground"; }
