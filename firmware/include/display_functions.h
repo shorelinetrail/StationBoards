@@ -45,6 +45,7 @@ inline void displayServiceLine(const ServiceData& service, const char* label,
     // TFL: Extract just the leading digits from "1st ", "2nd ", "3rd ", etc.
     // Find where the digits end
     String labelStr = String(label);
+    Serial.print("DEBUG: TFL label='" + labelStr + "', ");
     int digitEnd = 0;
     for (int i = 0; i < labelStr.length(); i++) {
       if (isdigit(labelStr[i])) {
@@ -55,9 +56,11 @@ inline void displayServiceLine(const ServiceData& service, const char* label,
     }
     // Extract just the digits and add one space
     leftSide = labelStr.substring(0, digitEnd) + " ";
+    Serial.println("leftSide='" + leftSide + "'");
   } else {
     // National Rail: Use ordinal label + time
     leftSide = String(label) + String(service.std) + " ";
+    Serial.println("DEBUG: National Rail label='" + String(label) + "', std='" + String(service.std) + "', leftSide='" + leftSide + "'");
   }
 
   String rightSide = formatETD(String(service.etd));
