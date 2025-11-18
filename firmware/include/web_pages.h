@@ -815,6 +815,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="tflplatform-help">Select a specific platform to display, or show all platforms</span>
         </div>
 
+        <div class="button-group">
+          <button type="button" id="applyStationBtn" class="btn btn-primary" aria-label="Apply station settings">
+            <span class="btn-text">Apply Station Settings</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Display Options</h2>
+        <p style="margin-top: 0; margin-bottom: 20px; color: #666; font-size: 14px;">These settings apply automatically when changed</p>
+
         <div class="form-row">
           <div class="form-group">
             <label for="interval">
@@ -834,16 +845,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="help-text" id="scrollspeed-help">Recommended: 50-100ms</span>
           </div>
         </div>
-
-        <div class="button-group">
-          <button type="button" id="applyStationBtn" class="btn btn-primary" aria-label="Apply station settings">
-            <span class="btn-text">Apply Station Settings</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Display Options</h2>
 
         <div class="form-group">
           <label for="mode">Display Mode</label>
