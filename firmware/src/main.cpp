@@ -1539,6 +1539,13 @@ void setupWebServer() {
       }
     }
 
+    // Handle TFL Line Filter
+    if (server.hasArg("tflLineFilter")) {
+      String lineFilter = server.arg("tflLineFilter");
+      safeStrCopy(config.tflLineFilter, lineFilter, sizeof(config.tflLineFilter));
+      Serial.printf("  🚇 TFL line filter: %s\n", lineFilter.length() > 0 ? lineFilter.c_str() : "All Lines");
+    }
+
     // Validate SSID
     if (server.hasArg("ssid")) {
       String ssid = server.arg("ssid");

@@ -1636,8 +1636,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       console.log('autoApplySettings: stationCodeOverride=', stationCodeOverride, 'station input value=', document.getElementById('station').value, 'final stationValue=', stationValue);
       formData.append('serviceType', document.getElementById('serviceType').value);
       formData.append('tflApiKey', document.getElementById('tflApiKey').value);
+      formData.append('tflLineFilter', document.getElementById('tflLineFilter').value);
       formData.append('station', stationValue);
-      console.log('autoApplySettings: Sending station=', stationValue);
+      console.log('autoApplySettings: Sending station=', stationValue, 'tflLineFilter=', document.getElementById('tflLineFilter').value);
       formData.append('interval', document.getElementById('interval').value);
       formData.append('mode', document.getElementById('mode').value);
       formData.append('showstation', document.getElementById('showstation').value);
@@ -1708,28 +1709,37 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const tubeLines = [];
 
         if (data.lineModeGroups) {
+          // Get tube mode lines
           const tubeModeGroup = data.lineModeGroups.find(group => group.modeName === 'tube');
 
-          if (tubeModeGroup && tubeModeGroup.lineIdentifier) {
-            tubeModeGroup.lineIdentifier.forEach(lineId => {
-              // Find the full line information from the lines array
-              const lineInfo = data.lines?.find(line => line.id === lineId);
-              if (lineInfo) {
-                tubeLines.push({
-                  id: lineInfo.id,
-                  name: lineInfo.name
-                });
-              } else {
-                // Fallback: create basic info from just the ID
-                tubeLines.push({
-                  id: lineId,
-                  name: lineId.split('-').map(word =>
-                    word.charAt(0).toUpperCase() + word.slice(1)
-                  ).join(' ')
-                });
-              }
-            });
-          }
+          // Also get Elizabeth line (categorized as 'elizabeth-line' mode)
+          const elizabethModeGroup = data.lineModeGroups.find(group => group.modeName === 'elizabeth-line');
+
+          // Combine both
+          const modeGroups = [tubeModeGroup, elizabethModeGroup].filter(g => g);
+
+          modeGroups.forEach(modeGroup => {
+            if (modeGroup && modeGroup.lineIdentifier) {
+              modeGroup.lineIdentifier.forEach(lineId => {
+                // Find the full line information from the lines array
+                const lineInfo = data.lines?.find(line => line.id === lineId);
+                if (lineInfo) {
+                  tubeLines.push({
+                    id: lineInfo.id,
+                    name: lineInfo.name
+                  });
+                } else {
+                  // Fallback: create basic info from just the ID
+                  tubeLines.push({
+                    id: lineId,
+                    name: lineId.split('-').map(word =>
+                      word.charAt(0).toUpperCase() + word.slice(1)
+                    ).join(' ')
+                  });
+                }
+              });
+            }
+          });
         }
 
         console.log('Station has', tubeLines.length, 'tube lines:', tubeLines.map(l => l.name));
@@ -1823,7 +1833,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Auto-apply for all settings except WiFi
-      const autoApplyFields = ["station", "interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3"];
+      const autoApplyFields = ["station", "interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3", "tflLineFilter"];
       autoApplyFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
