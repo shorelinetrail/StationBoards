@@ -415,10 +415,11 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   filter[0]["timeToStation"] = true;  // Seconds until arrival
 
   // With filtering, we can use much smaller documents:
-  // Line API (filtered): ~5KB response → 8KB document (was 16KB)
-  // StopPoint API (all): ~40KB response → 32KB document (was 65KB)
-  // Increased to 32KB to handle Liverpool Street's 40KB response
-  size_t docSize = (jsonLength < 10000) ? 8192 : 32768;
+  // Line API (filtered): ~5KB response → 6KB document
+  // StopPoint API (all): ~40KB response → 12KB document
+  // Kept small (12KB) to avoid heap fragmentation - we only parse first 8 services anyway
+  // With filtered parsing (7 fields), 12KB handles ~15 arrivals which is more than enough
+  size_t docSize = (jsonLength < 10000) ? 6144 : 12288;
   Serial.println("📦 Allocating " + String(docSize) + " byte JSON document (filtered parsing)");
 
   DynamicJsonDocument doc(docSize);
