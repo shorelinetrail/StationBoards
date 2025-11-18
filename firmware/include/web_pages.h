@@ -1020,7 +1020,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       <div class="status-item">
         <div class="label">Status</div>
         <div class="value">
-          <span class="status-badge online">Online</span>
+          <span class="status-badge offline" id="deviceStatus">Connecting...</span>
         </div>
       </div>
       <div class="status-item">
@@ -1705,17 +1705,31 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     const updateWSStatus = (connected) => {
       const indicator = document.getElementById("wsIndicator");
       const statusText = document.getElementById("wsStatusText");
+      const deviceStatus = document.getElementById("deviceStatus");
 
-      if (!indicator || !statusText) return;
+      if (indicator && statusText) {
+        if (connected) {
+          indicator.classList.add("connected");
+          statusText.textContent = "Connected";
+          statusText.style.color = "#28a745";
+        } else {
+          indicator.classList.remove("connected");
+          statusText.textContent = "Disconnected";
+          statusText.style.color = "#dc3545";
+        }
+      }
 
-      if (connected) {
-        indicator.classList.add("connected");
-        statusText.textContent = "Connected";
-        statusText.style.color = "#28a745";
-      } else {
-        indicator.classList.remove("connected");
-        statusText.textContent = "Disconnected";
-        statusText.style.color = "#dc3545";
+      // Update main device status badge
+      if (deviceStatus) {
+        if (connected) {
+          deviceStatus.textContent = "Online";
+          deviceStatus.classList.remove("offline");
+          deviceStatus.classList.add("online");
+        } else {
+          deviceStatus.textContent = "Offline";
+          deviceStatus.classList.remove("online");
+          deviceStatus.classList.add("offline");
+        }
       }
     };
 
