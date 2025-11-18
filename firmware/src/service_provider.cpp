@@ -413,18 +413,16 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   // Adaptive sizing based on JSON length to handle busy stations
   // Small response (~5KB): 8KB document
   // Medium response (~12KB): 12KB document
-  // Large response (~20KB): 16KB document
-  // Very large response (~64KB+): 20KB document
+  // Large response (~15KB+): 20KB document
   // Kept as small as possible to avoid heap fragmentation
+  // With 7-field filtering, 20KB handles even 64KB source JSON
   size_t docSize;
   if (jsonLength < 8000) {
     docSize = 8192;   // 8KB for small responses
-  } else if (jsonLength < 15000) {
+  } else if (jsonLength < 12000) {
     docSize = 12288;  // 12KB for medium responses
-  } else if (jsonLength < 30000) {
-    docSize = 16384;  // 16KB for large responses
   } else {
-    docSize = 20480;  // 20KB for very large responses (busy stations like King's Cross)
+    docSize = 20480;  // 20KB for large responses (handles 15KB-64KB source)
   }
   Serial.println("📦 Allocating " + String(docSize) + " byte JSON document (filtered parsing)");
 
