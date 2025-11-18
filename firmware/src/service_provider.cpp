@@ -159,18 +159,41 @@ bool NationalRailProvider::parseResponse(const String& response,
 
       // Parse calling points for first service if in calling at mode
       if (useCallingAt && serviceCount == 0) {
+        Serial.println("📍 Attempting to parse calling points (useCallingAt=true, serviceCount=0)");
+
         int cpListIdx = block.indexOf("<lt5:subsequentCallingPoints>");
         if (cpListIdx == -1) cpListIdx = block.indexOf("<lt4:subsequentCallingPoints>");
+
+        if (cpListIdx == -1) {
+          Serial.println("❌ No <subsequentCallingPoints> tag found");
+          Serial.println("📄 Block size: " + String(block.length()) + " bytes");
+          Serial.println("📄 First 300 chars: " + block.substring(0, min(300, (int)block.length())));
+        } else {
+          Serial.println("✅ Found <subsequentCallingPoints> at position " + String(cpListIdx));
+        }
 
         if (cpListIdx != -1) {
           int cpListEndIdx = block.indexOf("</lt5:subsequentCallingPoints>", cpListIdx);
           if (cpListEndIdx == -1) cpListEndIdx = block.indexOf("</lt4:subsequentCallingPoints>", cpListIdx);
 
+          if (cpListEndIdx == -1) {
+            Serial.println("❌ No closing </subsequentCallingPoints> tag found");
+          } else {
+            Serial.println("✅ Found closing tag at position " + String(cpListEndIdx));
+          }
+
           if (cpListEndIdx != -1) {
             String cpSection = block.substring(cpListIdx, cpListEndIdx);
+            Serial.println("📄 Calling points section size: " + String(cpSection.length()) + " bytes");
 
             int cpListStart = cpSection.indexOf("<lt4:callingPointList>");
             if (cpListStart == -1) cpListStart = cpSection.indexOf("<lt5:callingPointList>");
+
+            if (cpListStart == -1) {
+              Serial.println("❌ No <callingPointList> tag found");
+            } else {
+              Serial.println("✅ Found <callingPointList> at position " + String(cpListStart));
+            }
 
             if (cpListStart != -1) {
               int cpListEnd = cpSection.indexOf("</lt4:callingPointList>", cpListStart);
@@ -217,11 +240,16 @@ bool NationalRailProvider::parseResponse(const String& response,
 
                 if (callingPoints != "" && callingPoints.length() < 500) {
                   callingPoints.toCharArray(services[serviceCount].callingPoints, 500);
-                  Serial.println("  📍 Calling at: " + callingPoints);
+                  Serial.println("  ✅ Calling at: " + callingPoints);
                 } else if (callingPoints == "") {
                   String fallback = "No further stops available";
                   fallback.toCharArray(services[serviceCount].callingPoints, 500);
-                  Serial.println("  ⚠️  No calling points found");
+                  Serial.println("  ⚠️  Empty calling points list");
+                } else {
+                  Serial.println("  ⚠️  Calling points too long (" + String(callingPoints.length()) + " chars), truncating");
+                  callingPoints = callingPoints.substring(0, 499);
+                  callingPoints.toCharArray(services[serviceCount].callingPoints, 500);
+                  Serial.println("  ✅ Calling at (truncated): " + callingPoints);
                 }
               }
             }
