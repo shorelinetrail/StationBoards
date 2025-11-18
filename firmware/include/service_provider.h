@@ -77,9 +77,14 @@ private:
   String apiKey;  // Will be loaded from config
   String lineFilter;  // Line filter (e.g., "northern", "elizabeth", "" for all)
   String directionFilter;  // Direction filter ("inbound", "outbound", "" for all)
+  String currentStationCode;  // Store current station code for fallback station name
+  String currentStationName;  // Store fetched station name
 
   // Helper to format ISO timestamp into time string
   String formatTime(const String& isoTimestamp);
+
+  // Fetch station name from TFL API
+  bool fetchStationName(const char* stationCode);
 
   // Extract JSON value (simple parser to avoid ArduinoJson overhead)
   String extractJsonValue(const String& json, const String& key);

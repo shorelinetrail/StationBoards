@@ -1,5 +1,6 @@
 #include "service_provider.h"
 #include <ArduinoJson.h>
+#include <WiFiClientSecure.h>
 
 // ============ National Rail Provider Implementation ============
 
@@ -215,11 +216,77 @@ bool TflUndergroundProvider::isValidStationCode(const char* code) {
   return true;
 }
 
+bool TflUndergroundProvider::fetchStationName(const char* stationCode) {
+  // Quick fetch of station name from TFL API
+  WiFiClientSecure client;
+  client.setInsecure();  // Skip cert validation for speed
+
+  if (!client.connect(apiHost, 443)) {
+    Serial.println("⚠️  Failed to connect for station name fetch");
+    return false;
+  }
+
+  // Build station info request
+  String path = "/StopPoint/" + String(stationCode);
+  if (apiKey.length() > 0) {
+    path += "?app_key=" + apiKey;
+  }
+
+  String req = "GET " + path + " HTTP/1.1\r\n";
+  req += "Host: " + String(apiHost) + "\r\n";
+  req += "Connection: close\r\n\r\n";
+
+  client.print(req);
+
+  // Wait for response with timeout
+  unsigned long start = millis();
+  while (!client.available() && millis() - start < 5000) {
+    delay(10);
+  }
+
+  if (!client.available()) {
+    client.stop();
+    return false;
+  }
+
+  // Read response
+  String response = "";
+  while (client.available()) {
+    response += client.readString();
+  }
+  client.stop();
+
+  // Find JSON body
+  int jsonStart = response.indexOf('{');
+  if (jsonStart == -1) return false;
+
+  String jsonBody = response.substring(jsonStart);
+
+  // Parse for commonName using simple string search
+  int nameStart = jsonBody.indexOf("\"commonName\":\"");
+  if (nameStart == -1) return false;
+
+  nameStart += 14;  // Length of "commonName":"
+  int nameEnd = jsonBody.indexOf("\"", nameStart);
+  if (nameEnd == -1) return false;
+
+  currentStationName = jsonBody.substring(nameStart, nameEnd);
+  Serial.println("📍 Fetched station name: " + currentStationName);
+
+  return true;
+}
+
 bool TflUndergroundProvider::buildRequest(const char* stationCode, String& request) {
   if (!isValidStationCode(stationCode)) {
     Serial.println("❌ Invalid TFL station code: " + String(stationCode));
     return false;
   }
+
+  // Store station code for use as fallback station name
+  currentStationCode = String(stationCode);
+
+  // Fetch proper station name (quick HTTP request)
+  fetchStationName(stationCode);
 
   // Build TFL API request
   // GET /StopPoint/{stationCode}/Arrivals
@@ -268,7 +335,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   JsonArray arrivals = doc.as<JsonArray>();
 
-  // Extract station name from first arrival (if available)
+  // Extract station name - prefer from arrival, fall back to fetched name, then station code
   if (arrivals.size() > 0) {
     const char* stName = arrivals[0]["stationName"];
     if (stName) {
@@ -277,6 +344,16 @@ bool TflUndergroundProvider::parseResponse(const String& response,
       Serial.println("📍 " + String(stName));
     }
   } else {
+    // No arrivals - use pre-fetched station name or station code as fallback
+    if (currentStationName.length() > 0) {
+      strncpy(stationName, currentStationName.c_str(), stationNameSize - 1);
+      stationName[stationNameSize - 1] = '\0';
+      Serial.println("📍 " + currentStationName);
+    } else if (currentStationCode.length() > 0) {
+      strncpy(stationName, currentStationCode.c_str(), stationNameSize - 1);
+      stationName[stationNameSize - 1] = '\0';
+      Serial.println("📍 " + currentStationCode + " (using station code as fallback)");
+    }
     Serial.println("⚠️  No arrivals in TFL response");
   }
 
