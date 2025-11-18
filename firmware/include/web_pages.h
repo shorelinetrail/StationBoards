@@ -1795,6 +1795,11 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
      * Display tube line selector
      */
     const showTflLineSelector = async (stationId) => {
+      // Clear line filter first
+      const lineFilter = document.getElementById('tflLineFilter');
+      lineFilter.innerHTML = '<option value="">All Lines</option>';
+      lineFilter.value = '';
+
       const lines = await fetchTflStationLines(stationId);
 
       if (lines.length === 0) {
@@ -1803,9 +1808,19 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Populate the line filter dropdown
-      const lineFilter = document.getElementById('tflLineFilter');
       lineFilter.innerHTML = '<option value="">All Lines</option>' +
         lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
+
+      // Auto-select the first line
+      if (lines.length > 0) {
+        lineFilter.value = lines[0].id;
+        console.log('Auto-selected first line:', lines[0].name);
+
+        // Auto-apply settings with the selected line
+        setTimeout(() => {
+          autoApplySettings();
+        }, 100);
+      }
 
       // Show toast with available lines
       const lineNames = lines.map(l => l.name).join(', ');
