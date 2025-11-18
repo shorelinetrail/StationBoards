@@ -38,7 +38,13 @@ inline void displayStationName(const char* stationName) {
  */
 inline void displayServiceLine(const ServiceData& service, const char* label,
                                 int yPos, U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI& display) {
-  String leftSide = String(label) + String(service.std) + " ";
+  // Build left side: label already has trailing space, only add another space if STD has content
+  // TFL: "1st " + "" = "1st "
+  // National Rail: "1st " + "18:45" + " " = "1st 18:45 "
+  String leftSide = String(label);
+  if (service.std[0] != '\0') {  // STD has content (National Rail)
+    leftSide += String(service.std) + " ";
+  }
   String rightSide = formatETD(String(service.etd));
 
   int leftWidth = display.getUTF8Width(leftSide.c_str());

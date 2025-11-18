@@ -1097,22 +1097,23 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       try {
         const tflApiKey = document.getElementById('tflApiKey')?.value || '';
-        const apiUrl = `https://api.tfl.gov.uk/StopPoint/Search?query=${encodeURIComponent(query)}&modes=tube${tflApiKey ? '&app_key=' + encodeURIComponent(tflApiKey) : ''}`;
+        const apiUrl = `https://api.tfl.gov.uk/StopPoint/Search?query=${encodeURIComponent(query)}&modes=tube,elizabeth-line${tflApiKey ? '&app_key=' + encodeURIComponent(tflApiKey) : ''}`;
 
         const response = await fetch(apiUrl);
         if (!response.ok) return [];
 
         const data = await response.json();
 
-        // Extract station matches
+        // Extract station matches (both tube and Elizabeth line)
         const stations = [];
         if (data.matches) {
           data.matches.forEach(match => {
-            if (match.modes && match.modes.includes('tube')) {
-              // Remove "Underground Station" suffix
+            if (match.modes && (match.modes.includes('tube') || match.modes.includes('elizabeth-line'))) {
+              // Remove station type suffixes
               let name = match.name;
               name = name.replace(/ Underground Station$/i, '');
               name = name.replace(/ Station$/i, '');
+              name = name.replace(/ Rail Station$/i, '');
 
               stations.push({
                 name: name,
@@ -1761,14 +1762,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const tubeLines = [];
 
         if (data.lineModeGroups) {
-          // Get tube mode lines
+          // Get tube mode lines only (Elizabeth line uses separate station IDs)
           const tubeModeGroup = data.lineModeGroups.find(group => group.modeName === 'tube');
 
-          // Also get Elizabeth line (categorized as 'elizabeth-line' mode)
-          const elizabethModeGroup = data.lineModeGroups.find(group => group.modeName === 'elizabeth-line');
-
-          // Combine both
-          const modeGroups = [tubeModeGroup, elizabethModeGroup].filter(g => g);
+          const modeGroups = [tubeModeGroup].filter(g => g);
 
           modeGroups.forEach(modeGroup => {
             if (modeGroup && modeGroup.lineIdentifier) {
