@@ -1595,12 +1595,20 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           } else if (data.type === "metrics") {
             updateRSSI(data.rssi);
           } else if (data.type === "state") {
-            if (data.stationName) {
+            // Handle station name display
+            const stationName = data.stationName || data['displayState.stationName'];
+            if (stationName) {
               const stationEl = document.getElementById("currentStation");
               if (stationEl) {
-                stationEl.textContent = decodeHtml(data.stationName);
+                stationEl.textContent = decodeHtml(stationName);
               }
             }
+
+            // Highlight active preset button based on station code
+            if (data.station) {
+              highlightActivePresetButton(data.station);
+            }
+
             updateRSSI(data.rssi);
           }
         } catch (e) {
@@ -2281,6 +2289,27 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
     }, 1000);
 
+    // ==================== Preset Button Highlighting ====================
+
+    /**
+     * Highlight the active preset button based on station code
+     */
+    function highlightActivePresetButton(stationCode) {
+      if (!stationCode) return;
+
+      // Normalize the station code for comparison
+      const normalizedCode = stationCode.trim().toUpperCase();
+
+      document.querySelectorAll('.preset-btn[data-station]').forEach(btn => {
+        const btnCode = btn.dataset.station.trim().toUpperCase();
+        if (btnCode === normalizedCode) {
+          btn.classList.add('selected');
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
+    }
+
     // ==================== Recent Stations Management ====================
 
     /**
@@ -2577,6 +2606,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const firmwareInfo = document.getElementById('firmwareInfo');
       if (firmwareInfo) {
         firmwareInfo.textContent = 'v2.1.0';
+      }
+
+      // Highlight the active preset button based on initial station value
+      const stationInput = document.getElementById('station');
+      if (stationInput && stationInput.value) {
+        // Use stationCode from dataset if available, otherwise use the input value
+        const initialStationCode = stationInput.dataset.stationCode || stationInput.value;
+        highlightActivePresetButton(initialStationCode);
       }
     });
   </script>
