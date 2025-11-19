@@ -161,9 +161,9 @@ struct MonitoringState {
   unsigned long lastLoop;
 
   MonitoringState() :
-    serverHost("192.168.0.75"),
-    serverPort(Net::MONITOR_PORT),
-    useSSL(false),
+    serverHost("stationboards.up.railway.app"),
+    serverPort(443),
+    useSSL(true),
     enabled(true),
     connected(false),
     lastHeartbeat(0),
