@@ -35,6 +35,7 @@ db.serialize(() => {
     firmware_version TEXT,
     station_code TEXT,
     station_name TEXT,
+    service_type TEXT DEFAULT 'National Rail',
     rssi INTEGER,
     uptime INTEGER,
     free_heap INTEGER,
