@@ -981,11 +981,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <div class="label">Uptime</div>
         <div class="value uptime-counter" id="deviceUptime" aria-live="polite">--:--:--</div>
       </div>
-      <div class="status-item" style="grid-column: span 2; display: flex; justify-content: center; align-items: center;">
-        <button type="button" id="refreshNowBtn" class="btn" style="padding: 10px 20px; font-size: 14px;" aria-label="Manually refresh departure data now">
-          <span class="btn-text">🔄 Refresh Data Now</span>
-        </button>
-      </div>
     </div>
 
     <!-- Tabs -->
@@ -1207,9 +1202,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <div id="livePreview" class="display-frame" role="region" aria-live="polite" aria-label="Live display preview">
             <div class="display-waiting">Connecting to device...</div>
           </div>
-          <div class="ws-status">
-            <span><span class="ws-indicator" id="wsIndicator" aria-hidden="true"></span> <span id="wsStatusText">Disconnected</span></span>
-            <span>Last Update: <span id="lastUpdate">Never</span></span>
+          <div class="ws-status" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; gap: 20px;">
+              <span><span class="ws-indicator" id="wsIndicator" aria-hidden="true"></span> <span id="wsStatusText">Disconnected</span></span>
+              <span>Last Update: <span id="lastUpdate">Never</span></span>
+            </div>
+            <button type="button" id="refreshNowBtn" class="btn btn-outline" style="padding: 6px 12px; font-size: 13px;" aria-label="Manually refresh departure data now">
+              🔄 Refresh Now
+            </button>
           </div>
         </div>
       </div>
