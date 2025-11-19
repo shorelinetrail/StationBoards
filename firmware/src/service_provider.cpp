@@ -102,8 +102,9 @@ bool NationalRailProvider::parseResponse(const String& response,
   if (servicesStart == -1) servicesStart = response.indexOf("<lt4:trainServices>");
 
   if (servicesStart == -1) {
-    Serial.println("❌ No services tag found");
-    return false;
+    Serial.println("ℹ️ No services tag found - station has no departures");
+    serviceCount = 0;
+    return true;  // Valid response, just no services available
   }
 
   int servicesEnd = response.indexOf("</lt5:trainServices>", servicesStart);
