@@ -329,9 +329,9 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               fetchStateData.lastSuccess = 0;
               fetchStateData.lastAttempt = 0;
             }
-            else if (strcmp(command, "otaUpdate") == 0) {
+            else if (strcmp(command, "ota") == 0) {
               Serial.println("📦 OTA update from monitoring server");
-              const char* url = doc["url"];
+              const char* url = doc["firmwareUrl"];
               
               displayMessage("OTA Update", "Starting...");
               
