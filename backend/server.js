@@ -234,9 +234,28 @@ wss.on('connection', (ws, req) => {
 
         case 'log':
           handleDeviceLog(message);
-          
+
           // Broadcast to dashboard
           io.emit('logUpdate', message);
+          break;
+
+        case 'configResponse':
+          console.log('📖 Config response from device:', message.deviceId);
+
+          // Broadcast config to dashboard
+          io.emit('configResponse', {
+            deviceId: message.deviceId,
+            config: {
+              station_code: message.stationCode,
+              service_type: message.serviceType,
+              use_calling_at: message.useCallingAt,
+              show_station_name: message.showStationName,
+              extra_services: message.extraServices,
+              refresh_interval: message.refreshInterval,
+              scroll_speed: message.scrollSpeed,
+              rotation_speed: message.rotationSpeed
+            }
+          });
           break;
 
         default:
@@ -740,15 +759,32 @@ app.post('/api/devices/:id/command', requireAuth, (req, res) => {
 // Restart device
 app.post('/api/devices/:id/restart', requireAuth, (req, res) => {
   const ws = wsClients.get(req.params.id);
-  
+
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'command',
       command: 'restart'
     }));
-    
+
     logEvent(req.params.id, 'command', 'Restart command sent');
     res.json({ success: true, message: 'Restart command sent' });
+  } else {
+    res.status(503).json({ success: false, message: 'Device not connected' });
+  }
+});
+
+// Request config from device
+app.post('/api/devices/:id/getConfig', requireAuth, (req, res) => {
+  const ws = wsClients.get(req.params.id);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'command',
+      command: 'getConfig'
+    }));
+
+    console.log(`📖 Config request sent to device: ${req.params.id}`);
+    res.json({ success: true, message: 'Config request sent' });
   } else {
     res.status(503).json({ success: false, message: 'Device not connected' });
   }

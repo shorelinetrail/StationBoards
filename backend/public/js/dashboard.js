@@ -271,6 +271,16 @@ function setupWebSocket() {
     updateDeviceInList(data);
   });
 
+  socket.on('configResponse', (data) => {
+    console.log('Config response from device:', data);
+
+    // Update config form if modal is open for this device
+    if (AppState.currentDeviceId === data.deviceId) {
+      updateConfigForm(data.config);
+      showToast('Configuration synced from device', 'success');
+    }
+  });
+
   socket.on('reconnect', (attemptNumber) => {
     console.log('Reconnected after', attemptNumber, 'attempts');
     showToast('Reconnected to server', 'success');
@@ -693,6 +703,59 @@ async function saveDeviceConfig(event) {
   } finally {
     AppState.activeRequests.delete('saveConfig');
     setLoadingState(saveButton, false);
+  }
+}
+
+/**
+ * Sync config from device (read actual device settings)
+ */
+async function syncConfigFromDevice() {
+  if (!AppState.currentDeviceId) {
+    showToast('No device selected', 'warning');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/devices/${AppState.currentDeviceId}/getConfig`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      showToast('Requesting config from device...', 'info');
+      // Config will be updated via socket.io when device responds
+    } else {
+      throw new Error('Device not connected');
+    }
+  } catch (err) {
+    console.error('Error syncing config:', err);
+    showToast('Error: Device not connected', 'danger');
+  }
+}
+
+/**
+ * Update config form with values from device
+ */
+function updateConfigForm(config) {
+  if (config.station_code) {
+    document.getElementById('configStationCode').value = config.station_code;
+  }
+  if (config.refresh_interval !== undefined) {
+    document.getElementById('configRefreshInterval').value = config.refresh_interval;
+  }
+  if (config.use_calling_at !== undefined) {
+    document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
+  }
+  if (config.show_station_name !== undefined) {
+    document.getElementById('configShowStationName').value = config.show_station_name ? '1' : '0';
+  }
+  if (config.extra_services !== undefined) {
+    document.getElementById('configExtraServices').value = config.extra_services;
+  }
+  if (config.scroll_speed !== undefined) {
+    document.getElementById('configScrollSpeed').value = config.scroll_speed;
+  }
+  if (config.rotation_speed !== undefined) {
+    document.getElementById('configRotationSpeed').value = config.rotation_speed;
   }
 }
 

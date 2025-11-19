@@ -411,6 +411,26 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               delay(5000);
               ESP.restart(); // Restart to restore normal operation
             }
+            else if (strcmp(command, "getConfig") == 0) {
+              Serial.println("📖 Config read request from monitoring server");
+
+              // Send current config back to server
+              String configMsg = "{";
+              configMsg += "\"type\":\"configResponse\",";
+              configMsg += "\"deviceId\":\"" + config.deviceId + "\",";
+              configMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
+              configMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
+              configMsg += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
+              configMsg += "\"showStationName\":" + String(config.showStationName ? "true" : "false") + ",";
+              configMsg += "\"extraServices\":" + String(config.extraServices) + ",";
+              configMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
+              configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
+              configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed);
+              configMsg += "}";
+
+              monitorClient.sendTXT(configMsg);
+              Serial.println("✅ Config sent to monitoring server");
+            }
           }
         }
       }
