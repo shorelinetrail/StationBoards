@@ -139,8 +139,13 @@ function requireAuth(req, res, next) {
 app.use(express.json());
 app.use(sessionMiddleware);
 
-// Serve static files (login page accessible without auth)
-app.use(express.static('public'));
+// Serve static files EXCEPT index.html (which requires auth)
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path === '/index.html') {
+    return next(); // Don't serve index.html statically, let the protected route handle it
+  }
+  express.static('public')(req, res, next);
+});
 app.use('/firmware', express.static('firmware'));
 
 // Multer for firmware uploads
