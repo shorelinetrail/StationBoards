@@ -13,6 +13,9 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const app = express();
 const server = http.createServer(app);
 
+// Trust Railway proxy for secure cookies
+app.set('trust proxy', 1);
+
 // Socket.IO for web dashboard
 const io = socketIo(server);
 
