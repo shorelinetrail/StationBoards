@@ -496,7 +496,7 @@ app.get('/api/server-info', requireAuth, (req, res) => {
   const os = require('os');
   const interfaces = os.networkInterfaces();
   const addresses = [];
-  
+
   // Get all non-internal IPv4 addresses
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
@@ -505,15 +505,28 @@ app.get('/api/server-info', requireAuth, (req, res) => {
       }
     }
   }
-  
+
   // Prefer the first non-localhost address, fallback to localhost
   const serverIp = addresses.length > 0 ? addresses[0] : 'localhost';
   const port = PORT;
-  
+
+  // For Railway/production: use the actual request host (e.g., stationboards.up.railway.app)
+  // For local development: use the local IP
+  let baseUrl;
+  if (process.env.RAILWAY_PUBLIC_DOMAIN || req.get('host').includes('railway.app')) {
+    // Running on Railway - use public HTTPS URL
+    const protocol = req.protocol; // 'https' on Railway
+    const host = req.get('host'); // e.g., 'stationboards.up.railway.app'
+    baseUrl = `${protocol}://${host}`;
+  } else {
+    // Local development - use local IP
+    baseUrl = `http://${serverIp}:${port}`;
+  }
+
   res.json({
     ip: serverIp,
     port: port,
-    baseUrl: `http://${serverIp}:${port}`,
+    baseUrl: baseUrl,
     allAddresses: addresses
   });
 });
