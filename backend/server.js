@@ -790,6 +790,40 @@ app.post('/api/devices/:id/getConfig', requireAuth, (req, res) => {
   }
 });
 
+// Enable log streaming
+app.post('/api/devices/:id/enableLogs', requireAuth, (req, res) => {
+  const ws = wsClients.get(req.params.id);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'command',
+      command: 'enableLogs'
+    }));
+
+    console.log(`📡 Log streaming enabled for device: ${req.params.id}`);
+    res.json({ success: true, message: 'Log streaming enabled' });
+  } else {
+    res.status(503).json({ success: false, message: 'Device not connected' });
+  }
+});
+
+// Disable log streaming
+app.post('/api/devices/:id/disableLogs', requireAuth, (req, res) => {
+  const ws = wsClients.get(req.params.id);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'command',
+      command: 'disableLogs'
+    }));
+
+    console.log(`📡 Log streaming disabled for device: ${req.params.id}`);
+    res.json({ success: true, message: 'Log streaming disabled' });
+  } else {
+    res.status(503).json({ success: false, message: 'Device not connected' });
+  }
+});
+
 // OTA firmware update
 app.post('/api/devices/:id/ota', requireAuth, (req, res) => {
   const { firmwareUrl } = req.body;

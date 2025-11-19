@@ -215,7 +215,28 @@
 
             <!-- Logs Tab -->
             <div class="tab-pane fade" id="logsTab">
-              <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+              <div class="mb-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Live Serial Logs</h6>
+                <div class="btn-group" role="group">
+                  <button type="button" class="btn btn-sm btn-success" onclick="enableLogStreaming()">
+                    <i class="bi bi-play-fill"></i> Start
+                  </button>
+                  <button type="button" class="btn btn-sm btn-danger" onclick="disableLogStreaming()">
+                    <i class="bi bi-stop-fill"></i> Stop
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearLiveLogs()">
+                    <i class="bi bi-trash"></i> Clear
+                  </button>
+                </div>
+              </div>
+              <div id="liveLogsContainer" style="background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px;">
+                <div id="liveLogsContent">
+                  <div style="color: #888;">Click "Start" to begin streaming logs from device...</div>
+                </div>
+              </div>
+
+              <h6 class="mt-4">Historical Events</h6>
+              <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
                 <table class="table table-sm table-striped">
                   <thead>
                     <tr>

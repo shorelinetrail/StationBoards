@@ -431,6 +431,15 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               monitorClient.sendTXT(configMsg);
               Serial.println("✅ Config sent to monitoring server");
             }
+            else if (strcmp(command, "enableLogs") == 0) {
+              monitoringState.logsEnabled = true;
+              Serial.println("📡 Log streaming enabled");
+              LOG_TO_MONITOR("info", "Log streaming enabled from dashboard");
+            }
+            else if (strcmp(command, "disableLogs") == 0) {
+              monitoringState.logsEnabled = false;
+              Serial.println("📡 Log streaming disabled");
+            }
           }
         }
       }
@@ -467,6 +476,24 @@ void sendMonitorHeartbeat() {
 
   monitorClient.sendTXT(heartbeat);
 }
+
+// Send log message to monitoring server
+void sendMonitorLog(const String& level, const String& message) {
+  if (!monitoringState.connected || !monitoringState.logsEnabled) return;
+
+  String logMsg = "{";
+  logMsg += "\"type\":\"log\",";
+  logMsg += "\"deviceId\":\"" + config.deviceId + "\",";
+  logMsg += "\"level\":\"" + level + "\",";
+  logMsg += "\"message\":\"" + message + "\",";
+  logMsg += "\"timestamp\":" + String(millis());
+  logMsg += "}";
+
+  monitorClient.sendTXT(logMsg);
+}
+
+// Helper macro for easy logging
+#define LOG_TO_MONITOR(level, msg) sendMonitorLog(level, msg)
 
 // ============ END MONITORING Functions ============
 

@@ -281,6 +281,13 @@ function setupWebSocket() {
     }
   });
 
+  socket.on('logUpdate', (data) => {
+    // Only display logs for currently viewed device
+    if (AppState.currentDeviceId === data.deviceId) {
+      appendLiveLog(data);
+    }
+  });
+
   socket.on('reconnect', (attemptNumber) => {
     console.log('Reconnected after', attemptNumber, 'attempts');
     showToast('Reconnected to server', 'success');
@@ -1030,6 +1037,94 @@ function setupEventListeners() {
   if (startOtaButton) {
     startOtaButton.addEventListener('click', startOTA);
   }
+}
+
+// ==================== Log Streaming ====================
+/**
+ * Enable log streaming from device
+ */
+async function enableLogStreaming() {
+  if (!AppState.currentDeviceId) {
+    showToast('No device selected', 'warning');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/devices/${AppState.currentDeviceId}/enableLogs`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      showToast('Log streaming started', 'success');
+      clearLiveLogs();
+      document.getElementById('liveLogsContent').innerHTML = '<div style="color: #4ec9b0;">Waiting for logs...</div>';
+    } else {
+      throw new Error('Device not connected');
+    }
+  } catch (err) {
+    console.error('Error enabling logs:', err);
+    showToast('Error: Device not connected', 'danger');
+  }
+}
+
+/**
+ * Disable log streaming from device
+ */
+async function disableLogStreaming() {
+  if (!AppState.currentDeviceId) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/devices/${AppState.currentDeviceId}/disableLogs`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      showToast('Log streaming stopped', 'info');
+    }
+  } catch (err) {
+    console.error('Error disabling logs:', err);
+  }
+}
+
+/**
+ * Append live log entry
+ */
+function appendLiveLog(data) {
+  const container = document.getElementById('liveLogsContent');
+  const logEntry = document.createElement('div');
+  logEntry.style.marginBottom = '2px';
+
+  // Color based on log level
+  const colors = {
+    error: '#f48771',
+    warn: '#dcdcaa',
+    info: '#4ec9b0',
+    debug: '#9cdcfe'
+  };
+  const color = colors[data.level] || '#d4d4d4';
+
+  const timestamp = new Date(data.timestamp).toLocaleTimeString();
+  logEntry.innerHTML = `<span style="color: #858585;">[${timestamp}]</span> <span style="color: ${color};">${escapeHtml(data.message)}</span>`;
+
+  container.appendChild(logEntry);
+
+  // Auto-scroll to bottom
+  const scrollContainer = document.getElementById('liveLogsContainer');
+  scrollContainer.scrollTop = scrollContainer.scrollHeight;
+
+  // Limit to 500 lines
+  while (container.children.length > 500) {
+    container.removeChild(container.firstChild);
+  }
+}
+
+/**
+ * Clear live logs
+ */
+function clearLiveLogs() {
+  document.getElementById('liveLogsContent').innerHTML = '<div style="color: #888;">Logs cleared</div>';
 }
 
 // ==================== Initialization ====================

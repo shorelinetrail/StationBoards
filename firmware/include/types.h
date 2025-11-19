@@ -156,6 +156,7 @@ struct MonitoringState {
   bool useSSL;
   bool enabled;
   bool connected;
+  bool logsEnabled;
   unsigned long lastHeartbeat;
   unsigned long lastDisconnect;
   unsigned long lastLoop;
@@ -166,6 +167,7 @@ struct MonitoringState {
     useSSL(true),
     enabled(true),
     connected(false),
+    logsEnabled(false),
     lastHeartbeat(0),
     lastDisconnect(0),
     lastLoop(0) {}
