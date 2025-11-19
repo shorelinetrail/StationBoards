@@ -330,22 +330,87 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               fetchStateData.lastAttempt = 0;
             }
             else if (strcmp(command, "ota") == 0) {
-              Serial.println("📦 OTA update from monitoring server");
-              Serial.println("⚠️  NOTE: Remote HTTPS OTA is unreliable on ESP32");
-              Serial.println("💡 Recommended: Use ArduinoOTA or USB for updates");
+              Serial.println("\n========================================");
+              Serial.println("📦 REMOTE OTA UPDATE STARTING");
+              Serial.println("========================================");
 
-              // For now, just log the request and suggest alternative
-              if (doc.containsKey("firmwareUrl")) {
-                String url = doc["firmwareUrl"].as<String>();
-                Serial.printf("📥 Firmware URL: %s\n", url.c_str());
+              // Validate firmwareUrl
+              if (!doc.containsKey("firmwareUrl")) {
+                Serial.println("❌ No firmwareUrl provided");
+                break;
               }
 
-              displayMessage("OTA Update", "Not supported");
-              Serial.println("❌ Remote HTTPS OTA disabled due to ESP32 memory constraints");
-              Serial.println("   Use one of these methods instead:");
-              Serial.println("   1. ArduinoOTA on local network (password: trainboard2024)");
-              Serial.println("   2. USB upload via PlatformIO");
+              String url = doc["firmwareUrl"].as<String>();
+              if (url.length() == 0) {
+                Serial.println("❌ Empty firmwareUrl");
+                break;
+              }
+
+              Serial.printf("📥 URL: %s\n", url.c_str());
+              Serial.printf("💾 Free heap: %d bytes\n", ESP.getFreeHeap());
+
+              // AGGRESSIVE CLEANUP - Free maximum memory
+              Serial.println("\n🧹 Freeing memory...");
+
+              // 1. Show OTA message on display
+              displayMessage("OTA Update", "Preparing...");
+              delay(2000);
+
+              // 2. Disconnect local WebSocket server and free clients
+              Serial.println("   - Stopping local WebSocket");
+              webSocket.disconnect();
+              webSocket.close();
+
+              // 3. Disconnect monitoring WebSocket
+              Serial.println("   - Stopping monitoring WebSocket");
+              monitorClient.disconnect();
+
+              // 4. Stop HTTP server
+              Serial.println("   - Stopping HTTP server");
+              server.stop();
+
+              // 5. Wait for everything to clean up
+              delay(2000);
+
+              Serial.printf("💾 Free heap after cleanup: %d bytes\n", ESP.getFreeHeap());
+
+              // Clear display and show update progress
+              u8g2.clearBuffer();
+              u8g2.setFont(u8g2_font_helvB08_tr);
+              u8g2.drawStr(0, 30, "OTA UPDATE");
+              u8g2.drawStr(0, 45, "Downloading...");
+              u8g2.sendBuffer();
+
+              Serial.println("\n🔒 Starting HTTPS download...");
+
+              // Use WiFiClientSecure with minimal configuration
+              WiFiClientSecure client;
+              client.setInsecure(); // Skip certificate validation
+              client.setTimeout(60000); // 60 second timeout
+
+              // Configure httpUpdate
+              httpUpdate.setLedPin(LED_BUILTIN, LOW);
+              httpUpdate.rebootOnUpdate(true); // Auto reboot on success
+
+              Serial.println("📡 Connecting to server...");
+
+              // Attempt update
+              t_httpUpdate_return ret = httpUpdate.update(client, url);
+
+              // Only reaches here on failure (success reboots automatically)
+              Serial.println("\n========================================");
+              Serial.printf("❌ UPDATE FAILED: %s\n", httpUpdate.getLastErrorString().c_str());
+              Serial.println("========================================");
+
+              u8g2.clearBuffer();
+              u8g2.drawStr(0, 20, "UPDATE FAILED");
+              u8g2.setFont(u8g2_font_6x10_tr);
+              u8g2.drawStr(0, 35, httpUpdate.getLastErrorString().c_str());
+              u8g2.drawStr(0, 50, "Restarting...");
+              u8g2.sendBuffer();
+
               delay(5000);
+              ESP.restart(); // Restart to restore normal operation
             }
           }
         }
