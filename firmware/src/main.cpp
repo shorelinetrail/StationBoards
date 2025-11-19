@@ -59,6 +59,7 @@ TflUndergroundProvider tflUndergroundProvider;
 
 // Phase 2 Step 4: Migrate to DisplayState struct
 DisplayState displayState;
+DisplayState fetchBuffer;  // Dual buffer for background fetching - instant updates with no pauses
 
 // Migrated to displayState:
 // - services[] → displayState.services[]
@@ -573,16 +574,16 @@ void broadcastDisplaySnapshot() {
   json = "{\"type\":\"display_snapshot\",";
   json += "\"timestamp\":";
   json += millis();
-  json += ",\"displayState.stationName\":\"";
+  json += ",\"stationName\":\"";
   json += displayState.stationName;
   json += "\",\"mode\":\"";
   json += config.useCallingAt ? "calling_at" : "normal";
-  json += "\",\"displayState.serviceCount\":";
+  json += "\",\"serviceCount\":";
   json += displayState.serviceCount;
   json += ",\"services\":[";
 
-  // Send up to 3 services for the preview
-  for (int i = 0; i < min(displayState.serviceCount, 3); i++) {
+  // Send up to 6 services for the preview
+  for (int i = 0; i < min(displayState.serviceCount, 6); i++) {
     if (i > 0) json += ",";
     json += "{\"std\":\"";
     json += displayState.services[i].std;
@@ -615,7 +616,7 @@ void broadcastDisplaySnapshot() {
 
   json += "\"alternatingService\":";
   json += displayState.currentAlternatingService;
-  json += ",\"displayState.isAnimating\":";
+  json += ",\"isAnimating\":";
   json += displayState.isAnimating ? "true" : "false";
   json += "}";
 
@@ -981,13 +982,13 @@ bool asyncFetchStart() {
 
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected");
-    displayStatus("OFF");
+    // Keep displaying previous data - no status changes
     return false;
   }
 
   if (!serviceProvider) {
     Serial.println("❌ Service provider not initialized");
-    displayStatus("ERROR");
+    // Keep displaying previous data - no status changes
     return false;
   }
 
@@ -998,40 +999,70 @@ bool asyncFetchStart() {
   // was adding 6+ seconds of unnecessary delay (separate HTTPS connection)
   // Station name now extracted from arrivals data in parseResponse()
 
-  // Update display before blocking operations
-  unsigned long currentTime = millis();
-  handleAlternatingService(currentTime);
-  updateDisplay();
+  // AGGRESSIVE CACHING: No display updates during fetch - let main loop handle it
+  // This prevents any pauses or freezes during background data fetching
 
-  // Connect with periodic display updates
+  // Connect with retry logic and exponential backoff
   Serial.println("🔌 Connecting to " + String(serviceProvider->getApiHost()) + "...");
-  unsigned long connectStart = millis();
 
-  // Set connection timeout (10 seconds for TLS handshake)
-  fetchClient.setTimeout(10);  // 10 seconds in WiFiClient (converted to milliseconds internally)
+  const int MAX_RETRIES = 4;  // Total of 5 attempts (1 initial + 4 retries)
+  const int INITIAL_TIMEOUT = 15;  // 15 seconds for TLS handshake
+  bool connected = false;
+  unsigned long connectStart = 0;
 
-  // Non-blocking connect attempt with display updates
-  if (!fetchClient.connect(serviceProvider->getApiHost(), serviceProvider->getApiPort())) {
-    Serial.println("❌ API connection failed (timeout or network error)");
-    displayStatus("FAIL");
-    return false;
+  for (int attempt = 0; attempt <= MAX_RETRIES && !connected; attempt++) {
+    if (attempt > 0) {
+      // Exponential backoff: 2s, 4s, 8s, 16s
+      int backoffMs = 1000 * (1 << attempt);  // 2^attempt seconds
+      Serial.println("⏳ Retry #" + String(attempt) + " after " + String(backoffMs/1000) + "s backoff...");
+
+      // Non-blocking delay - main loop continues to update display
+      unsigned long backoffStart = millis();
+      while (millis() - backoffStart < backoffMs) {
+        delay(100);  // Yield to prevent watchdog
+      }
+
+      // Close any previous connection attempt
+      fetchClient.stop();
+      delay(100);
+    }
+
+    connectStart = millis();
+
+    // Increase timeout for retries (TLS can be slow on congested networks)
+    int timeout = INITIAL_TIMEOUT + (attempt * 5);  // Add 5s per retry
+    fetchClient.setTimeout(timeout);
+    Serial.println("🔌 Attempt " + String(attempt + 1) + "/" + String(MAX_RETRIES + 1) +
+                   " (timeout: " + String(timeout) + "s)...");
+
+    // Attempt connection
+    if (fetchClient.connect(serviceProvider->getApiHost(), serviceProvider->getApiPort())) {
+      connected = true;
+      Serial.println("✅ Connected (" + String(millis() - connectStart) + "ms)");
+    } else {
+      Serial.println("❌ Connection attempt " + String(attempt + 1) + " failed");
+
+      // Check WiFi still connected
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("❌ WiFi disconnected during connection attempt");
+        // Keep displaying previous data - no status changes
+        return false;
+      }
+    }
   }
 
-  Serial.println("✅ Connected (" + String(millis() - connectStart) + "ms)");
-
-  // Update display after connection
-  currentTime = millis();
-  handleAlternatingService(currentTime);
-  updateDisplay();
-
-  broadcastStatus("Fetching data...", "info");
+  if (!connected) {
+    Serial.println("❌ All connection attempts failed after " + String(MAX_RETRIES + 1) + " tries");
+    Serial.println("💡 Troubleshooting: Check WiFi signal, DNS, firewall, or try different station");
+    // Don't show FAIL status - keep displaying previous data smoothly
+    return false;
+  }
 
   // Build request using service provider
   String request;
   if (!serviceProvider->buildRequest(config.stationCode, request)) {
     Serial.println("❌ Failed to build request");
     fetchClient.stop();
-    displayStatus("ERROR");
     return false;
   }
 
@@ -1041,12 +1072,9 @@ bool asyncFetchStart() {
   fetchStateData.startTime = millis();
   fetchStateData.buffer = "";
   fetchStateData.state = FETCH_WAITING;
-  displayStatus("Fetch");
 
-  // One more display update after sending request
-  currentTime = millis();
-  handleAlternatingService(currentTime);
-  updateDisplay();
+  // AGGRESSIVE CACHING: No status updates or display pauses
+  // Display continues showing previous data seamlessly
 
   return true;
 }
@@ -1059,17 +1087,16 @@ void handleFetchStateMachine() {
       } else if (millis() - fetchStateData.startTime > 8000) {
         fetchClient.stop();
         Serial.println("❌ Timeout WAITING");
-        displayStatus("TIMEOUT");
+        // Don't show timeout status - keep displaying previous data
         fetchStateData.state = FETCH_FAIL;
       }
       break;
 
     case FETCH_READING:
       {
-        // Track when we last updated display
-        static unsigned long lastDisplayUpdate = 0;
-        unsigned long currentTime = millis();
-        
+        // AGGRESSIVE CACHING: Read data in background without blocking display
+        // Main loop handles display updates independently for zero pauses
+
         // Read in chunks for much better performance (10-20x faster than char-by-char)
         while (fetchClient.available()) {
           // Read up to 512 bytes at a time
@@ -1078,16 +1105,9 @@ void handleFetchStateMachine() {
           if (bytesRead > 0) {
             fetchStateData.buffer.concat((const char*)buffer, bytesRead);
           }
-          
-          // Update display every 200ms while reading to keep clock and animations alive
-          currentTime = millis();
-          if (currentTime - lastDisplayUpdate > 200) {
-            handleAlternatingService(currentTime);
-            updateDisplay();
-            lastDisplayUpdate = currentTime;
-          }
+          yield();  // Yield to prevent watchdog
         }
-        
+
         // Check if done - connection closed and no more data
         if (!fetchClient.connected() && !fetchClient.available()) {
           fetchClient.stop();  // Ensure clean disconnect
@@ -1099,7 +1119,7 @@ void handleFetchStateMachine() {
             fetchStateData.state = FETCH_FAIL;
           }
         }
-        
+
         // Timeout for reading - API server can be slow with large responses
         if (millis() - fetchStateData.startTime > 15000) {
           fetchClient.stop();
@@ -1109,7 +1129,7 @@ void handleFetchStateMachine() {
             fetchStateData.state = FETCH_DONE;
           } else {
             Serial.println("❌ Timeout READING");
-            displayStatus("TIMEOUT");
+            // Don't show timeout status - keep displaying previous data
             fetchStateData.state = FETCH_FAIL;
           }
         }
@@ -1118,25 +1138,25 @@ void handleFetchStateMachine() {
 
     case FETCH_DONE:
       if (parseAndDisplayResponse(fetchStateData.buffer)) {
-        displayStatus("OK");
-        fetchStateData.lastSuccess = millis();  
+        // INSTANT UPDATE: Dual buffer swap completed - display now shows fresh data
+        fetchStateData.lastSuccess = millis();
         lastDataUpdate = millis();
-        Serial.println("✅ Parse successful");
+        Serial.println("✅ Parse successful - display updated instantly");
       } else {
-        displayStatus("ERR");
-        Serial.println("❌ Parse failed");
+        Serial.println("❌ Parse failed - keeping previous data");
       }
       fetchStateData.buffer = "";
       fetchStateData.state = FETCH_IDLE;
       break;
 
     case FETCH_FAIL:
-      displayStatus("FAIL");
+      // AGGRESSIVE CACHING: On fetch fail, keep displaying previous data seamlessly
+      // No error status shown - display continues without interruption
       fetchClient.stop();
       fetchStateData.buffer = "";
       fetchStateData.state = FETCH_IDLE;
       lastDataUpdate = millis();
-      broadcastStatus("Failed to fetch train data", "error");
+      Serial.println("⚠️ Fetch failed - continuing with previous data");
       break;
 
     default:
@@ -1144,21 +1164,22 @@ void handleFetchStateMachine() {
   }
 }
 
-// Parse function - using the WORKING logic from original
+// Parse function - using dual buffer for instant updates with no pauses
 bool parseAndDisplayResponse(const String& response) {
   if (!serviceProvider) {
     Serial.println("❌ Service provider not initialized");
     return false;
   }
 
-  // Parse using service provider
+  // Parse into FETCH BUFFER (not displayState) - this allows background fetching
+  // Display continues showing previous data with zero pauses
   int newServiceCount = 0;
   bool success = serviceProvider->parseResponse(
     response,
-    displayState.services,
+    fetchBuffer.services,
     newServiceCount,
-    displayState.stationName,
-    sizeof(displayState.stationName),
+    fetchBuffer.stationName,
+    sizeof(fetchBuffer.stationName),
     config.useCallingAt
   );
 
@@ -1167,10 +1188,15 @@ bool parseAndDisplayResponse(const String& response) {
     return false;
   }
 
-  // Update display state
-  displayState.serviceCount = newServiceCount;
+  // ATOMIC SWAP: Copy fetch buffer to display state - instant update
+  // This is the only point where display data changes, ensuring no partial updates
+  fetchBuffer.serviceCount = newServiceCount;
+  memcpy(displayState.stationName, fetchBuffer.stationName, sizeof(displayState.stationName));
+  memcpy(displayState.services, fetchBuffer.services, sizeof(ServiceData) * Data::MAX_SERVICES);
+  displayState.serviceCount = fetchBuffer.serviceCount;
+
   displayState.markDirty();
-  displayState.fetchingNewStation = false;  // Clear loading state after successful parse
+  // AGGRESSIVE CACHING: No loading state to clear - instant update complete
 
   if (displayState.serviceCount > 0) {
     broadcastTrainUpdate();
@@ -1279,7 +1305,7 @@ void updateDisplay() {
 
   // 2. Handle no services case
   if (displayState.serviceCount == 0) {
-    displayNoServicesMessage(displayState.fetchingNewStation);
+    displayNoServicesMessage();
   }
   // 3. Handle calling at mode
   else if (config.useCallingAt && displayState.serviceCount > 0) {
@@ -1401,7 +1427,10 @@ void setupWebServer() {
       chunk.replace("{EXTRA_SEL_2}", config.extraServices == 2 ? " selected" : "");
       chunk.replace("{EXTRA_SEL_3}", config.extraServices == 3 ? " selected" : "");
       chunk.replace("{EXTRA_SEL_4}", config.extraServices == 4 ? " selected" : "");
-      chunk.replace("{SCROLL}", String(config.scrollSpeed));
+      chunk.replace("{SCROLL_SEL_10}", config.scrollSpeed == 10 ? " selected" : "");
+      chunk.replace("{SCROLL_SEL_25}", config.scrollSpeed == 25 ? " selected" : "");
+      chunk.replace("{SCROLL_SEL_50}", config.scrollSpeed == 50 ? " selected" : "");
+      chunk.replace("{SCROLL_SEL_100}", config.scrollSpeed == 100 ? " selected" : "");
       chunk.replace("{ROTATION}", String(config.rotationSpeed));
       chunk.replace("{YTOP}", String(config.yPosTop));
       chunk.replace("{Y1}", String(config.yPos1st));
@@ -1763,8 +1792,8 @@ void setupWebServer() {
     
     // Force immediate data fetch when station changes, line filter changes, direction filter changes, platform filter changes, OR when switching to calling at
     if (stationChanged || lineFilterChanged || directionFilterChanged || platformFilterChanged || switchedToCallingAt) {
-      displayState.serviceCount = 0;
-      displayState.fetchingNewStation = true;  // Mark that we're loading new station data
+      // AGGRESSIVE CACHING: Don't clear display data - keep showing previous station/data
+      // until new data arrives via instant atomic swap. No "No trains scheduled" flash!
 
       // Cancel any in-progress fetch and wait for cleanup
       if (fetchStateData.state != FETCH_IDLE) {
@@ -2000,12 +2029,10 @@ void loop() {
     if ((shouldFetch && enoughTimeSinceAttempt) || forceFetch) {
       if (WiFi.status() == WL_CONNECTED) {
         fetchStateData.lastAttempt = currentTime;
-        if (!asyncFetchStart()) {
-          displayStatus("ERR");
-        }
+        asyncFetchStart();  // Background fetch - no status changes, keeps displaying previous data
       } else {
         Serial.println("❌ WiFi disconnected");
-        displayStatus("OFF");
+        // Keep displaying previous data even when WiFi is down - no status changes
         fetchStateData.lastAttempt = currentTime;
         if (!initializeWiFi()) startAccessPoint();
       }

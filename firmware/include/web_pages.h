@@ -162,6 +162,39 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       border-bottom: 2px solid #667eea;
     }
 
+    /* Collapsible sections */
+    .collapsible-header {
+      transition: all 0.3s ease;
+    }
+
+    .collapsible-header:hover {
+      opacity: 0.8;
+    }
+
+    .collapsible-header .chevron {
+      transition: transform 0.3s ease;
+      font-size: 14px;
+      color: #667eea;
+    }
+
+    .collapsible-header[aria-expanded="false"] .chevron {
+      transform: rotate(-90deg);
+    }
+
+    .collapsible-content {
+      max-height: 2000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+      opacity: 1;
+      margin-top: 0;
+    }
+
+    .collapsible-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+      margin-top: -20px;
+    }
+
     .form-group {
       margin-bottom: 25px;
     }
@@ -348,6 +381,38 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       background: #667eea;
       color: white;
       border-color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .preset-category-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .preset-category-tab {
+      padding: 8px 16px;
+      background: white;
+      border: 2px solid #e0e0e0;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .preset-category-tab:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+
+    .preset-category-tab.active {
+      background: #667eea;
+      border-color: #667eea;
+      color: white;
     }
 
     .preset-btn.selected {
@@ -383,6 +448,83 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     .advanced-content.show {
       display: block;
+    }
+
+    .range-slider-group {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      border: 2px solid #e0e0e0;
+      margin-top: 8px;
+    }
+
+    .range-slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    .range-label {
+      font-weight: 500;
+    }
+
+    .range-value {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      background: white;
+      border-radius: 6px;
+      border: 2px solid #667eea;
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .range-slider {
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right, #28a745 0%, #ffc107 50%, #dc3545 100%);
+      outline: none;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .range-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: all 0.2s ease;
+    }
+
+    .range-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .range-slider::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: all 0.2s ease;
+    }
+
+    .range-slider::-moz-range-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
 
     .network-list {
@@ -694,6 +836,104 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       font-size: 14px;
     }
 
+    /* Signal Bars */
+    .signal-bars {
+      display: inline-flex;
+      gap: 3px;
+      align-items: flex-end;
+      height: 20px;
+      vertical-align: middle;
+    }
+
+    .signal-bar {
+      width: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      transition: background 0.3s ease;
+    }
+
+    .signal-bar:nth-child(1) { height: 25%; }
+    .signal-bar:nth-child(2) { height: 50%; }
+    .signal-bar:nth-child(3) { height: 75%; }
+    .signal-bar:nth-child(4) { height: 100%; }
+
+    .signal-bar.active {
+      background: #28a745;
+    }
+
+    .signal-bar.active.weak {
+      background: #dc3545;
+    }
+
+    .signal-bar.active.fair {
+      background: #ffc107;
+    }
+
+    .signal-bar.active.good,
+    .signal-bar.active.excellent {
+      background: #28a745;
+    }
+
+    /* Device Info Panel */
+    .device-info-panel {
+      margin-top: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .device-info-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      color: #667eea;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+
+    .device-info-toggle:hover {
+      background: #e9ecef;
+    }
+
+    .device-info-content {
+      display: none;
+      padding: 12px;
+      font-size: 11px;
+      color: #666;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .device-info-content.show {
+      display: block;
+    }
+
+    .device-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .device-info-row:last-child {
+      border-bottom: none;
+    }
+
+    .device-info-label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .uptime-counter {
+      font-family: 'Courier New', monospace;
+      color: #667eea;
+      font-weight: 600;
+    }
+
     /* Focus visible for accessibility */
     *:focus-visible {
       outline: 2px solid #667eea;
@@ -712,12 +952,21 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     <!-- Status Bar -->
     <div class="status-bar">
       <div class="status-item">
-        <div class="label">Device Status</div>
+        <div class="label">Status</div>
         <div class="value">
-          <span class="status-badge online">Online</span>
+          <span class="status-badge offline" id="deviceStatus">Connecting...</span>
         </div>
-        <div style="margin-top: 8px; font-size: 12px; color: #666;" id="wifiStrength" aria-live="polite">
-          📶 <span id="rssiValue">--</span> dBm
+      </div>
+      <div class="status-item">
+        <div class="label">WiFi Signal</div>
+        <div class="value" style="display: flex; align-items: center; justify-content: center; gap: 8px;" id="wifiStrength" aria-live="polite">
+          <div class="signal-bars" id="signalBars" aria-label="WiFi signal strength">
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+          </div>
+          <span style="font-size: 11px; color: #666;" id="rssiText">--</span>
         </div>
       </div>
       <div class="status-item">
@@ -725,12 +974,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <div class="value" id="currentStation" aria-live="polite">{STATION_NAME}</div>
       </div>
       <div class="status-item">
-        <div class="label">Device ID</div>
-        <div class="value" style="font-size: 14px;">{DEVICE_ID}</div>
-      </div>
-      <div class="status-item">
-        <div class="label">IP Address</div>
-        <div class="value" style="font-size: 14px;">{IP}</div>
+        <div class="label">Last Data Fetch</div>
+        <div class="value" id="lastFetchTime" aria-live="polite">Never</div>
       </div>
     </div>
 
@@ -770,22 +1015,74 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span id="stationLabel">Station Code (CRS)</span>
             <span class="info-tooltip" id="stationTooltip" title="Three-letter National Rail station code" aria-label="Information: Three-letter National Rail station code">?</span>
           </label>
-          <div class="preset-stations" id="nationalRailPresets">
-            <button type="button" class="preset-btn" data-station="PAD" data-name="Paddington" aria-label="Select Paddington station">PAD<br><small>Paddington</small></button>
-            <button type="button" class="preset-btn" data-station="VIC" data-name="Victoria" aria-label="Select Victoria station">VIC<br><small>Victoria</small></button>
-            <button type="button" class="preset-btn" data-station="WAT" data-name="Waterloo" aria-label="Select Waterloo station">WAT<br><small>Waterloo</small></button>
-            <button type="button" class="preset-btn" data-station="KGX" data-name="Kings Cross" aria-label="Select Kings Cross station">KGX<br><small>Kings Cross</small></button>
-            <button type="button" class="preset-btn" data-station="EUS" data-name="Euston" aria-label="Select Euston station">EUS<br><small>Euston</small></button>
-            <button type="button" class="preset-btn" data-station="LST" data-name="Liverpool Street" aria-label="Select Liverpool Street station">LST<br><small>Liverpool St</small></button>
+
+          <!-- National Rail Presets with Category Tabs -->
+          <div id="nationalRailPresets">
+            <div style="margin-bottom: 15px;">
+              <div class="preset-category-tabs" id="nationalRailTabs">
+                <button type="button" class="preset-category-tab active" data-category="london" aria-label="Show London stations">London</button>
+                <button type="button" class="preset-category-tab" data-category="major" aria-label="Show major city stations">Major Cities</button>
+                <button type="button" class="preset-category-tab" data-category="airports" aria-label="Show airport stations">Airports</button>
+                <button type="button" class="preset-category-tab" data-category="recent" aria-label="Show recently used stations">Recent</button>
+              </div>
+            </div>
+
+            <div class="preset-stations-container">
+              <!-- London Stations (default visible) -->
+              <div class="preset-stations" id="presets-london">
+                <button type="button" class="preset-btn" data-station="PAD" data-name="Paddington" aria-label="Select Paddington station">Paddington</button>
+                <button type="button" class="preset-btn" data-station="VIC" data-name="Victoria" aria-label="Select Victoria station">Victoria</button>
+                <button type="button" class="preset-btn" data-station="WAT" data-name="Waterloo" aria-label="Select Waterloo station">Waterloo</button>
+                <button type="button" class="preset-btn" data-station="KGX" data-name="Kings Cross" aria-label="Select Kings Cross station">Kings Cross</button>
+                <button type="button" class="preset-btn" data-station="EUS" data-name="Euston" aria-label="Select Euston station">Euston</button>
+                <button type="button" class="preset-btn" data-station="LST" data-name="Liverpool Street" aria-label="Select Liverpool Street station">Liverpool St</button>
+              </div>
+
+              <!-- Major Cities (hidden by default) -->
+              <div class="preset-stations" id="presets-major" style="display: none;">
+                <button type="button" class="preset-btn" data-station="MAN" data-name="Manchester Piccadilly" aria-label="Select Manchester Piccadilly station">Manchester</button>
+                <button type="button" class="preset-btn" data-station="BHM" data-name="Birmingham New Street" aria-label="Select Birmingham New Street station">Birmingham</button>
+                <button type="button" class="preset-btn" data-station="EDB" data-name="Edinburgh Waverley" aria-label="Select Edinburgh Waverley station">Edinburgh</button>
+                <button type="button" class="preset-btn" data-station="GLC" data-name="Glasgow Central" aria-label="Select Glasgow Central station">Glasgow</button>
+                <button type="button" class="preset-btn" data-station="LDS" data-name="Leeds" aria-label="Select Leeds station">Leeds</button>
+                <button type="button" class="preset-btn" data-station="LIV" data-name="Liverpool Lime Street" aria-label="Select Liverpool Lime Street station">Liverpool</button>
+              </div>
+
+              <!-- Airports -->
+              <div class="preset-stations" id="presets-airports" style="display: none;">
+                <button type="button" class="preset-btn" data-station="GTW" data-name="Gatwick Airport" aria-label="Select Gatwick Airport station">Gatwick</button>
+                <button type="button" class="preset-btn" data-station="SRA" data-name="Stansted Airport" aria-label="Select Stansted Airport station">Stansted</button>
+                <button type="button" class="preset-btn" data-station="LTN" data-name="Luton Airport Parkway" aria-label="Select Luton Airport station">Luton</button>
+                <button type="button" class="preset-btn" data-station="HWV" data-name="Heathrow Terminals 2 & 3" aria-label="Select Heathrow terminals station">Heathrow</button>
+                <button type="button" class="preset-btn" data-station="BHX" data-name="Birmingham International" aria-label="Select Birmingham Airport station">Birmingham Arpt</button>
+                <button type="button" class="preset-btn" data-station="MIA" data-name="Manchester Airport" aria-label="Select Manchester Airport station">Manchester Arpt</button>
+              </div>
+
+              <!-- Recent Stations (populated from localStorage) -->
+              <div class="preset-stations" id="presets-recent" style="display: none;">
+                <div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">
+                  No recently used stations
+                </div>
+              </div>
+            </div>
           </div>
+
+          <!-- TFL Underground Presets -->
           <div class="preset-stations" id="tflPresets" style="display:none;">
-            <button type="button" class="preset-btn" data-station="940GZZLUPAC" data-name="Paddington" aria-label="Select Paddington Underground">940GZZLUPAC<br><small>Paddington</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUVIC" data-name="Victoria" aria-label="Select Victoria Underground">940GZZLUVIC<br><small>Victoria</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUWLO" data-name="Waterloo" aria-label="Select Waterloo Underground">940GZZLUWLO<br><small>Waterloo</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUKSX" data-name="King's Cross" aria-label="Select Kings Cross Underground">940GZZLUKSX<br><small>King's Cross</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLUBST" data-name="Baker Street" aria-label="Select Baker Street Underground">940GZZLUBST<br><small>Baker Street</small></button>
-            <button type="button" class="preset-btn" data-station="940GZZLULVT" data-name="Liverpool Street" aria-label="Select Liverpool Street Underground">940GZZLULVT<br><small>Liverpool St</small></button>
+            <button type="button" class="preset-btn" data-station="940GZZLUPAC" data-name="Paddington" aria-label="Select Paddington Underground">Paddington</button>
+            <button type="button" class="preset-btn" data-station="940GZZLUVIC" data-name="Victoria" aria-label="Select Victoria Underground">Victoria</button>
+            <button type="button" class="preset-btn" data-station="940GZZLUWLO" data-name="Waterloo" aria-label="Select Waterloo Underground">Waterloo</button>
+            <button type="button" class="preset-btn" data-station="940GZZLUKSX" data-name="King's Cross" aria-label="Select Kings Cross Underground">King's Cross</button>
+            <button type="button" class="preset-btn" data-station="940GZZLUBST" data-name="Baker Street" aria-label="Select Baker Street Underground">Baker Street</button>
+            <button type="button" class="preset-btn" data-station="940GZZLULVT" data-name="Liverpool Street" aria-label="Select Liverpool Street Underground">Liverpool St</button>
           </div>
+
+          <!-- Manual Search Divider -->
+          <div style="text-align: center; margin: 20px 0 15px 0; color: #999; font-size: 13px; position: relative;">
+            <span style="background: white; padding: 0 10px; position: relative; z-index: 1;">OR search manually</span>
+            <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e0e0e0; z-index: 0;"></div>
+          </div>
+
           <div class="autocomplete-wrapper">
             <input type="text" id="station" name="station" value="{STATION}" placeholder="Type station name or code..." required maxlength="15" aria-label="Station code or name" aria-describedby="station-help">
             <div id="stationAutocomplete" class="autocomplete-results" role="listbox" aria-label="Station suggestions"></div>
@@ -838,11 +1135,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
           <div class="form-group">
             <label for="scrollspeed">
-              Scroll Speed (ms)
-              <span class="info-tooltip" title="Lower = faster scrolling" aria-label="Information: Lower = faster scrolling">?</span>
+              Scroll Speed
+              <span class="info-tooltip" title="Controls how fast text scrolls across the display" aria-label="Information: Controls how fast text scrolls across the display">?</span>
             </label>
-            <input type="number" id="scrollspeed" name="scrollspeed" value="{SCROLL}" min="10" max="200" required aria-describedby="scrollspeed-help">
-            <span class="help-text" id="scrollspeed-help">Recommended: 50-100ms</span>
+            <select id="scrollspeed" name="scrollspeed" aria-describedby="scrollspeed-help">
+              <option value="10"{SCROLL_SEL_10}>10ms (fastest)</option>
+              <option value="25"{SCROLL_SEL_25}>25ms (fast)</option>
+              <option value="50"{SCROLL_SEL_50}>50ms (moderate)</option>
+              <option value="100"{SCROLL_SEL_100}>100ms (smooth)</option>
+            </select>
+            <span class="help-text" id="scrollspeed-help">Delay between scroll steps - lower is faster, higher is smoother</span>
           </div>
         </div>
 
@@ -850,85 +1152,61 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <label for="mode">Display Mode</label>
           <select id="mode" name="mode" aria-describedby="mode-help">
             <option value="0"{MODE_SEL_0}>Standard View</option>
-            <option value="1"{MODE_SEL_1}>Calling At Mode (shows stops)</option>
+            <option value="1"{MODE_SEL_1}>Calling At Mode (show all intermediate stops)</option>
           </select>
-          <span class="help-text" id="mode-help">Calling At mode shows detailed stops for the first train</span>
+          <span class="help-text" id="mode-help">Calling At mode displays all intermediate station stops for the first departure</span>
         </div>
 
         <div class="form-group">
           <label for="showstation">Show Station Name at Top</label>
           <select id="showstation" name="showstation" aria-describedby="showstation-help">
             <option value="1"{SHOWSTATION_SEL_1}>Show Station Name</option>
-            <option value="0"{SHOWSTATION_SEL_0}>Hide Station Name (adds extra service line)</option>
+            <option value="0"{SHOWSTATION_SEL_0}>Hide Station Name (frees space for one more departure)</option>
           </select>
-          <span class="help-text" id="showstation-help">Hiding the station name adds an extra service at the top for more trains</span>
+          <span class="help-text" id="showstation-help">Hiding the station name frees up the top line to display an additional departure</span>
         </div>
 
         <div class="form-group">
-          <label for="extra">Extra Services on Bottom Line</label>
+          <label for="extra">Rotating Bottom Line Services</label>
           <select id="extra" name="extra" aria-describedby="extra-help">
-            <option value="0"{EXTRA_SEL_0}>No Extra Services</option>
-            <option value="1"{EXTRA_SEL_1}>1 Extra Service</option>
-            <option value="2"{EXTRA_SEL_2}>2 Extra Services</option>
-            <option value="3"{EXTRA_SEL_3}>3 Extra Services</option>
-            <option value="4"{EXTRA_SEL_4}>4 Extra Services</option>
+            <option value="0"{EXTRA_SEL_0}>No rotation (fixed last service)</option>
+            <option value="1"{EXTRA_SEL_1}>Rotate 1 extra service</option>
+            <option value="2"{EXTRA_SEL_2}>Rotate 2 extra services</option>
+            <option value="3"{EXTRA_SEL_3}>Rotate 3 extra services</option>
+            <option value="4"{EXTRA_SEL_4}>Rotate 4 extra services</option>
           </select>
-          <span class="help-text" id="extra-help">Number of additional services that rotate on the bottom line</span>
+          <span class="help-text" id="extra-help">The bottom line of the display automatically cycles through additional departures at the rotation speed below</span>
         </div>
 
         <div class="form-group">
-          <label for="rotationspeed">Bottom Line Rotation Speed (seconds)</label>
+          <label for="rotationspeed">
+            Bottom Line Rotation Speed (seconds)
+            <span class="info-tooltip" title="How long each service is displayed before rotating to the next" aria-label="Information: How long each service is displayed">?</span>
+          </label>
           <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" required aria-describedby="rotationspeed-help">
-          <span class="help-text" id="rotationspeed-help">How often the bottom line alternates between services (default: 15 seconds)</span>
+          <span class="help-text" id="rotationspeed-help">Recommended: 12-18 seconds. How often the bottom line alternates between services</span>
         </div>
-
-        <div class="form-row form-row-three">
-          <div class="form-group">
-            <label for="ytop">Top Line Position (No Station Name)</label>
-            <input type="number" id="ytop" name="ytop" value="{YTOP}" min="0" max="64" required aria-describedby="ytop-help">
-            <span class="help-text" id="ytop-help">Default 12. Position when station name is hidden.</span>
-          </div>
-
-          <div class="form-group">
-            <label for="y1">First Line Vertical Position</label>
-            <input type="number" id="y1" name="y1" value="{Y1}" min="0" max="64" required aria-describedby="y1-help">
-            <span class="help-text" id="y1-help">Default 26. Higher values move the first line lower.</span>
-          </div>
-
-          <div class="form-group">
-            <label for="y2">Second Line Vertical Position</label>
-            <input type="number" id="y2" name="y2" value="{Y2}" min="0" max="64" required aria-describedby="y2-help">
-            <span class="help-text" id="y2-help">Default 38. Keep lower than the bottom line for spacing.</span>
-          </div>
-
-          <div class="form-group">
-            <label for="y3">Bottom Line Vertical Position</label>
-            <input type="number" id="y3" name="y3" value="{Y3}" min="0" max="64" required aria-describedby="y3-help">
-            <span class="help-text" id="y3-help">Default 50. Controls the alternating services baseline.</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="button-group">
-          <button type="button" class="btn btn-danger" id="resetButton" aria-label="Factory reset device">
-            Factory Reset
-          </button>
-        </div>
-        <p style="margin-top: 15px; padding: 12px; background: #e7f3ff; border-radius: 8px; font-size: 13px; color: #004085;">
-          <strong>ℹ️ Note:</strong> All settings on this page apply automatically when changed. Only WiFi changes (in Network Settings) require a restart.
-        </p>
       </div>
 
       <!-- Live Display Preview -->
       <div class="card" style="margin-top: 20px;">
-        <h2>🖥️ Live Display Preview</h2>
-        <div id="livePreview" class="display-frame" role="region" aria-live="polite" aria-label="Live display preview">
-          <div class="display-waiting">Connecting to device...</div>
-        </div>
-        <div class="ws-status">
-          <span><span class="ws-indicator" id="wsIndicator" aria-hidden="true"></span> <span id="wsStatusText">Disconnected</span></span>
-          <span>Last Update: <span id="lastUpdate">Never</span></span>
+        <h2 class="collapsible-header" id="previewHeader" style="cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;" role="button" tabindex="0" aria-expanded="true" aria-controls="previewContent">
+          <span>🖥️ Live Display Preview</span>
+          <span class="chevron" aria-hidden="true">▼</span>
+        </h2>
+        <div id="previewContent" class="collapsible-content">
+          <div id="livePreview" class="display-frame" role="region" aria-live="polite" aria-label="Live display preview">
+            <div class="display-waiting">Connecting to device...</div>
+          </div>
+          <div class="ws-status" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; gap: 20px;">
+              <span><span class="ws-indicator" id="wsIndicator" aria-hidden="true"></span> <span id="wsStatusText">Disconnected</span></span>
+              <span>Last Update: <span id="lastUpdate">Never</span></span>
+            </div>
+            <button type="button" id="refreshNowBtn" class="btn btn-outline" style="padding: 6px 12px; font-size: 13px;" aria-label="Manually refresh departure data now">
+              🔄 Refresh Now
+            </button>
+          </div>
         </div>
       </div>
         </div>
@@ -977,6 +1255,22 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             </p>
           </div>
         </form>
+
+        <!-- Danger Zone -->
+        <div class="card" style="margin-top: 20px; border: 2px solid #dc3545;">
+          <h2 style="color: #dc3545;">⚠️ Danger Zone</h2>
+          <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+            Irreversible actions that will reset your device to factory defaults.
+          </p>
+          <div class="button-group">
+            <button type="button" class="btn btn-danger" id="resetButton" aria-label="Factory reset device">
+              Factory Reset
+            </button>
+          </div>
+          <p style="margin-top: 15px; padding: 12px; background: #f8d7da; border-radius: 8px; font-size: 13px; color: #721c24;">
+            <strong>⚠️ Warning:</strong> This will erase all settings including WiFi credentials and restart the device in setup mode.
+          </p>
+        </div>
       </div>
     </div>
 
@@ -1009,6 +1303,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    };
+
+    /**
+     * Decode HTML entities for display
+     */
+    const decodeHtml = (html) => {
+      if (html === null || html === undefined) return '';
+      const txt = document.createElement('textarea');
+      txt.innerHTML = html;
+      return txt.value;
     };
 
     /**
@@ -1316,24 +1620,34 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
           if (data.type === "display_snapshot") {
             updateDisplayPreview(data);
+            updateLastFetchTime(); // Update when we get new data
           } else if (data.type === "status") {
             showToast(data.message, data.level);
           } else if (data.type === "train_update") {
             if (data.station) {
               const stationEl = document.getElementById("currentStation");
               if (stationEl) {
-                stationEl.textContent = escapeHtml(data.station);
+                stationEl.textContent = decodeHtml(data.station);
               }
             }
+            updateLastFetchTime(); // Update when we get new train data
           } else if (data.type === "metrics") {
             updateRSSI(data.rssi);
           } else if (data.type === "state") {
-            if (data.stationName) {
+            // Handle station name display
+            const stationName = data.stationName || data['displayState.stationName'];
+            if (stationName) {
               const stationEl = document.getElementById("currentStation");
               if (stationEl) {
-                stationEl.textContent = escapeHtml(data.stationName);
+                stationEl.textContent = decodeHtml(stationName);
               }
             }
+
+            // Highlight active preset button based on station code
+            if (data.station) {
+              highlightActivePresetButton(data.station);
+            }
+
             updateRSSI(data.rssi);
           }
         } catch (e) {
@@ -1358,17 +1672,31 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     const updateWSStatus = (connected) => {
       const indicator = document.getElementById("wsIndicator");
       const statusText = document.getElementById("wsStatusText");
+      const deviceStatus = document.getElementById("deviceStatus");
 
-      if (!indicator || !statusText) return;
+      if (indicator && statusText) {
+        if (connected) {
+          indicator.classList.add("connected");
+          statusText.textContent = "Connected";
+          statusText.style.color = "#28a745";
+        } else {
+          indicator.classList.remove("connected");
+          statusText.textContent = "Disconnected";
+          statusText.style.color = "#dc3545";
+        }
+      }
 
-      if (connected) {
-        indicator.classList.add("connected");
-        statusText.textContent = "Connected";
-        statusText.style.color = "#28a745";
-      } else {
-        indicator.classList.remove("connected");
-        statusText.textContent = "Disconnected";
-        statusText.style.color = "#dc3545";
+      // Update main device status badge
+      if (deviceStatus) {
+        if (connected) {
+          deviceStatus.textContent = "Online";
+          deviceStatus.classList.remove("offline");
+          deviceStatus.classList.add("online");
+        } else {
+          deviceStatus.textContent = "Offline";
+          deviceStatus.classList.remove("online");
+          deviceStatus.classList.add("offline");
+        }
       }
     };
 
@@ -1376,18 +1704,42 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       if (!rssi) return;
 
       let signal = "Weak";
-      if (rssi > -50) signal = "Excellent";
-      else if (rssi > -60) signal = "Good";
-      else if (rssi > -70) signal = "Fair";
+      let activeBars = 1;
+      let signalClass = "weak";
 
-      const rssiValueEl = document.getElementById("rssiValue");
-      if (rssiValueEl) {
-        rssiValueEl.textContent = escapeHtml(rssi);
+      if (rssi > -50) {
+        signal = "Excellent";
+        activeBars = 4;
+        signalClass = "excellent";
+      } else if (rssi > -60) {
+        signal = "Good";
+        activeBars = 3;
+        signalClass = "good";
+      } else if (rssi > -70) {
+        signal = "Fair";
+        activeBars = 2;
+        signalClass = "fair";
       }
 
-      const wifiStrengthEl = document.getElementById("wifiStrength");
-      if (wifiStrengthEl) {
-        wifiStrengthEl.textContent = `📶 ${escapeHtml(signal)} (${escapeHtml(rssi)} dBm)`;
+      // Update signal bars
+      const signalBars = document.querySelectorAll('#signalBars .signal-bar');
+      signalBars.forEach((bar, index) => {
+        bar.classList.remove('active', 'weak', 'fair', 'good', 'excellent');
+        if (index < activeBars) {
+          bar.classList.add('active', signalClass);
+        }
+      });
+
+      // Update RSSI text
+      const rssiTextEl = document.getElementById("rssiText");
+      if (rssiTextEl) {
+        rssiTextEl.textContent = `${escapeHtml(signal)}`;
+      }
+
+      // Update RSSI value in device info
+      const rssiValueEl = document.getElementById("rssiValue");
+      if (rssiValueEl) {
+        rssiValueEl.textContent = `${escapeHtml(rssi)} dBm`;
       }
     };
 
@@ -1627,6 +1979,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Note: Don't auto-apply - user must click the Apply Station Settings button
+
+      // Track recent stations
+      addToRecentStations(code, name || code);
     };
 
     // ==================== Form Validation ====================
@@ -1715,7 +2070,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       setTimeout(() => {
         window.location.href = "/reset";
-      }, 1000);
+      }, 1500);
     };
 
     // ==================== Auto-Apply Settings ====================
@@ -1855,37 +2210,182 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
      * Display tube line selector
      */
     const showTflLineSelector = async (stationId) => {
-      // Clear line filter first
       const lineFilter = document.getElementById('tflLineFilter');
-      lineFilter.innerHTML = '<option value="">All Lines</option>';
-      lineFilter.value = '';
-
-      // Clear platform filter
       const platformFilter = document.getElementById('tflPlatformFilter');
-      platformFilter.innerHTML = '<option value="">All Platforms</option>';
-      platformFilter.value = '';
 
-      const lines = await fetchTflStationLines(stationId);
+      // Show loading state - disable dropdowns and show "Loading..."
+      lineFilter.innerHTML = '<option value="">Loading lines...</option>';
+      lineFilter.disabled = true;
+      platformFilter.innerHTML = '<option value="">Loading platforms...</option>';
+      platformFilter.disabled = true;
 
-      if (lines.length === 0) {
-        showToast('No tube lines found for this station', 'warning');
-        return;
+      try {
+        const lines = await fetchTflStationLines(stationId);
+
+        if (lines.length === 0) {
+          // No lines found - reset to default state
+          lineFilter.innerHTML = '<option value="">All Lines</option>';
+          lineFilter.disabled = false;
+          platformFilter.innerHTML = '<option value="">All Platforms</option>';
+          platformFilter.disabled = false;
+          showToast('No tube lines found for this station', 'warning');
+          return;
+        }
+
+        // Store lines data globally for platform filtering
+        window.tflLinesData = lines;
+
+        // Populate the line filter dropdown
+        lineFilter.innerHTML = '<option value="">All Lines</option>' +
+          lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
+        lineFilter.disabled = false;
+
+        // Reset platform filter and re-enable
+        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.disabled = false;
+
+        // Don't auto-select any line - let the user choose
+        lineFilter.value = '';
+
+        // Show toast with available lines
+        const lineNames = lines.map(l => l.name).join(', ');
+        showToast(`Available lines: ${lineNames}`, 'info');
+      } catch (error) {
+        // Error handling - reset to default state
+        lineFilter.innerHTML = '<option value="">All Lines</option>';
+        lineFilter.disabled = false;
+        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.disabled = false;
       }
-
-      // Store lines data globally for platform filtering
-      window.tflLinesData = lines;
-
-      // Populate the line filter dropdown
-      lineFilter.innerHTML = '<option value="">All Lines</option>' +
-        lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
-
-      // Don't auto-select any line - let the user choose
-      lineFilter.value = '';
-
-      // Show toast with available lines
-      const lineNames = lines.map(l => l.name).join(', ');
-      showToast(`Available lines: ${lineNames}`, 'info');
     };
+
+    // ==================== Advanced Controls Toggle ====================
+
+    /**
+     * Update the last fetch time display
+     */
+    let lastFetchTimestamp = null;
+
+    function updateLastFetchTime() {
+      lastFetchTimestamp = Date.now();
+      const lastFetchEl = document.getElementById('lastFetchTime');
+      if (lastFetchEl) {
+        lastFetchEl.textContent = 'Just now';
+      }
+    }
+
+    // Update "time ago" display for last fetch
+    setInterval(() => {
+      if (!lastFetchTimestamp) return;
+
+      const lastFetchEl = document.getElementById('lastFetchTime');
+      if (!lastFetchEl) return;
+
+      const secondsAgo = Math.floor((Date.now() - lastFetchTimestamp) / 1000);
+
+      if (secondsAgo < 60) {
+        lastFetchEl.textContent = secondsAgo < 10 ? 'Just now' : `${secondsAgo}s ago`;
+      } else if (secondsAgo < 3600) {
+        const minutesAgo = Math.floor(secondsAgo / 60);
+        lastFetchEl.textContent = `${minutesAgo}m ago`;
+      } else {
+        const hoursAgo = Math.floor(secondsAgo / 3600);
+        lastFetchEl.textContent = `${hoursAgo}h ago`;
+      }
+    }, 1000);
+
+    // ==================== Preset Button Highlighting ====================
+
+    /**
+     * Highlight the active preset button based on station code
+     */
+    function highlightActivePresetButton(stationCode) {
+      if (!stationCode) return;
+
+      // Normalize the station code for comparison
+      const normalizedCode = stationCode.trim().toUpperCase();
+
+      document.querySelectorAll('.preset-btn[data-station]').forEach(btn => {
+        const btnCode = btn.dataset.station.trim().toUpperCase();
+        if (btnCode === normalizedCode) {
+          btn.classList.add('selected');
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
+    }
+
+    // ==================== Recent Stations Management ====================
+
+    /**
+     * Add station to recent stations list
+     */
+    function addToRecentStations(code, name) {
+      try {
+        let recent = JSON.parse(localStorage.getItem('recentStations') || '[]');
+        // Remove duplicates
+        recent = recent.filter(s => s.code !== code);
+        // Add to front
+        recent.unshift({ code, name, timestamp: Date.now() });
+        // Keep last 6
+        recent = recent.slice(0, 6);
+        localStorage.setItem('recentStations', JSON.stringify(recent));
+      } catch (e) {
+        console.error('Error saving recent stations:', e);
+      }
+    }
+
+    /**
+     * Load and display recent stations
+     */
+    function loadRecentStations() {
+      const container = document.getElementById('presets-recent');
+      if (!container) return;
+
+      try {
+        const recent = JSON.parse(localStorage.getItem('recentStations') || '[]');
+
+        if (recent.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">No recently used stations</div>';
+          return;
+        }
+
+        const stationButtons = recent.map(station =>
+          `<button type="button" class="preset-btn" data-station="${escapeHtml(station.code)}" aria-label="Select ${escapeHtml(station.name || station.code)} station">
+            ${escapeHtml(station.name || station.code)}
+          </button>`
+        ).join('');
+
+        // Add Clear All button
+        const clearButton = `
+          <button type="button" class="preset-btn" id="clearRecentBtn" style="background: #dc3545; color: white; border-color: #dc3545;" aria-label="Clear all recent stations">
+            🗑️ Clear All
+          </button>
+        `;
+
+        container.innerHTML = stationButtons + clearButton;
+
+        // Re-attach click handlers for station buttons
+        container.querySelectorAll('.preset-btn[data-station]').forEach(btn => {
+          btn.addEventListener('click', () => setStation(btn.dataset.station));
+        });
+
+        // Attach handler for Clear All button
+        const clearBtn = document.getElementById('clearRecentBtn');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', () => {
+            if (confirm('Clear all recently used stations?')) {
+              localStorage.removeItem('recentStations');
+              loadRecentStations(); // Reload to show empty state
+              showToast('Recent stations cleared', 'success');
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error loading recent stations:', e);
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 14px;">Error loading recent stations</div>';
+      }
+    }
 
     /**
      * Display platform selector for a selected tube line
@@ -1926,6 +2426,56 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       loadStationData();
       setupStationAutocomplete();
       setupValidation();
+
+      // Setup Refresh Now button
+      const refreshNowBtn = document.getElementById('refreshNowBtn');
+      if (refreshNowBtn) {
+        refreshNowBtn.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({command: "refresh"}));
+            showToast("Refreshing departure data...", "info");
+          } else {
+            showToast("Not connected to device", "error");
+          }
+        });
+      }
+
+      // Setup auto-apply for scroll speed dropdown
+      const scrollspeedSelect = document.getElementById('scrollspeed');
+      if (scrollspeedSelect) {
+        scrollspeedSelect.addEventListener('change', () => {
+          autoApplySettings();
+        });
+      }
+
+      // Setup auto-apply for rotation speed input
+      const rotationspeedInput = document.getElementById('rotationspeed');
+      if (rotationspeedInput) {
+        rotationspeedInput.addEventListener('input', () => {
+          autoApplySettings();
+        });
+      }
+
+      // Setup preset category tabs
+      document.querySelectorAll('.preset-category-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+          // Update active tab
+          document.querySelectorAll('.preset-category-tab').forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+
+          // Show corresponding presets
+          const category = this.dataset.category;
+          document.querySelectorAll('.preset-stations').forEach(group => {
+            group.style.display = group.id === `presets-${category}` ? 'grid' : 'none';
+          });
+
+          // Load recent stations if needed
+          if (category === 'recent') {
+            loadRecentStations();
+          }
+        });
+      });
+
       setupForms();
 
       // Service type selection handler
@@ -1961,8 +2511,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // Update labels
         if (isUnderground) {
-          stationLabel.textContent = "TFL Station ID";
-          stationTooltip.title = "TFL Station ID (hub codes like HUBSOK or NaPTAN IDs like 940GZZLUPAC)";
+          stationLabel.textContent = "TFL Station";
+          stationTooltip.title = "TFL Station code (e.g., HUBSOK for South Kensington or 940GZZLUPAC for Piccadilly Circus)";
         } else {
           stationLabel.textContent = "Station Code (CRS)";
           stationTooltip.title = "Three-letter National Rail station code";
@@ -2022,19 +2572,22 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Apply Station Settings button handler
-      document.getElementById('applyStationBtn').addEventListener('click', () => {
-        const stationInput = document.getElementById('station');
+      const applyStationBtn = document.getElementById('applyStationBtn');
+      if (applyStationBtn) {
+        applyStationBtn.addEventListener('click', () => {
+          const stationInput = document.getElementById('station');
 
-        if (stationInput.value.length < 3) {
-          showToast("Station code must be at least 3 characters", "error");
-          return;
-        }
+          if (stationInput && stationInput.value.length < 3) {
+            showToast("Station code must be at least 3 characters", "error");
+            return;
+          }
 
-        autoApplySettings();
+          autoApplySettings();
 
-        // Note: Don't refetch lines - they're already loaded when station was selected
-        // Refetching would clear the user's line and platform selections
-      });
+          // Note: Don't refetch lines - they're already loaded when station was selected
+          // Refetching would clear the user's line and platform selections
+        });
+      }
 
       // Tab button event listeners
       document.querySelectorAll('.tab-button').forEach((btn, index) => {
@@ -2046,15 +2599,83 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         btn.addEventListener('click', () => setStation(btn.dataset.station, btn.dataset.name));
       });
 
+      // Live Preview collapsible toggle
+      const previewHeader = document.getElementById('previewHeader');
+      const previewContent = document.getElementById('previewContent');
+
+      if (previewHeader && previewContent) {
+        // Load saved state from localStorage
+        const isCollapsed = localStorage.getItem('previewCollapsed') === 'true';
+        if (isCollapsed) {
+          previewContent.classList.add('collapsed');
+          previewHeader.setAttribute('aria-expanded', 'false');
+        }
+
+        // Toggle function
+        const togglePreview = () => {
+          const isCurrentlyCollapsed = previewContent.classList.contains('collapsed');
+
+          if (isCurrentlyCollapsed) {
+            previewContent.classList.remove('collapsed');
+            previewHeader.setAttribute('aria-expanded', 'true');
+            localStorage.setItem('previewCollapsed', 'false');
+          } else {
+            previewContent.classList.add('collapsed');
+            previewHeader.setAttribute('aria-expanded', 'false');
+            localStorage.setItem('previewCollapsed', 'true');
+          }
+        };
+
+        // Add click handler
+        previewHeader.addEventListener('click', togglePreview);
+
+        // Add keyboard support (Enter or Space)
+        previewHeader.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            togglePreview();
+          }
+        });
+      }
+
       // Reset button
-      document.getElementById('resetButton').addEventListener('click', showResetModal);
-      document.getElementById('cancelResetBtn').addEventListener('click', hideResetModal);
-      document.getElementById('confirmResetBtn').addEventListener('click', confirmReset);
+      const resetButton = document.getElementById('resetButton');
+      const cancelResetBtn = document.getElementById('cancelResetBtn');
+      const confirmResetBtn = document.getElementById('confirmResetBtn');
+
+      if (resetButton) resetButton.addEventListener('click', showResetModal);
+      if (cancelResetBtn) cancelResetBtn.addEventListener('click', hideResetModal);
+      if (confirmResetBtn) confirmResetBtn.addEventListener('click', confirmReset);
 
       // Scan networks button
-      document.getElementById('scanNetworksBtn').addEventListener('click', scanNetworks);
+      const scanNetworksBtn = document.getElementById('scanNetworksBtn');
+      if (scanNetworksBtn) scanNetworksBtn.addEventListener('click', scanNetworks);
+
+      // Update firmware info in footer
+      const firmwareInfo = document.getElementById('firmwareInfo');
+      if (firmwareInfo) {
+        firmwareInfo.textContent = 'v2.1.0';
+      }
+
+      // Highlight the active preset button based on initial station value
+      if (stationInput && stationInput.value) {
+        // Use stationCode from dataset if available, otherwise use the input value
+        const initialStationCode = stationInput.dataset.stationCode || stationInput.value;
+        highlightActivePresetButton(initialStationCode);
+      }
     });
   </script>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; color: #555; font-size: 12px; background: rgba(255,255,255,0.8); margin-top: 20px; border-radius: 8px;">
+    <div style="margin-bottom: 5px;">
+      <strong>StationBoards</strong> • Firmware <span id="firmwareInfo">v2.1.0</span> • IP <span id="deviceIP">{IP}</span>
+    </div>
+    <div>
+      Device ID: <span id="deviceID">{DEVICE_ID}</span>
+    </div>
+  </div>
+
 </body>
 </html>
 )HTMLCODE";

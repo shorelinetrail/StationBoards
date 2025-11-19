@@ -45,15 +45,16 @@ bool NationalRailProvider::buildRequest(const char* stationCode, String& request
   }
 
   // Build SOAP request
+  // Use GetDepBoardWithDetailsRequest to include calling points (subsequentCallingPoints)
   String soapRequest;
   soapRequest.reserve(512);
   soapRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
   soapRequest += "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">";
   soapRequest += "<soap:Header><AccessToken xmlns=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\">";
   soapRequest += "<TokenValue>" + String(apiToken) + "</TokenValue></AccessToken></soap:Header>";
-  soapRequest += "<soap:Body><GetDepartureBoardRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
+  soapRequest += "<soap:Body><GetDepBoardWithDetailsRequest xmlns=\"http://thalesgroup.com/RTTI/2016-02-16/ldb/\">";
   soapRequest += "<numRows>8</numRows><crs>" + String(stationCode) + "</crs>";
-  soapRequest += "</GetDepartureBoardRequest></soap:Body></soap:Envelope>";
+  soapRequest += "</GetDepBoardWithDetailsRequest></soap:Body></soap:Envelope>";
 
   // Build HTTP request
   request = "POST " + String(apiPath) + " HTTP/1.1\r\n";
@@ -101,8 +102,9 @@ bool NationalRailProvider::parseResponse(const String& response,
   if (servicesStart == -1) servicesStart = response.indexOf("<lt4:trainServices>");
 
   if (servicesStart == -1) {
-    Serial.println("❌ No services tag found");
-    return false;
+    Serial.println("ℹ️ No services tag found - station has no departures");
+    serviceCount = 0;
+    return true;  // Valid response, just no services available
   }
 
   int servicesEnd = response.indexOf("</lt5:trainServices>", servicesStart);
@@ -156,6 +158,107 @@ bool NationalRailProvider::parseResponse(const String& response,
       services[serviceCount].callingPoints[0] = '\0';
 
       Serial.println("🚂 " + String(serviceCount + 1) + ": " + std + " → " + destination);
+
+      // Parse calling points for first service if in calling at mode
+      if (useCallingAt && serviceCount == 0) {
+        Serial.println("📍 Attempting to parse calling points (useCallingAt=true, serviceCount=0)");
+
+        int cpListIdx = block.indexOf("<lt5:subsequentCallingPoints>");
+        if (cpListIdx == -1) cpListIdx = block.indexOf("<lt4:subsequentCallingPoints>");
+
+        if (cpListIdx == -1) {
+          Serial.println("❌ No <subsequentCallingPoints> tag found");
+          Serial.println("📄 Block size: " + String(block.length()) + " bytes");
+          Serial.println("📄 First 300 chars: " + block.substring(0, min(300, (int)block.length())));
+        } else {
+          Serial.println("✅ Found <subsequentCallingPoints> at position " + String(cpListIdx));
+        }
+
+        if (cpListIdx != -1) {
+          int cpListEndIdx = block.indexOf("</lt5:subsequentCallingPoints>", cpListIdx);
+          if (cpListEndIdx == -1) cpListEndIdx = block.indexOf("</lt4:subsequentCallingPoints>", cpListIdx);
+
+          if (cpListEndIdx == -1) {
+            Serial.println("❌ No closing </subsequentCallingPoints> tag found");
+          } else {
+            Serial.println("✅ Found closing tag at position " + String(cpListEndIdx));
+          }
+
+          if (cpListEndIdx != -1) {
+            String cpSection = block.substring(cpListIdx, cpListEndIdx);
+            Serial.println("📄 Calling points section size: " + String(cpSection.length()) + " bytes");
+
+            int cpListStart = cpSection.indexOf("<lt4:callingPointList>");
+            if (cpListStart == -1) cpListStart = cpSection.indexOf("<lt5:callingPointList>");
+
+            if (cpListStart == -1) {
+              Serial.println("❌ No <callingPointList> tag found");
+            } else {
+              Serial.println("✅ Found <callingPointList> at position " + String(cpListStart));
+            }
+
+            if (cpListStart != -1) {
+              int cpListEnd = cpSection.indexOf("</lt4:callingPointList>", cpListStart);
+              if (cpListEnd == -1) cpListEnd = cpSection.indexOf("</lt5:callingPointList>", cpListStart);
+
+              if (cpListEnd != -1) {
+                String cpList = cpSection.substring(cpListStart, cpListEnd);
+
+                String cpTag = "<lt4:callingPoint>";
+                String cpEndTag = "</lt4:callingPoint>";
+
+                if (cpList.indexOf(cpTag) == -1) {
+                  cpTag = "<lt5:callingPoint>";
+                  cpEndTag = "</lt5:callingPoint>";
+                }
+
+                String callingPoints = "";
+                int cpPos = 0;
+
+                while ((cpPos = cpList.indexOf(cpTag, cpPos)) != -1) {
+                  int cpEnd = cpList.indexOf(cpEndTag, cpPos);
+                  if (cpEnd == -1) break;
+
+                  String cpBlock = cpList.substring(cpPos, cpEnd);
+
+                  String cpName = extractTagValue(cpBlock, "locationName", "lt4");
+                  if (cpName == "") cpName = extractTagValue(cpBlock, "locationName", "lt5");
+                  cpName = decodeHTMLEntities(cpName);
+
+                  String cpTime = extractTagValue(cpBlock, "st", "lt4");
+                  if (cpTime == "") cpTime = extractTagValue(cpBlock, "st", "lt5");
+
+                  if (cpName != "") {
+                    if (callingPoints != "") callingPoints += ", ";
+                    callingPoints += cpName;
+                    if (cpTime != "") callingPoints += " (" + cpTime + ")";
+                  }
+
+                  cpPos = cpEnd;
+
+                  // Allow other tasks to run during long calling points lists
+                  yield();
+                }
+
+                if (callingPoints != "" && callingPoints.length() < 500) {
+                  callingPoints.toCharArray(services[serviceCount].callingPoints, 500);
+                  Serial.println("  ✅ Calling at: " + callingPoints);
+                } else if (callingPoints == "") {
+                  String fallback = "No further stops available";
+                  fallback.toCharArray(services[serviceCount].callingPoints, 500);
+                  Serial.println("  ⚠️  Empty calling points list");
+                } else {
+                  Serial.println("  ⚠️  Calling points too long (" + String(callingPoints.length()) + " chars), truncating");
+                  callingPoints = callingPoints.substring(0, 499);
+                  callingPoints.toCharArray(services[serviceCount].callingPoints, 500);
+                  Serial.println("  ✅ Calling at (truncated): " + callingPoints);
+                }
+              }
+            }
+          }
+        }
+      }
+
       serviceCount++;
     }
 
@@ -401,7 +504,7 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   // TFL JSON has TONS of fields we don't use: currentLocation, vehicleId, bearing, etc.
   // By filtering, we can use much smaller documents and avoid heap fragmentation
   StaticJsonDocument<200> filter;
-  filter[0]["$type"] = true;          // Required by ArduinoJson for proper parsing
+  // Note: $type field removed - it contains problematic characters that cause InvalidInput
   filter[0]["stationName"] = true;    // Station name (first arrival only)
   filter[0]["lineName"] = true;       // e.g., "Northern"
   filter[0]["lineId"] = true;         // e.g., "northern"
@@ -424,14 +527,15 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   DynamicJsonDocument doc(docSize);
   DeserializationError error = deserializeJson(doc, jsonStart_ptr, DeserializationOption::Filter(filter));
 
-  // Retry logic for IncompleteInput - increase size incrementally
+  // Retry logic for IncompleteInput or InvalidInput - increase size incrementally
   int retryCount = 0;
-  while (error && error.code() == DeserializationError::IncompleteInput && retryCount < 3) {
+  while (error && (error.code() == DeserializationError::IncompleteInput ||
+                   error.code() == DeserializationError::InvalidInput) && retryCount < 3) {
     retryCount++;
     size_t newSize = docSize + 8192; // Add 8KB per retry
     if (newSize > 49152) newSize = 49152; // Cap at 48KB
 
-    Serial.println("⚠️  IncompleteInput error - retry #" + String(retryCount) + " with " + String(newSize) + " bytes");
+    Serial.println("⚠️  " + String(error.c_str()) + " error - retry #" + String(retryCount) + " with " + String(newSize) + " bytes");
     Serial.print("💾 Free heap: ");
     Serial.print(ESP.getFreeHeap());
     Serial.println(" bytes");
