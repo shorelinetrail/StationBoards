@@ -516,9 +516,12 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   // With filtering, we extract only 8 fields per arrival, so the filtered document
   // is much smaller than the source JSON. However, major stations can return 22KB+
-  // even with line filtering. Start larger to avoid retry/fragmentation.
-  // Strategy: Start with 32KB, retry incrementally on IncompleteInput if needed
-  size_t docSize = 32768;  // Start with 32KB for filtered responses (major stations need this)
+  // even with line filtering.
+  //
+  // HEAP FRAGMENTATION STRATEGY: Start with smaller size that can fit in fragmented heap,
+  // then progressively retry with larger sizes if IncompleteInput
+  // Major stations need 16-20KB even with filtering
+  size_t docSize = 16384;  // Start with 16KB - better chance in fragmented heap
 
   unsigned long freeHeap = ESP.getFreeHeap();
   Serial.print("💾 Free heap: ");
@@ -530,17 +533,22 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     Serial.println("⚠️  WARNING: Low heap memory - allocation may fail due to fragmentation");
   }
 
+  // Force garbage collection before large allocation
+  yield();
+  delay(10);
+
   DynamicJsonDocument doc(docSize);
   DeserializationError error = deserializeJson(doc, jsonStart_ptr, DeserializationOption::Filter(filter));
 
   // Retry logic for IncompleteInput or InvalidInput - increase size incrementally
   // Note: NoMemory errors are NOT retried - they indicate heap fragmentation
+  // Progressive sizing: 16KB → 20KB → 24KB → 28KB (4KB increments, more attempts)
   int retryCount = 0;
   while (error && (error.code() == DeserializationError::IncompleteInput ||
-                   error.code() == DeserializationError::InvalidInput) && retryCount < 2) {
+                   error.code() == DeserializationError::InvalidInput) && retryCount < 3) {
     retryCount++;
-    size_t newSize = docSize + 4096; // Add 4KB per retry (smaller increments)
-    if (newSize > 40960) newSize = 40960; // Cap at 40KB (realistic for ESP32)
+    size_t newSize = docSize + 4096; // Add 4KB per retry
+    if (newSize > 28672) newSize = 28672; // Cap at 28KB (balance size vs fragmentation)
 
     Serial.println("⚠️  " + String(error.c_str()) + " error - retry #" + String(retryCount) + " with " + String(newSize) + " bytes");
     Serial.print("💾 Free heap: ");
