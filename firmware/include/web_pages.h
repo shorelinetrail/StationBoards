@@ -2613,19 +2613,22 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Apply Station Settings button handler
-      document.getElementById('applyStationBtn').addEventListener('click', () => {
-        const stationInput = document.getElementById('station');
+      const applyStationBtn = document.getElementById('applyStationBtn');
+      if (applyStationBtn) {
+        applyStationBtn.addEventListener('click', () => {
+          const stationInput = document.getElementById('station');
 
-        if (stationInput.value.length < 3) {
-          showToast("Station code must be at least 3 characters", "error");
-          return;
-        }
+          if (stationInput && stationInput.value.length < 3) {
+            showToast("Station code must be at least 3 characters", "error");
+            return;
+          }
 
-        autoApplySettings();
+          autoApplySettings();
 
-        // Note: Don't refetch lines - they're already loaded when station was selected
-        // Refetching would clear the user's line and platform selections
-      });
+          // Note: Don't refetch lines - they're already loaded when station was selected
+          // Refetching would clear the user's line and platform selections
+        });
+      }
 
       // Tab button event listeners
       document.querySelectorAll('.tab-button').forEach((btn, index) => {
@@ -2677,12 +2680,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Reset button
-      document.getElementById('resetButton').addEventListener('click', showResetModal);
-      document.getElementById('cancelResetBtn').addEventListener('click', hideResetModal);
-      document.getElementById('confirmResetBtn').addEventListener('click', confirmReset);
+      const resetButton = document.getElementById('resetButton');
+      const cancelResetBtn = document.getElementById('cancelResetBtn');
+      const confirmResetBtn = document.getElementById('confirmResetBtn');
+
+      if (resetButton) resetButton.addEventListener('click', showResetModal);
+      if (cancelResetBtn) cancelResetBtn.addEventListener('click', hideResetModal);
+      if (confirmResetBtn) confirmResetBtn.addEventListener('click', confirmReset);
 
       // Scan networks button
-      document.getElementById('scanNetworksBtn').addEventListener('click', scanNetworks);
+      const scanNetworksBtn = document.getElementById('scanNetworksBtn');
+      if (scanNetworksBtn) scanNetworksBtn.addEventListener('click', scanNetworks);
 
       // Update firmware info in footer
       const firmwareInfo = document.getElementById('firmwareInfo');
