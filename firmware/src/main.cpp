@@ -389,7 +389,6 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               client.setTimeout(60000); // 60 second timeout
 
               // Configure httpUpdate
-              httpUpdate.setLedPin(LED_BUILTIN, LOW);
               httpUpdate.rebootOnUpdate(true); // Auto reboot on success
 
               Serial.println("📡 Connecting to server...");
