@@ -1987,7 +1987,14 @@ void setup() {
   if (monitoringState.enabled && !systemFlags.apMode) {
     Serial.println("🔌 Connecting to monitoring server...");
     Serial.println("   Host: " + monitoringState.serverHost + ":" + String(monitoringState.serverPort));
-    monitorClient.begin(monitoringState.serverHost, monitoringState.serverPort, "/ws");
+    Serial.println("   SSL: " + String(monitoringState.useSSL ? "enabled" : "disabled"));
+
+    if (monitoringState.useSSL) {
+      monitorClient.beginSSL(monitoringState.serverHost, monitoringState.serverPort, "/ws");
+    } else {
+      monitorClient.begin(monitoringState.serverHost, monitoringState.serverPort, "/ws");
+    }
+
     monitorClient.onEvent(monitorWebSocketEvent);
     monitorClient.setReconnectInterval(5000);
     delay(500);

@@ -153,6 +153,7 @@ struct WebSocketClients {
 struct MonitoringState {
   String serverHost;
   int serverPort;
+  bool useSSL;
   bool enabled;
   bool connected;
   unsigned long lastHeartbeat;
@@ -162,6 +163,7 @@ struct MonitoringState {
   MonitoringState() :
     serverHost("192.168.0.75"),
     serverPort(Net::MONITOR_PORT),
+    useSSL(false),
     enabled(true),
     connected(false),
     lastHeartbeat(0),

@@ -1,0 +1,5 @@
+node_modules/
+stationboards.db
+firmware/*.bin
+*.log
+.env

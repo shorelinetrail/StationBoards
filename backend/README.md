@@ -413,6 +413,66 @@ Tested with up to **200 devices** simultaneously.
 - Initial release
 - Socket.IO for all connections
 
+## Cloud Deployment (Railway)
+
+### Why Railway?
+
+Railway is perfect for hosting the backend when you want to monitor boards from anywhere:
+- ✅ Full WebSocket support
+- ✅ Persistent storage for SQLite
+- ✅ Automatic HTTPS
+- ✅ Simple deployment from GitHub
+- ✅ Free tier available
+
+### Deploy to Railway
+
+1. **Push your code to GitHub** (if not already done)
+
+2. **Sign up at Railway**: https://railway.app
+
+3. **Create New Project**:
+   - Click "New Project"
+   - Choose "Deploy from GitHub repo"
+   - Select your StationBoards repository
+   - Railway will auto-detect the backend
+
+4. **Configure Root Directory**:
+   - Go to Settings → Service Settings
+   - Set **Root Directory**: `backend`
+   - Railway will use `backend/railway.json` for configuration
+
+5. **Deploy**!
+   - Railway automatically installs dependencies
+   - Starts server with `node server.js`
+   - Assigns a public URL like `https://stationboards-production.up.railway.app`
+
+6. **Configure Your ESP32 Devices**:
+   ```cpp
+   String monitorServerHost = "stationboards-production.up.railway.app";
+   int monitorServerPort = 443;  // HTTPS port
+   bool monitoringUseSSL = true;  // Enable SSL
+   ```
+
+### Environment Variables on Railway
+
+Railway automatically sets `PORT`. No additional variables needed for basic setup.
+
+### Database Persistence
+
+Railway provides persistent volumes automatically. Your SQLite database will survive restarts and redeployments.
+
+### Monitoring Your Deployment
+
+- View logs in Railway dashboard
+- Check deployment status
+- Monitor resource usage
+- View connected devices at your Railway URL
+
+### Cost
+
+- **Free tier**: Generous limits for hobby use
+- **Pro plan**: ~$5-10/month for production use with multiple boards
+
 ## Support & Development
 
 ### View Logs
