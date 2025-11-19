@@ -345,14 +345,16 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       border-radius: 50%;
       border-top-color: white;
       animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+    }
+
+    .btn-outline .spinner {
+      border: 2px solid rgba(102, 126, 234, 0.3);
+      border-top-color: #667eea;
     }
 
     .btn.loading .spinner {
-      display: block;
-    }
-
-    .btn.loading .btn-text {
-      display: none;
+      display: inline-block;
     }
 
     @keyframes spin {
