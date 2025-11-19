@@ -50,6 +50,7 @@ db.serialize(() => {
   // Add new columns if they don't exist (for existing databases)
   db.run(`ALTER TABLE devices ADD COLUMN scroll_speed INTEGER DEFAULT 50`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN show_station_name INTEGER DEFAULT 1`, () => {});
+  db.run(`ALTER TABLE devices ADD COLUMN service_type TEXT DEFAULT 'National Rail'`, () => {});
   
   // Data migration: Fix rotation_speed values
   // 1. Fix values in seconds (< 1000) → convert to milliseconds
@@ -217,11 +218,11 @@ wss.on('connection', (ws, req) => {
 
 function handleDeviceRegister(ws, data) {
   const stmt = db.prepare(`
-    INSERT OR REPLACE INTO devices 
-    (id, name, ip, firmware_version, station_code, station_name, rssi, uptime, 
-     free_heap, services, last_seen, status, first_seen, use_calling_at, 
+    INSERT OR REPLACE INTO devices
+    (id, name, ip, firmware_version, station_code, station_name, service_type, rssi, uptime,
+     free_heap, services, last_seen, status, first_seen, use_calling_at,
      extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online',
             COALESCE((SELECT first_seen FROM devices WHERE id = ?), ?),
             COALESCE((SELECT use_calling_at FROM devices WHERE id = ?), 1),
             COALESCE((SELECT extra_services FROM devices WHERE id = ?), 0),
@@ -232,7 +233,7 @@ function handleDeviceRegister(ws, data) {
   `);
 
   const now = Date.now();
-  
+
   stmt.run(
     data.deviceId,
     data.name || 'Board-' + data.deviceId.substring(0, 8),
@@ -240,6 +241,7 @@ function handleDeviceRegister(ws, data) {
     data.firmwareVersion,
     data.stationCode,
     data.stationName,
+    data.serviceType || 'National Rail',
     data.rssi,
     data.uptime,
     data.freeHeap,
@@ -266,7 +268,7 @@ function handleDeviceHeartbeat(data) {
   // Build dynamic SQL based on what fields are present
   let fields = ['rssi', 'uptime', 'free_heap', 'services', 'last_seen', 'status'];
   let values = [data.rssi, data.uptime, data.freeHeap, data.services, Date.now(), 'online'];
-  
+
   // If station info is provided, update it too
   if (data.stationCode) {
     fields.push('station_code');
@@ -276,12 +278,16 @@ function handleDeviceHeartbeat(data) {
     fields.push('station_name');
     values.push(data.stationName);
   }
-  
+  if (data.serviceType) {
+    fields.push('service_type');
+    values.push(data.serviceType);
+  }
+
   // Add deviceId for WHERE clause
   values.push(data.deviceId);
-  
+
   const updateSQL = `UPDATE devices SET ${fields.map(f => `${f} = ?`).join(', ')} WHERE id = ?`;
-  
+
   db.run(updateSQL, values, (err) => {
     if (err) {
       console.error('Error updating device heartbeat:', err);
@@ -290,7 +296,8 @@ function handleDeviceHeartbeat(data) {
       io.emit('deviceUpdate', {
         deviceId: data.deviceId,
         station_code: data.stationCode,
-        station_name: data.stationName
+        station_name: data.stationName,
+        service_type: data.serviceType
       });
     }
   });

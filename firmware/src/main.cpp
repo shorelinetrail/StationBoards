@@ -243,7 +243,8 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         registerMsg += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
         registerMsg += "\"firmwareVersion\":\"" + config.firmwareVersion + "\",";
         registerMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
-        registerMsg += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
+        registerMsg += "\"stationName\":\"" + String(displayState.stationName) + "\",";
+        registerMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
         registerMsg += "\"rssi\":" + String(WiFi.RSSI()) + ",";
         registerMsg += "\"uptime\":" + String(millis() / 1000) + ",";
         registerMsg += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
@@ -378,7 +379,7 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 void sendMonitorHeartbeat() {
   if (!monitoringState.connected) return;
-  
+
   String heartbeat = "{";
   heartbeat += "\"type\":\"heartbeat\",";
   heartbeat += "\"deviceId\":\"" + config.deviceId + "\",";
@@ -386,13 +387,14 @@ void sendMonitorHeartbeat() {
   heartbeat += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
   heartbeat += "\"firmwareVersion\":\"" + config.firmwareVersion + "\",";
   heartbeat += "\"stationCode\":\"" + String(config.stationCode) + "\",";
-  heartbeat += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
+  heartbeat += "\"stationName\":\"" + String(displayState.stationName) + "\",";
+  heartbeat += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
   heartbeat += "\"rssi\":" + String(WiFi.RSSI()) + ",";
   heartbeat += "\"uptime\":" + String(millis() / 1000) + ",";
   heartbeat += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
   heartbeat += "\"services\":" + String(displayState.serviceCount);
   heartbeat += "}";
-  
+
   monitorClient.sendTXT(heartbeat);
 }
 

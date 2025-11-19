@@ -405,6 +405,11 @@ function createDeviceCard(device) {
           </div>
 
           <div class="metric-item">
+            <span class="metric-label">Service:</span>
+            <span class="metric-value">${escapeHtml(device.service_type || 'National Rail')}</span>
+          </div>
+
+          <div class="metric-item">
             <span class="metric-label">Signal:</span>
             <span class="metric-value">${rssiIcon} ${escapeHtml(device.rssi || 0)} dBm</span>
           </div>
@@ -412,11 +417,6 @@ function createDeviceCard(device) {
           <div class="metric-item">
             <span class="metric-label">Services:</span>
             <span class="metric-value">${escapeHtml(device.services_count || 0)}</span>
-          </div>
-
-          <div class="metric-item">
-            <span class="metric-label">Uptime:</span>
-            <span class="metric-value">${escapeHtml(uptime)}</span>
           </div>
 
           <div class="metric-item">
@@ -520,6 +520,7 @@ function populateDeviceModal(data) {
   document.getElementById('infoIpAddress').textContent = device.ip_address || 'Unknown';
   document.getElementById('infoFirmware').textContent = device.firmware_version || 'Unknown';
   document.getElementById('infoStation').textContent = `${device.station_code || 'N/A'} - ${device.station_name || 'Unknown'}`;
+  document.getElementById('infoServiceType').textContent = device.service_type || 'National Rail';
   document.getElementById('infoLastSeen').textContent = formatLastSeen(device.last_seen);
   document.getElementById('infoRSSI').innerHTML = `${getRSSIIcon(device.rssi)} ${device.rssi || 0} dBm`;
   document.getElementById('infoUptime').textContent = formatUptime(device.uptime);
