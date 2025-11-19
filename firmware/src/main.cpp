@@ -348,23 +348,30 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               Serial.printf("📥 Downloading from: %s\n", url.c_str());
               Serial.printf("💾 Free heap before OTA: %d bytes\n", ESP.getFreeHeap());
 
-              displayMessage("OTA Update", "Starting...");
+              displayMessage("OTA Update", "Downloading...");
 
-              // Determine if HTTPS or HTTP
-              WiFiClient* client;
-              WiFiClient httpClient;
-              WiFiClientSecure httpsClient;
+              // Disconnect from monitoring server to free resources
+              monitorClient.disconnect();
+              delay(500);
 
-              if (url.startsWith("https://")) {
-                httpsClient.setInsecure();
-                client = &httpsClient;
-                Serial.println("🔒 Using HTTPS");
-              } else {
-                client = &httpClient;
-                Serial.println("🔓 Using HTTP");
+              // Use HTTPS (Railway uses HTTPS)
+              WiFiClientSecure *client = new WiFiClientSecure;
+
+              if (!client) {
+                Serial.println("❌ OTA failed: Could not allocate client");
+                displayMessage("OTA Failed", "Memory error");
+                delay(3000);
+                break;
               }
 
+              client->setInsecure();
+
+              Serial.println("🔒 Starting HTTPS OTA update...");
+              httpUpdate.rebootOnUpdate(false); // We'll handle reboot ourselves
+
               t_httpUpdate_return ret = httpUpdate.update(*client, url);
+
+              delete client; // Clean up
 
               switch(ret) {
                 case HTTP_UPDATE_FAILED:
@@ -375,13 +382,13 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
                 case HTTP_UPDATE_NO_UPDATES:
                   Serial.println("⚠️ No updates available");
-                  displayMessage("No Updates", "");
+                  displayMessage("No Updates", "Same version");
                   delay(2000);
                   break;
 
                 case HTTP_UPDATE_OK:
                   Serial.println("✅ OTA complete - restarting");
-                  displayMessage("Update Complete", "Restarting...");
+                  displayMessage("Update OK!", "Restarting...");
                   delay(1000);
                   ESP.restart();
                   break;
