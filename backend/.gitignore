@@ -1,5 +1,6 @@
 node_modules/
 stationboards.db
+sessions.db
 firmware/*.bin
 *.log
 .env

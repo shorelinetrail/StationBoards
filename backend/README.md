@@ -455,7 +455,25 @@ Railway is perfect for hosting the backend when you want to monitor boards from 
 
 ### Environment Variables on Railway
 
-Railway automatically sets `PORT`. No additional variables needed for basic setup.
+**Required for Production:**
+
+1. **Set Admin Password** (IMPORTANT!):
+   ```bash
+   # Generate password hash locally
+   node -e "console.log(require('bcryptjs').hashSync('your-secure-password', 10))"
+   ```
+
+   In Railway Dashboard → Variables:
+   - `ADMIN_PASSWORD_HASH`: Paste the hash from above
+   - `ADMIN_USERNAME`: Your username (default: "admin")
+   - `SESSION_SECRET`: Random string (e.g., generate with `openssl rand -base64 32`)
+
+2. **Default Credentials** (if not set):
+   - Username: `admin`
+   - Password: `admin123`
+   - ⚠️ **Change immediately in production!**
+
+Railway automatically sets `PORT` - no need to configure it.
 
 ### Database Persistence
 
@@ -472,6 +490,42 @@ Railway provides persistent volumes automatically. Your SQLite database will sur
 
 - **Free tier**: Generous limits for hobby use
 - **Pro plan**: ~$5-10/month for production use with multiple boards
+
+## Authentication & Security
+
+### Dashboard Login
+
+The dashboard is protected with username/password authentication:
+- **Login page**: Automatically shown when accessing the dashboard
+- **Session duration**: 7 days (30 days if "Remember me" is checked)
+- **Logout**: Click your username in dashboard (coming soon) or clear cookies
+
+### Device Connections
+
+ESP32 devices connect via WebSocket **without authentication**:
+- Devices use the `/ws` endpoint (unprotected)
+- Only the web dashboard requires login
+- This keeps firmware simple while protecting the dashboard
+
+### Changing Your Password
+
+1. **Generate new password hash**:
+   ```bash
+   node -e "console.log(require('bcryptjs').hashSync('your-new-password', 10))"
+   ```
+
+2. **Update on Railway**:
+   - Go to your service → Variables
+   - Update `ADMIN_PASSWORD_HASH` with the new hash
+   - Save (automatic redeploy)
+
+### Security Best Practices
+
+✅ **Always set** a strong password before deploying to production
+✅ **Use HTTPS** (Railway provides this automatically)
+✅ **Keep URL private** - don't share your Railway URL publicly
+✅ **Rotate passwords** periodically
+✅ **Monitor access** via Railway logs
 
 ## Support & Development
 

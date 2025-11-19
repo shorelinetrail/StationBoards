@@ -6,6 +6,9 @@ const sqlite3 = require('sqlite3').verbose();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const session = require('express-session');
+const bcrypt = require('bcryptjs');
+const SQLiteStore = require('connect-sqlite3')(session);
 
 const app = express();
 const server = http.createServer(app);
@@ -84,8 +87,58 @@ db.serialize(() => {
   )`);
 });
 
+// ============================================================================
+// Authentication Setup
+// ============================================================================
+
+// Get credentials from environment variables (set in Railway)
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || null;
+
+// If no password hash is set, create one for default password "admin123"
+// IMPORTANT: Change this in production!
+let adminPasswordHash = ADMIN_PASSWORD_HASH;
+if (!adminPasswordHash) {
+  console.warn('⚠️  WARNING: Using default password! Set ADMIN_PASSWORD_HASH environment variable!');
+  adminPasswordHash = bcrypt.hashSync('admin123', 10);
+}
+
+// Session configuration
+const sessionMiddleware = session({
+  store: new SQLiteStore({
+    db: 'sessions.db',
+    dir: './'
+  }),
+  secret: process.env.SESSION_SECRET || 'stationboards-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  }
+});
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+  if (req.session && req.session.authenticated) {
+    return next();
+  }
+
+  // For API requests, return 401
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  // For page requests, redirect to login
+  res.redirect('/login.html');
+}
+
 // Middleware
 app.use(express.json());
+app.use(sessionMiddleware);
+
+// Serve static files (login page accessible without auth)
 app.use(express.static('public'));
 app.use('/firmware', express.static('firmware'));
 
@@ -380,11 +433,57 @@ io.on('connection', (socket) => {
 });
 
 // ============================================================================
-// REST API Endpoints
+// Authentication Routes (unprotected)
+// ============================================================================
+
+// Login endpoint
+app.post('/api/auth/login', (req, res) => {
+  const { username, password, remember } = req.body;
+
+  if (username === ADMIN_USERNAME && bcrypt.compareSync(password, adminPasswordHash)) {
+    req.session.authenticated = true;
+    req.session.username = username;
+
+    // Extend session if "remember me" is checked
+    if (remember) {
+      req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+    }
+
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid username or password' });
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
+});
+
+// Check authentication status
+app.get('/api/auth/status', (req, res) => {
+  res.json({
+    authenticated: !!(req.session && req.session.authenticated),
+    username: req.session?.username || null
+  });
+});
+
+// ============================================================================
+// Protected Routes - Dashboard and API
+// ============================================================================
+
+// Protect the main dashboard
+app.get('/', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ============================================================================
+// REST API Endpoints (all protected)
 // ============================================================================
 
 // Get server info (for constructing firmware URLs)
-app.get('/api/server-info', (req, res) => {
+app.get('/api/server-info', requireAuth, (req, res) => {
   const os = require('os');
   const interfaces = os.networkInterfaces();
   const addresses = [];
@@ -411,7 +510,7 @@ app.get('/api/server-info', (req, res) => {
 });
 
 // Get all devices
-app.get('/api/devices', (req, res) => {
+app.get('/api/devices', requireAuth, (req, res) => {
   db.all('SELECT * FROM devices ORDER BY name', (err, devices) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -427,7 +526,7 @@ app.get('/api/devices', (req, res) => {
 });
 
 // Get single device
-app.get('/api/devices/:id', (req, res) => {
+app.get('/api/devices/:id', requireAuth, (req, res) => {
   db.get('SELECT * FROM devices WHERE id = ?', [req.params.id], (err, device) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -492,7 +591,7 @@ app.get('/api/devices/:id', (req, res) => {
 });
 
 // Update device configuration
-app.post('/api/devices/:id/config', (req, res) => {
+app.post('/api/devices/:id/config', requireAuth, (req, res) => {
   const { stationCode, useCallingAt, extraServices, rotationSpeed, refreshInterval, scrollSpeed, showStationName } = req.body;
   
   // Validate rotation speed is in expected range (5-60 seconds)
@@ -597,7 +696,7 @@ app.post('/api/devices/:id/config', (req, res) => {
 });
 
 // Send command to device
-app.post('/api/devices/:id/command', (req, res) => {
+app.post('/api/devices/:id/command', requireAuth, (req, res) => {
   const { command, params } = req.body;
   const ws = wsClients.get(req.params.id);
   
@@ -616,7 +715,7 @@ app.post('/api/devices/:id/command', (req, res) => {
 });
 
 // Restart device
-app.post('/api/devices/:id/restart', (req, res) => {
+app.post('/api/devices/:id/restart', requireAuth, (req, res) => {
   const ws = wsClients.get(req.params.id);
   
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -633,7 +732,7 @@ app.post('/api/devices/:id/restart', (req, res) => {
 });
 
 // OTA firmware update
-app.post('/api/devices/:id/ota', (req, res) => {
+app.post('/api/devices/:id/ota', requireAuth, (req, res) => {
   const { firmwareUrl } = req.body;
   const ws = wsClients.get(req.params.id);
   
@@ -662,7 +761,7 @@ app.post('/api/devices/:id/ota', (req, res) => {
 });
 
 // Get device events
-app.get('/api/devices/:id/events', (req, res) => {
+app.get('/api/devices/:id/events', requireAuth, (req, res) => {
   const limit = req.query.limit || 100;
   
   db.all(
@@ -679,7 +778,7 @@ app.get('/api/devices/:id/events', (req, res) => {
 });
 
 // Upload firmware
-app.post('/api/firmware/upload', upload.single('firmware'), (req, res) => {
+app.post('/api/firmware/upload', requireAuth, upload.single('firmware'), (req, res) => {
   const { version } = req.body;
   const { filename, size } = req.file;
 
@@ -697,7 +796,7 @@ app.post('/api/firmware/upload', upload.single('firmware'), (req, res) => {
 });
 
 // Get firmware list
-app.get('/api/firmware', (req, res) => {
+app.get('/api/firmware', requireAuth, (req, res) => {
   db.all('SELECT * FROM firmware ORDER BY upload_date DESC', (err, firmwares) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -708,7 +807,7 @@ app.get('/api/firmware', (req, res) => {
 });
 
 // Get statistics
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', requireAuth, (req, res) => {
   const stats = {
     totalDevices: 0,
     onlineDevices: 0,
