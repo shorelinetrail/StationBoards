@@ -777,9 +777,14 @@ function renderFirmwareList() {
       <div class="d-flex justify-content-between align-items-center">
         <div class="firmware-info">
           <div class="firmware-version">Version ${escapeHtml(fw.version)}</div>
-          <div class="firmware-date">${escapeHtml(formatTimestamp(fw.uploaded_at))} • ${escapeHtml(formatBytes(fw.size))}</div>
+          <div class="firmware-date">${escapeHtml(formatTimestamp(fw.upload_date))} • ${escapeHtml(formatBytes(fw.size))}</div>
         </div>
-        <span class="badge bg-primary">${escapeHtml(fw.filename)}</span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-primary">${escapeHtml(fw.filename)}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteFirmware(${fw.id}, '${escapeAttr(fw.version)}')">
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </div>
       </div>
     </div>
   `).join('');
@@ -832,6 +837,32 @@ async function uploadFirmware(event) {
     showToast('Error uploading firmware', 'danger');
   } finally {
     setLoadingState(submitButton, false);
+  }
+}
+
+/**
+ * Delete firmware
+ */
+async function deleteFirmware(firmwareId, version) {
+  if (!confirm(`Are you sure you want to delete firmware version ${version}?\n\nThis action cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/firmware/${firmwareId}`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      showToast(`Firmware ${version} deleted successfully`, 'success');
+      await loadFirmware();
+    } else {
+      const error = await response.json();
+      throw new Error(error.error || 'Delete failed');
+    }
+  } catch (err) {
+    console.error('Error deleting firmware:', err);
+    showToast(`Error deleting firmware: ${err.message}`, 'danger');
   }
 }
 

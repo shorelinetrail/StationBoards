@@ -850,6 +850,42 @@ app.get('/api/firmware', requireAuth, (req, res) => {
   });
 });
 
+// Delete firmware
+app.delete('/api/firmware/:id', requireAuth, (req, res) => {
+  const firmwareId = req.params.id;
+
+  // First, get the firmware details to know which file to delete
+  db.get('SELECT * FROM firmware WHERE id = ?', [firmwareId], (err, firmware) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (!firmware) {
+      return res.status(404).json({ error: 'Firmware not found' });
+    }
+
+    const filePath = path.join('./firmware', firmware.filename);
+
+    // Delete the file from disk
+    fs.unlink(filePath, (unlinkErr) => {
+      // Continue even if file doesn't exist (may have been manually deleted)
+      if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+        console.warn(`⚠️  Warning: Could not delete file ${firmware.filename}:`, unlinkErr.message);
+      }
+
+      // Delete from database
+      db.run('DELETE FROM firmware WHERE id = ?', [firmwareId], (dbErr) => {
+        if (dbErr) {
+          return res.status(500).json({ error: dbErr.message });
+        }
+
+        console.log(`🗑️  Deleted firmware: ${firmware.version} (${firmware.filename})`);
+        res.json({ success: true, message: 'Firmware deleted successfully' });
+      });
+    });
+  });
+});
+
 // Get statistics
 app.get('/api/stats', requireAuth, (req, res) => {
   const stats = {
