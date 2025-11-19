@@ -161,7 +161,8 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    cb(null, `firmware-${req.body.version}.bin`);
+    // Use temporary filename - we'll rename it after we have access to req.body
+    cb(null, `temp-${Date.now()}.bin`);
   }
 });
 
@@ -802,19 +803,40 @@ app.get('/api/devices/:id/events', requireAuth, (req, res) => {
 // Upload firmware
 app.post('/api/firmware/upload', requireAuth, upload.single('firmware'), (req, res) => {
   const { version } = req.body;
-  const { filename, size } = req.file;
+  const { path: tempPath, size } = req.file;
 
-  db.run(
-    'INSERT INTO firmware (version, filename, upload_date, size) VALUES (?, ?, ?, ?)',
-    [version, filename, Date.now(), size],
-    (err) => {
-      if (err) {
-        res.status(500).json({ error: err.message });
-      } else {
-        res.json({ success: true, version, filename });
-      }
+  if (!version) {
+    // Delete temp file if version is missing
+    fs.unlinkSync(tempPath);
+    return res.status(400).json({ error: 'Version is required' });
+  }
+
+  const finalFilename = `firmware-${version}.bin`;
+  const finalPath = path.join('./firmware', finalFilename);
+
+  // Rename temp file to final filename
+  fs.rename(tempPath, finalPath, (err) => {
+    if (err) {
+      // Clean up temp file on error
+      fs.unlinkSync(tempPath);
+      return res.status(500).json({ error: 'Failed to save firmware file' });
     }
-  );
+
+    // Save to database
+    db.run(
+      'INSERT INTO firmware (version, filename, upload_date, size) VALUES (?, ?, ?, ?)',
+      [version, finalFilename, Date.now(), size],
+      (err) => {
+        if (err) {
+          // Clean up file if database insert fails
+          fs.unlinkSync(finalPath);
+          res.status(500).json({ error: err.message });
+        } else {
+          res.json({ success: true, version, filename: finalFilename });
+        }
+      }
+    );
+  });
 });
 
 // Get firmware list
