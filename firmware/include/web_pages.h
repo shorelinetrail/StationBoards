@@ -162,6 +162,39 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       border-bottom: 2px solid #667eea;
     }
 
+    /* Collapsible sections */
+    .collapsible-header {
+      transition: all 0.3s ease;
+    }
+
+    .collapsible-header:hover {
+      opacity: 0.8;
+    }
+
+    .collapsible-header .chevron {
+      transition: transform 0.3s ease;
+      font-size: 14px;
+      color: #667eea;
+    }
+
+    .collapsible-header[aria-expanded="false"] .chevron {
+      transform: rotate(-90deg);
+    }
+
+    .collapsible-content {
+      max-height: 2000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+      opacity: 1;
+      margin-top: 0;
+    }
+
+    .collapsible-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+      margin-top: -20px;
+    }
+
     .form-group {
       margin-bottom: 25px;
     }
@@ -1177,13 +1210,18 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       <!-- Live Display Preview -->
       <div class="card" style="margin-top: 20px;">
-        <h2>🖥️ Live Display Preview</h2>
-        <div id="livePreview" class="display-frame" role="region" aria-live="polite" aria-label="Live display preview">
-          <div class="display-waiting">Connecting to device...</div>
-        </div>
-        <div class="ws-status">
-          <span><span class="ws-indicator" id="wsIndicator" aria-hidden="true"></span> <span id="wsStatusText">Disconnected</span></span>
-          <span>Last Update: <span id="lastUpdate">Never</span></span>
+        <h2 class="collapsible-header" id="previewHeader" style="cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;" role="button" tabindex="0" aria-expanded="true" aria-controls="previewContent">
+          <span>🖥️ Live Display Preview</span>
+          <span class="chevron" aria-hidden="true">▼</span>
+        </h2>
+        <div id="previewContent" class="collapsible-content">
+          <div id="livePreview" class="display-frame" role="region" aria-live="polite" aria-label="Live display preview">
+            <div class="display-waiting">Connecting to device...</div>
+          </div>
+          <div class="ws-status">
+            <span><span class="ws-indicator" id="wsIndicator" aria-hidden="true"></span> <span id="wsStatusText">Disconnected</span></span>
+            <span>Last Update: <span id="lastUpdate">Never</span></span>
+          </div>
         </div>
       </div>
         </div>
@@ -2593,6 +2631,45 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => setStation(btn.dataset.station, btn.dataset.name));
       });
+
+      // Live Preview collapsible toggle
+      const previewHeader = document.getElementById('previewHeader');
+      const previewContent = document.getElementById('previewContent');
+
+      if (previewHeader && previewContent) {
+        // Load saved state from localStorage
+        const isCollapsed = localStorage.getItem('previewCollapsed') === 'true';
+        if (isCollapsed) {
+          previewContent.classList.add('collapsed');
+          previewHeader.setAttribute('aria-expanded', 'false');
+        }
+
+        // Toggle function
+        const togglePreview = () => {
+          const isCurrentlyCollapsed = previewContent.classList.contains('collapsed');
+
+          if (isCurrentlyCollapsed) {
+            previewContent.classList.remove('collapsed');
+            previewHeader.setAttribute('aria-expanded', 'true');
+            localStorage.setItem('previewCollapsed', 'false');
+          } else {
+            previewContent.classList.add('collapsed');
+            previewHeader.setAttribute('aria-expanded', 'false');
+            localStorage.setItem('previewCollapsed', 'true');
+          }
+        };
+
+        // Add click handler
+        previewHeader.addEventListener('click', togglePreview);
+
+        // Add keyboard support (Enter or Space)
+        previewHeader.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            togglePreview();
+          }
+        });
+      }
 
       // Reset button
       document.getElementById('resetButton').addEventListener('click', showResetModal);
