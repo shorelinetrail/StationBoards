@@ -1197,17 +1197,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         </div>
       </div>
 
-      <div class="card">
-        <div class="button-group">
-          <button type="button" class="btn btn-danger" id="resetButton" aria-label="Factory reset device">
-            Factory Reset
-          </button>
-        </div>
-        <p style="margin-top: 15px; padding: 12px; background: #e7f3ff; border-radius: 8px; font-size: 13px; color: #004085;">
-          <strong>ℹ️ Note:</strong> All settings on this page apply automatically when changed. Only WiFi changes (in Network Settings) require a restart.
-        </p>
-      </div>
-
       <!-- Live Display Preview -->
       <div class="card" style="margin-top: 20px;">
         <h2 class="collapsible-header" id="previewHeader" style="cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;" role="button" tabindex="0" aria-expanded="true" aria-controls="previewContent">
@@ -1270,6 +1259,22 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             </p>
           </div>
         </form>
+
+        <!-- Danger Zone -->
+        <div class="card" style="margin-top: 20px; border: 2px solid #dc3545;">
+          <h2 style="color: #dc3545;">⚠️ Danger Zone</h2>
+          <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+            Irreversible actions that will reset your device to factory defaults.
+          </p>
+          <div class="button-group">
+            <button type="button" class="btn btn-danger" id="resetButton" aria-label="Factory reset device">
+              Factory Reset
+            </button>
+          </div>
+          <p style="margin-top: 15px; padding: 12px; background: #f8d7da; border-radius: 8px; font-size: 13px; color: #721c24;">
+            <strong>⚠️ Warning:</strong> This will erase all settings including WiFi credentials and restart the device in setup mode.
+          </p>
+        </div>
       </div>
     </div>
 
