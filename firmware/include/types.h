@@ -161,7 +161,7 @@ struct MonitoringState {
   unsigned long lastLoop;
 
   MonitoringState() :
-    serverHost("stationboards.up.railway.app"),
+    serverHost("stationboards-production.up.railway.app"),
     serverPort(443),
     useSSL(true),
     enabled(true),
