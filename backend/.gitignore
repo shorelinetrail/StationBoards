@@ -3,3 +3,5 @@ stationboards.db
 firmware/*.bin
 *.log
 .env
+Dockerfile
+.dockerignore
