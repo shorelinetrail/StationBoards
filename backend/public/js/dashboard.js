@@ -537,6 +537,39 @@ function populateDeviceModal(data) {
     document.getElementById('configExtraServices').value = config.extra_services || 1;
     document.getElementById('configScrollSpeed').value = config.scroll_speed || 50;
     document.getElementById('configRotationSpeed').value = config.rotation_speed || 15;
+
+    // Apply service-type specific UI adjustments
+    const isTFL = device.service_type === 'TFL';
+
+    // Station Code help text
+    const stationCodeHelp = document.getElementById('stationCodeHelp');
+    if (isTFL) {
+      stationCodeHelp.textContent = 'TFL NaPTAN ID (e.g., 940GZZLUKSX for King\'s Cross)';
+    } else {
+      stationCodeHelp.textContent = 'National Rail CRS code (e.g., PAD for Paddington)';
+    }
+
+    // Disable "Calling At" mode for TFL services (not supported)
+    const callingAtSelect = document.getElementById('configUseCallingAt');
+    const callingAtWrapper = callingAtSelect.closest('.mb-3');
+
+    if (isTFL) {
+      callingAtSelect.disabled = true;
+      callingAtSelect.value = '0'; // Force to Standard mode
+
+      // Add visual indication
+      if (!callingAtWrapper.querySelector('.form-text')) {
+        const helpText = document.createElement('small');
+        helpText.className = 'form-text text-muted';
+        helpText.textContent = 'Calling At mode not available for TFL services';
+        callingAtWrapper.appendChild(helpText);
+      }
+    } else {
+      callingAtSelect.disabled = false;
+      // Remove help text if it exists
+      const helpText = callingAtWrapper.querySelector('.form-text');
+      if (helpText) helpText.remove();
+    }
   }
 
   // Logs tab
