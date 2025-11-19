@@ -256,6 +256,7 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         registerMsg += "}";
         
         monitorClient.sendTXT(registerMsg);
+        LOG_TO_MONITOR("info", "Connected to monitoring server");
       }
       break;
       
@@ -287,12 +288,14 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             
             if (strcmp(command, "restart") == 0) {
               Serial.println("🔄 Remote restart requested");
+              LOG_TO_MONITOR("info", "Remote restart requested - device will reboot");
               delay(1000);
               ESP.restart();
             }
             else if (strcmp(command, "updateConfig") == 0) {
               Serial.println("⚙️ Remote config update");
-              
+              LOG_TO_MONITOR("info", "Remote config update received");
+
               if (doc.containsKey("stationCode")) {
                 String station = doc["stationCode"].as<String>();
                 station.toUpperCase();
@@ -318,7 +321,8 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               }
               
               config.save();
-              
+              LOG_TO_MONITOR("info", "Config updated and saved - Station: " + String(config.stationCode));
+
               // Reset alternating service
               if (config.useCallingAt) {
                 displayState.currentAlternatingService = 1;
@@ -353,6 +357,8 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               Serial.printf("📥 URL: %s\n", url.c_str());
               Serial.printf("💾 Free heap: %d bytes\n", ESP.getFreeHeap());
 
+              LOG_TO_MONITOR("info", "OTA update starting - Free heap: " + String(ESP.getFreeHeap()) + " bytes");
+
               // AGGRESSIVE CLEANUP - Free maximum memory
               Serial.println("\n🧹 Freeing memory...");
 
@@ -367,6 +373,8 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
               // 3. Disconnect monitoring WebSocket
               Serial.println("   - Stopping monitoring WebSocket");
+              LOG_TO_MONITOR("info", "Disconnecting for OTA - device will reboot if successful");
+              delay(500);  // Give time for log to send
               monitorClient.disconnect();
 
               // 4. Stop HTTP server
@@ -1001,10 +1009,12 @@ bool initializeWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
+    LOG_TO_MONITOR("info", "WiFi connected: " + WiFi.localIP().toString());
     systemFlags.apMode = false;
     return true;
   } else {
     Serial.println("\n❌ WiFi Connection Failed");
+    LOG_TO_MONITOR("error", "WiFi connection failed");
     return false;
   }
   // ← FIXED: Removed unreachable "return connected;"
@@ -1213,9 +1223,11 @@ void handleFetchStateMachine() {
           fetchClient.stop();  // Ensure clean disconnect
           if (fetchStateData.buffer.length() > 100) {  // Valid response is always >100 bytes
             Serial.println("✅ Fetched: " + String(fetchStateData.buffer.length()) + " bytes in " + String(millis() - fetchStateData.startTime) + "ms");
+            LOG_TO_MONITOR("info", "API fetch successful: " + String(fetchStateData.buffer.length()) + " bytes");
             fetchStateData.state = FETCH_DONE;
           } else {
             Serial.println("❌ Invalid response size: " + String(fetchStateData.buffer.length()) + " bytes");
+            LOG_TO_MONITOR("error", "API fetch failed: invalid response size");
             fetchStateData.state = FETCH_FAIL;
           }
         }
@@ -1285,6 +1297,7 @@ bool parseAndDisplayResponse(const String& response) {
 
   if (!success) {
     Serial.println("❌ Failed to parse response from " + String(serviceProvider->getProviderName()));
+    LOG_TO_MONITOR("error", "Parse failed: " + String(serviceProvider->getProviderName()));
     return false;
   }
 
@@ -1301,9 +1314,11 @@ bool parseAndDisplayResponse(const String& response) {
   if (displayState.serviceCount > 0) {
     broadcastTrainUpdate();
     broadcastStatus("Data updated", "success");
+    LOG_TO_MONITOR("info", "Services parsed: " + String(displayState.serviceCount) + " services for " + String(displayState.stationName));
   } else {
     // Valid response but no services (could be filtered out or genuinely none)
     broadcastStatus("No services found", "info");
+    LOG_TO_MONITOR("warn", "No services found for " + String(displayState.stationName));
   }
 
   return true;  // Return true for successful parse, even if 0 services
