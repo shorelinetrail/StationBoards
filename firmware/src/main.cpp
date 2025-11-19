@@ -331,68 +331,21 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             }
             else if (strcmp(command, "ota") == 0) {
               Serial.println("📦 OTA update from monitoring server");
+              Serial.println("⚠️  NOTE: Remote HTTPS OTA is unreliable on ESP32");
+              Serial.println("💡 Recommended: Use ArduinoOTA or USB for updates");
 
-              // Validate firmwareUrl exists
-              if (!doc.containsKey("firmwareUrl")) {
-                Serial.println("❌ OTA failed: No firmwareUrl provided");
-                break;
+              // For now, just log the request and suggest alternative
+              if (doc.containsKey("firmwareUrl")) {
+                String url = doc["firmwareUrl"].as<String>();
+                Serial.printf("📥 Firmware URL: %s\n", url.c_str());
               }
 
-              String url = doc["firmwareUrl"].as<String>();
-
-              if (url.length() == 0) {
-                Serial.println("❌ OTA failed: Empty firmwareUrl");
-                break;
-              }
-
-              Serial.printf("📥 Downloading from: %s\n", url.c_str());
-              Serial.printf("💾 Free heap before OTA: %d bytes\n", ESP.getFreeHeap());
-
-              displayMessage("OTA Update", "Downloading...");
-
-              // Disconnect from monitoring server to free resources
-              monitorClient.disconnect();
-              delay(500);
-
-              // Use HTTPS (Railway uses HTTPS)
-              WiFiClientSecure *client = new WiFiClientSecure;
-
-              if (!client) {
-                Serial.println("❌ OTA failed: Could not allocate client");
-                displayMessage("OTA Failed", "Memory error");
-                delay(3000);
-                break;
-              }
-
-              client->setInsecure();
-
-              Serial.println("🔒 Starting HTTPS OTA update...");
-              httpUpdate.rebootOnUpdate(false); // We'll handle reboot ourselves
-
-              t_httpUpdate_return ret = httpUpdate.update(*client, url);
-
-              delete client; // Clean up
-
-              switch(ret) {
-                case HTTP_UPDATE_FAILED:
-                  Serial.printf("❌ OTA failed: %s\n", httpUpdate.getLastErrorString().c_str());
-                  displayMessage("OTA Failed", httpUpdate.getLastErrorString().c_str());
-                  delay(3000);
-                  break;
-
-                case HTTP_UPDATE_NO_UPDATES:
-                  Serial.println("⚠️ No updates available");
-                  displayMessage("No Updates", "Same version");
-                  delay(2000);
-                  break;
-
-                case HTTP_UPDATE_OK:
-                  Serial.println("✅ OTA complete - restarting");
-                  displayMessage("Update OK!", "Restarting...");
-                  delay(1000);
-                  ESP.restart();
-                  break;
-              }
+              displayMessage("OTA Update", "Not supported");
+              Serial.println("❌ Remote HTTPS OTA disabled due to ESP32 memory constraints");
+              Serial.println("   Use one of these methods instead:");
+              Serial.println("   1. ArduinoOTA on local network (password: trainboard2024)");
+              Serial.println("   2. USB upload via PlatformIO");
+              delay(5000);
             }
           }
         }
