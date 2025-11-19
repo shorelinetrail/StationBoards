@@ -977,10 +977,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <div class="label">Last Data Fetch</div>
         <div class="value" id="lastFetchTime" aria-live="polite">Never</div>
       </div>
-      <div class="status-item">
-        <div class="label">Uptime</div>
-        <div class="value uptime-counter" id="deviceUptime" aria-live="polite">--:--:--</div>
-      </div>
     </div>
 
     <!-- Tabs -->
@@ -2265,40 +2261,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
     // ==================== Advanced Controls Toggle ====================
 
-    // ==================== Device Uptime Counter ====================
-
-    let deviceStartTime = Date.now();
-
-    /**
-     * Update the device uptime display
-     */
-    function updateUptime() {
-      const uptime = Date.now() - deviceStartTime;
-      const seconds = Math.floor(uptime / 1000);
-      const minutes = Math.floor(seconds / 60);
-      const hours = Math.floor(minutes / 60);
-      const days = Math.floor(hours / 24);
-
-      let uptimeStr = '';
-      if (days > 0) {
-        uptimeStr = `${days}d ${hours % 24}h ${minutes % 60}m`;
-      } else if (hours > 0) {
-        uptimeStr = `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-      } else if (minutes > 0) {
-        uptimeStr = `${minutes}m ${seconds % 60}s`;
-      } else {
-        uptimeStr = `${seconds}s`;
-      }
-
-      const uptimeEl = document.getElementById('deviceUptime');
-      if (uptimeEl) {
-        uptimeEl.textContent = uptimeStr;
-      }
-    }
-
-    // Update uptime every second
-    setInterval(updateUptime, 1000);
-
     /**
      * Update the last fetch time display
      */
@@ -2464,9 +2426,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       loadStationData();
       setupStationAutocomplete();
       setupValidation();
-
-      // Initialize uptime counter
-      updateUptime();
 
       // Setup Refresh Now button
       const refreshNowBtn = document.getElementById('refreshNowBtn');
@@ -2708,7 +2667,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
   </script>
 
   <!-- Footer -->
-  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; background: rgba(255,255,255,0.5); margin-top: 20px;">
+  <div style="text-align: center; padding: 20px; color: #555; font-size: 12px; background: rgba(255,255,255,0.8); margin-top: 20px; border-radius: 8px;">
     <div style="margin-bottom: 5px;">
       <strong>StationBoards</strong> • Firmware <span id="firmwareInfo">v2.1.0</span> • IP <span id="deviceIP">{IP}</span>
     </div>
