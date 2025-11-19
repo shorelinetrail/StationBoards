@@ -555,6 +555,10 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     Serial.print(ESP.getFreeHeap());
     Serial.println(" bytes");
 
+    // Yield to help with garbage collection between attempts
+    yield();
+    delay(10);
+
     DynamicJsonDocument retryDoc(newSize);
     error = deserializeJson(retryDoc, jsonStart_ptr, DeserializationOption::Filter(filter));
 
@@ -575,7 +579,11 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     Serial.println(" bytes");
 
     if (error.code() == DeserializationError::NoMemory) {
-      Serial.println("❌ Out of memory - try reducing line/platform filters or wait for quieter time");
+      Serial.println("❌ Out of memory - severe heap fragmentation detected");
+      Serial.println("💡 Suggestions:");
+      Serial.println("   1. Reduce line/platform filters to get smaller responses");
+      Serial.println("   2. Device may need restart to defragment heap");
+      Serial.println("   3. Try fetching during quieter times (fewer arrivals)");
     }
 
     // Show first 100 chars without String allocation to avoid memory issues
