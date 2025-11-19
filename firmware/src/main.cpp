@@ -217,6 +217,10 @@ void setupOTA();
 // String fitTextToWidth(...); // Template version in helpers.h handles this
 void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void sendMonitorHeartbeat();
+void sendMonitorLog(const String& level, const String& message);
+
+// Helper macro for easy logging
+#define LOG_TO_MONITOR(level, msg) sendMonitorLog(level, msg)
 
 // ============ NEW: WebSocket Functions ============
 
@@ -491,9 +495,6 @@ void sendMonitorLog(const String& level, const String& message) {
 
   monitorClient.sendTXT(logMsg);
 }
-
-// Helper macro for easy logging
-#define LOG_TO_MONITOR(level, msg) sendMonitorLog(level, msg)
 
 // ============ END MONITORING Functions ============
 
