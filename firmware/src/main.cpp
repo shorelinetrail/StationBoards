@@ -331,28 +331,54 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             }
             else if (strcmp(command, "ota") == 0) {
               Serial.println("📦 OTA update from monitoring server");
-              const char* url = doc["firmwareUrl"];
-              
+
+              // Validate firmwareUrl exists
+              if (!doc.containsKey("firmwareUrl")) {
+                Serial.println("❌ OTA failed: No firmwareUrl provided");
+                break;
+              }
+
+              String url = doc["firmwareUrl"].as<String>();
+
+              if (url.length() == 0) {
+                Serial.println("❌ OTA failed: Empty firmwareUrl");
+                break;
+              }
+
+              Serial.printf("📥 Downloading from: %s\n", url.c_str());
+              Serial.printf("💾 Free heap before OTA: %d bytes\n", ESP.getFreeHeap());
+
               displayMessage("OTA Update", "Starting...");
-              
-              WiFiClientSecure client;
-              client.setInsecure();
-              
-              t_httpUpdate_return ret = httpUpdate.update(client, url);
-              
+
+              // Determine if HTTPS or HTTP
+              WiFiClient* client;
+              WiFiClient httpClient;
+              WiFiClientSecure httpsClient;
+
+              if (url.startsWith("https://")) {
+                httpsClient.setInsecure();
+                client = &httpsClient;
+                Serial.println("🔒 Using HTTPS");
+              } else {
+                client = &httpClient;
+                Serial.println("🔓 Using HTTP");
+              }
+
+              t_httpUpdate_return ret = httpUpdate.update(*client, url);
+
               switch(ret) {
                 case HTTP_UPDATE_FAILED:
                   Serial.printf("❌ OTA failed: %s\n", httpUpdate.getLastErrorString().c_str());
                   displayMessage("OTA Failed", httpUpdate.getLastErrorString().c_str());
                   delay(3000);
                   break;
-                  
+
                 case HTTP_UPDATE_NO_UPDATES:
                   Serial.println("⚠️ No updates available");
                   displayMessage("No Updates", "");
                   delay(2000);
                   break;
-                  
+
                 case HTTP_UPDATE_OK:
                   Serial.println("✅ OTA complete - restarting");
                   displayMessage("Update Complete", "Restarting...");
