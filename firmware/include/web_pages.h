@@ -2699,7 +2699,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Highlight the active preset button based on initial station value
-      const stationInput = document.getElementById('station');
       if (stationInput && stationInput.value) {
         // Use stationCode from dataset if available, otherwise use the input value
         const initialStationCode = stationInput.dataset.stationCode || stationInput.value;
