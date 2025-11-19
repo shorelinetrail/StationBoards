@@ -497,31 +497,44 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   size_t jsonLength = response.length() - jsonStart;
   Serial.println("📍 JSON starts at position: " + String(jsonStart) + ", length: " + String(jsonLength) + " bytes");
 
-  // Use zero-copy parsing with pointer to avoid memory allocation
-  const char* jsonStart_ptr = response.c_str() + jsonStart;
+  // MEMORY OPTIMIZATION: Extract JSON substring to free HTTP headers from memory
+  // This reduces memory pressure before large DynamicJsonDocument allocation
+  Serial.println("🔄 Extracting JSON substring to free headers (" + String(jsonStart) + " bytes)");
+  String jsonOnly = response.substring(jsonStart);
 
-  // Create a filter to only parse fields we need (dramatically reduces memory usage)
+  // Force response String to be released (free ~24KB before parsing)
+  response = "";
+  yield();
+
+  Serial.print("💾 Free heap after header release: ");
+  Serial.print(ESP.getFreeHeap());
+  Serial.println(" bytes");
+
+  // Use zero-copy parsing with pointer
+  const char* jsonStart_ptr = jsonOnly.c_str();
+
+  // Create a filter to only parse fields we ACTUALLY USE (dramatically reduces memory usage)
   // TFL JSON has TONS of fields we don't use: currentLocation, vehicleId, bearing, etc.
   // By filtering, we can use much smaller documents and avoid heap fragmentation
-  StaticJsonDocument<200> filter;
-  // Note: $type field removed - it contains problematic characters that cause InvalidInput
-  filter[0]["stationName"] = true;    // Station name (first arrival only)
-  filter[0]["lineName"] = true;       // e.g., "Northern"
-  filter[0]["lineId"] = true;         // e.g., "northern"
-  filter[0]["towards"] = true;        // e.g., "Edgware"
-  filter[0]["expectedArrival"] = true; // ISO timestamp
-  filter[0]["direction"] = true;      // "inbound" or "outbound"
-  filter[0]["timeToStation"] = true;  // Seconds until arrival
-  filter[0]["platformName"] = true;   // e.g., "Eastbound - Platform 5"
+  //
+  // OPTIMIZED: Removed lineName (not used) and expectedArrival (not used)
+  // This reduces filtered data by ~25%
+  StaticJsonDocument<150> filter;
+  filter[0]["stationName"] = true;    // Station name (first arrival only, for display)
+  filter[0]["lineId"] = true;         // e.g., "northern" (for line filtering)
+  filter[0]["towards"] = true;        // e.g., "Edgware" (destination display)
+  filter[0]["direction"] = true;      // "inbound" or "outbound" (for direction filtering)
+  filter[0]["timeToStation"] = true;  // Seconds until arrival (for sorting and ETD calculation)
+  filter[0]["platformName"] = true;   // e.g., "Eastbound - Platform 5" (for platform filtering)
 
-  // With filtering, we extract only 8 fields per arrival, so the filtered document
-  // is much smaller than the source JSON. However, major stations can return 22KB+
-  // even with line filtering.
+  // With filtering, we extract only 6 fields per arrival (down from 8), so the filtered
+  // document is much smaller than the source JSON. However, major stations can still
+  // return large responses even with line filtering.
   //
   // HEAP FRAGMENTATION STRATEGY: Start with smaller size that can fit in fragmented heap,
   // then progressively retry with larger sizes if IncompleteInput
-  // Major stations need 16-20KB even with filtering
-  size_t docSize = 16384;  // Start with 16KB - better chance in fragmented heap
+  // Optimized filtering may allow smaller initial allocation
+  size_t docSize = 12288;  // Start with 12KB (reduced from 16KB due to 25% less fields)
 
   unsigned long freeHeap = ESP.getFreeHeap();
   Serial.print("💾 Free heap: ");
@@ -542,13 +555,13 @@ bool TflUndergroundProvider::parseResponse(const String& response,
 
   // Retry logic for IncompleteInput or InvalidInput - increase size incrementally
   // Note: NoMemory errors are NOT retried - they indicate heap fragmentation
-  // Progressive sizing: 16KB → 20KB → 24KB → 28KB (4KB increments, more attempts)
+  // Progressive sizing with optimized filtering: 12KB → 16KB → 20KB → 24KB (4KB increments)
   int retryCount = 0;
   while (error && (error.code() == DeserializationError::IncompleteInput ||
                    error.code() == DeserializationError::InvalidInput) && retryCount < 3) {
     retryCount++;
     size_t newSize = docSize + 4096; // Add 4KB per retry
-    if (newSize > 28672) newSize = 28672; // Cap at 28KB (balance size vs fragmentation)
+    if (newSize > 24576) newSize = 24576; // Cap at 24KB (reduced due to better filtering)
 
     Serial.println("⚠️  " + String(error.c_str()) + " error - retry #" + String(retryCount) + " with " + String(newSize) + " bytes");
     Serial.print("💾 Free heap: ");
@@ -674,15 +687,15 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   while (serviceCount < maxServices && arrivalsIndex < arrivalLimit) {
     JsonObject arrival = arrivals[sortedIndices[arrivalsIndex++]];
 
-    const char* lineName = arrival["lineName"];
+    // Only extract fields we actually use (optimized from 8 to 6 fields)
     const char* lineId = arrival["lineId"];
     const char* towards = arrival["towards"];
-    const char* expectedArrival = arrival["expectedArrival"];
     const char* direction = arrival["direction"];
     const char* platformName = arrival["platformName"];
     int timeToStation = arrival["timeToStation"] | 0;
 
-    if (!lineName || !towards || !expectedArrival) continue;
+    // Skip if essential fields are missing
+    if (!towards || !lineId) continue;
 
     // Filter by line if a line filter is set (client-side filtering)
     if (lineFilter.length() > 0) {
