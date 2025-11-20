@@ -1126,10 +1126,26 @@ bool asyncFetchStart() {
       int backoffMs = 1000 * (1 << attempt);  // 2^attempt seconds
       Serial.println("⏳ Retry #" + String(attempt) + " after " + String(backoffMs/1000) + "s backoff...");
 
-      // Non-blocking delay - main loop continues to update display
+      // Responsive backoff - allow web interface and display to continue working
       unsigned long backoffStart = millis();
       while (millis() - backoffStart < backoffMs) {
-        delay(100);  // Yield to prevent watchdog
+        // Handle web server requests (allows settings changes during backoff)
+        server.handleClient();
+
+        // Handle WebSocket connections (allows realtime updates)
+        webSocket.loop();
+
+        // Update display (keeps clock and animations running)
+        updateDisplay();
+
+        // Allow monitoring connection to work
+        if (monitoringState.enabled) {
+          monitorClient.loop();
+        }
+
+        // Yield to system and wait a bit
+        yield();
+        delay(50);  // Check every 50ms instead of 100ms for better responsiveness
       }
 
       // Close any previous connection attempt
