@@ -16,6 +16,7 @@ struct ServiceData {
 enum FetchState {
   FETCH_IDLE,
   FETCH_START,
+  FETCH_RETRY_BACKOFF,  // Waiting for retry backoff period
   FETCH_WAITING,
   FETCH_READING,
   FETCH_DONE,
@@ -42,13 +43,17 @@ struct FetchStateData {
   unsigned long startTime;
   unsigned long lastAttempt;
   unsigned long lastSuccess;
+  int retryAttempt;              // Current retry attempt (0 = first try)
+  unsigned long retryBackoffEnd;  // Time when backoff period ends
 
   FetchStateData() :
     state(FETCH_IDLE),
     buffer(""),
     startTime(0),
     lastAttempt(0),
-    lastSuccess(0) {
+    lastSuccess(0),
+    retryAttempt(0),
+    retryBackoffEnd(0) {
     buffer.reserve(Net::FETCH_BUFFER_SIZE);
   }
 
@@ -56,6 +61,8 @@ struct FetchStateData {
     state = FETCH_IDLE;
     buffer = "";
     startTime = 0;
+    retryAttempt = 0;
+    retryBackoffEnd = 0;
   }
 
   bool isIdle() const { return state == FETCH_IDLE; }

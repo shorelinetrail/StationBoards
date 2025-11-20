@@ -1741,11 +1741,20 @@ void setupWebServer() {
     // Handle TFL Line Filter
     if (server.hasArg("tflLineFilter")) {
       String lineFilter = server.arg("tflLineFilter");
+      lineFilter.trim();
+
+      // VALIDATE: TFL stations MUST have a line filter to prevent out-of-memory errors
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND && lineFilter.length() == 0) {
+        Serial.println("  ❌ TFL line filter is required");
+        server.send(400, "text/plain", "Line filter is REQUIRED for TFL stations to reduce memory usage. Please select a specific tube line.");
+        return;
+      }
+
       safeStrCopy(config.tflLineFilter, lineFilter, sizeof(config.tflLineFilter));
       if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setLineFilter(lineFilter);
       }
-      Serial.printf("  🚇 TFL line filter: %s\n", lineFilter.length() > 0 ? lineFilter.c_str() : "All Lines");
+      Serial.printf("  🚇 TFL line filter: %s\n", lineFilter.c_str());
     }
 
     // Handle TFL Direction Filter
