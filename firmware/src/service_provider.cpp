@@ -502,11 +502,11 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   Serial.println("🔄 Extracting JSON substring to free headers (" + String(jsonStart) + " bytes)");
   String jsonOnly = response.substring(jsonStart);
 
-  // Force response String to be released (free ~24KB before parsing)
-  response = "";
+  // Note: Can't modify const response, but substring creates new String with just JSON
+  // Original response buffer remains but will be cleaned up by caller
   yield();
 
-  Serial.print("💾 Free heap after header release: ");
+  Serial.print("💾 Free heap after substring: ");
   Serial.print(ESP.getFreeHeap());
   Serial.println(" bytes");
 
