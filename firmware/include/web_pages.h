@@ -1109,9 +1109,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="info-tooltip" title="Show only arrivals for selected platform" aria-label="Information: Filter by platform">?</span>
           </label>
           <select id="tflPlatformFilter" name="tflPlatformFilter" aria-describedby="tflplatform-help">
-            <option value="">-- Optional: Choose Platform --</option>
+            <option value="">All Platforms</option>
           </select>
-          <span class="help-text" id="tflplatform-help">Platform filter is optional - leave unselected to show all platforms</span>
+          <span class="help-text" id="tflplatform-help">Select a specific platform to display, or show all platforms</span>
         </div>
 
         <div class="button-group">
