@@ -152,22 +152,22 @@
                     <div class="mb-3">
                       <label class="form-label">Service Type</label>
                       <input type="text" class="form-control" id="configServiceType" readonly>
-                      <small class="text-muted">Service type is configured on the device</small>
+                      <small class="text-muted">Configured on device</small>
                     </div>
-                    <div class="mb-3" id="stationCodeWrapper">
-                      <label class="form-label">Station Code</label>
-                      <input type="text" class="form-control" id="configStationCode" maxlength="15" readonly>
-                      <small class="text-muted" id="stationCodeHelp">Configure on device web interface</small>
+                    <div class="mb-3">
+                      <label class="form-label">Station Name</label>
+                      <input type="text" class="form-control" id="configStationName" readonly>
+                      <small class="text-muted">Synced from device</small>
                     </div>
-                    <div class="mb-3" id="tflLineFilterGroup" style="display:none;">
-                      <label class="form-label">TFL Line Filter</label>
+                    <div class="mb-3" id="tflLineFilterGroup">
+                      <label class="form-label">TFL Line</label>
                       <input type="text" class="form-control" id="configTflLineFilter" readonly>
                     </div>
-                    <div class="mb-3" id="tflDirectionFilterGroup" style="display:none;">
+                    <div class="mb-3" id="tflDirectionFilterGroup">
                       <label class="form-label">TFL Direction</label>
                       <input type="text" class="form-control" id="configTflDirectionFilter" readonly>
                     </div>
-                    <div class="mb-3" id="tflPlatformFilterGroup" style="display:none;">
+                    <div class="mb-3" id="tflPlatformFilterGroup">
                       <label class="form-label">TFL Platform</label>
                       <input type="text" class="form-control" id="configTflPlatformFilter" readonly>
                     </div>
@@ -177,38 +177,43 @@
                     <h6>Display Settings</h6>
                     <div class="mb-3">
                       <label class="form-label">Display Mode</label>
-                      <select class="form-select" id="configUseCallingAt" disabled>
+                      <select class="form-select" id="configUseCallingAt">
                         <option value="0">Standard</option>
                         <option value="1">Calling At</option>
                       </select>
-                      <small class="text-muted">Configure on device web interface</small>
                     </div>
                     <div class="mb-3">
                       <label class="form-label">Show Station Name</label>
-                      <select class="form-select" id="configShowStationName" disabled>
+                      <select class="form-select" id="configShowStationName">
                         <option value="1">Yes</option>
                         <option value="0">No</option>
                       </select>
-                      <small class="text-muted">Configure on device web interface</small>
                     </div>
                     <div class="mb-3">
                       <label class="form-label">Extra Services</label>
-                      <select class="form-select" id="configExtraServices" disabled>
+                      <select class="form-select" id="configExtraServices">
                         <option value="0">0</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
                         <option value="4">4</option>
                       </select>
-                      <small class="text-muted">Configure on device web interface</small>
                     </div>
                   </div>
                 </div>
 
-                <div class="alert alert-info">
+                <div class="d-flex gap-2">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Save Configuration
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="syncConfigFromDevice()">
+                    <i class="bi bi-arrow-clockwise"></i> Sync from Device
+                  </button>
+                </div>
+                <div class="alert alert-info mt-3">
                   <i class="bi bi-info-circle"></i>
-                  <strong>Note:</strong> All configuration must be done through the device's web interface.
-                  This panel shows read-only status for monitoring purposes.
+                  <strong>Note:</strong> Station settings (service type, station code, TFL filters) are configured on the device.
+                  Display settings (mode, show name, extra services) can be changed here.
                 </div>
               </form>
             </div>
