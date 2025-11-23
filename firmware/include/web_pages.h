@@ -2447,11 +2447,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         if (!isUnderground) {
           document.getElementById('tflLineFilter').value = '';
           document.getElementById('tflPlatformFilter').value = '';
-          // Clear direction filter if it exists
-          const directionFilter = document.getElementById('tflDirectionFilter');
-          if (directionFilter) {
-            directionFilter.value = '';
-          }
         }
 
         // Disable "Calling At Mode" for TFL (option value="1")

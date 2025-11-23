@@ -267,7 +267,6 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         registerMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
         // TFL-specific filters
         registerMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
-        registerMsg += "\"tflDirectionFilter\":\"" + String(config.tflDirectionFilter) + "\",";
         registerMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\",";
         // Runtime status
         registerMsg += "\"rssi\":" + String(WiFi.RSSI()) + ",";
@@ -461,7 +460,6 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
               configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
               configMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
-              configMsg += "\"tflDirectionFilter\":\"" + String(config.tflDirectionFilter) + "\",";
               configMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\"";
               configMsg += "}";
 
@@ -1975,7 +1973,6 @@ void setupWebServer() {
       configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
       configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
       configMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
-      configMsg += "\"tflDirectionFilter\":\"" + String(config.tflDirectionFilter) + "\",";
       configMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\"";
       configMsg += "}";
       monitorClient.sendTXT(configMsg);
