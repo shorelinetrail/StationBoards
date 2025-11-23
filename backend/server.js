@@ -660,6 +660,7 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
               firmware_version: device.firmware_version,
               station_code: device.station_code,
               station_name: device.station_name,
+              service_type: device.service_type,
               rssi: device.rssi,
               uptime: device.uptime,
               free_heap: device.free_heap,
@@ -669,11 +670,16 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
             },
             config: {
               station_code: device.station_code,
+              station_name: device.station_name,
+              service_type: device.service_type,
               refresh_interval: device.refresh_interval,
               use_calling_at: device.use_calling_at === 1,
               show_station_name: device.show_station_name === 1,
               extra_services: device.extra_services,
               scroll_speed: device.scroll_speed || 50,
+              tfl_line_filter: device.tfl_line_filter || '',
+              tfl_direction_filter: device.tfl_direction_filter || '',
+              tfl_platform_filter: device.tfl_platform_filter || '',
               // Convert rotation_speed from milliseconds to seconds
               // Handle edge cases: NULL, 0, or values already in seconds
               rotation_speed: (() => {
