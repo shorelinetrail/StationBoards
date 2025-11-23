@@ -152,7 +152,13 @@ public:
     
     // Load Vertical Spacing
     lineSpacing = doc["lineSpacing"] | 14;
-    
+
+    // Migrate old config values to new defaults (one-time migration)
+    if (yPosTop == 12) {
+      yPosTop = 14;  // Update from old default to new default
+      Serial.println("  ⬆️  Migrated yPosTop: 12 → 14");
+    }
+
     // Load Device Info
     if (doc.containsKey("deviceId")) {
       deviceId = doc["deviceId"].as<String>();
