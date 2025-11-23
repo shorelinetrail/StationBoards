@@ -1513,7 +1513,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.value = name;
       console.log('Set input.value to:', input.value, 'stored code:', code);
       document.getElementById("stationAutocomplete").classList.remove("show");
-      showToast(`Selected: ${escapeHtml(name)}. Click "Apply Station Settings" to apply.`, "info");
 
       input.classList.add("success");
       input.classList.remove("error");
@@ -1924,7 +1923,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     const selectNetwork = (ssid) => {
       document.getElementById("ssid2").value = ssid;
       document.getElementById("password2").focus();
-      showToast(`Selected: ${ssid}`, "info");
     };
 
     // ==================== Station Presets ====================
@@ -1938,7 +1936,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       // Store the code in a data attribute and show the name in the input
       input.dataset.stationCode = code;
       input.value = name || code; // Fallback to code if name not provided
-      showToast(`Station set to: ${name || code}. Click "Apply Station Settings" to apply.`, "info");
       input.blur();
 
       // Highlight the selected preset button
@@ -2099,8 +2096,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const y3Field = document.getElementById('y3');
       if (y3Field) formData.append('y3', y3Field.value);
 
-      showToast("Applying changes...", "info");
-
       fetch("/apply", {
         method: "POST",
         body: formData
@@ -2113,8 +2108,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         return response;
       })
       .then(() => {
-        showToast("Settings updated!", "success");
-
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({command: "getState"}));
         }
@@ -2229,10 +2222,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // Don't auto-select any line - let the user choose
         lineFilter.value = '';
-
-        // Show toast with available lines
-        const lineNames = lines.map(l => l.name).join(', ');
-        showToast(`Available lines: ${lineNames}`, 'info');
       } catch (error) {
         // Error handling - reset to default state
         lineFilter.innerHTML = '<option value="">-- Select Line --</option>';
