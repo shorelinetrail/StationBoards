@@ -58,6 +58,9 @@ db.serialize(() => {
   db.run(`ALTER TABLE devices ADD COLUMN scroll_speed INTEGER DEFAULT 50`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN show_station_name INTEGER DEFAULT 1`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN service_type TEXT DEFAULT 'National Rail'`, () => {});
+  db.run(`ALTER TABLE devices ADD COLUMN tfl_line_filter TEXT DEFAULT ''`, () => {});
+  db.run(`ALTER TABLE devices ADD COLUMN tfl_direction_filter TEXT DEFAULT ''`, () => {});
+  db.run(`ALTER TABLE devices ADD COLUMN tfl_platform_filter TEXT DEFAULT ''`, () => {});
   
   // Data migration: Fix rotation_speed values
   // 1. Fix values in seconds (< 1000) → convert to milliseconds
@@ -247,13 +250,41 @@ wss.on('connection', (ws, req) => {
             deviceId: message.deviceId,
             config: {
               station_code: message.stationCode,
+              station_name: message.stationName,
               service_type: message.serviceType,
               use_calling_at: message.useCallingAt,
               show_station_name: message.showStationName,
               extra_services: message.extraServices,
               refresh_interval: message.refreshInterval,
               scroll_speed: message.scrollSpeed,
-              rotation_speed: message.rotationSpeed
+              rotation_speed: message.rotationSpeed,
+              tfl_line_filter: message.tflLineFilter,
+              tfl_direction_filter: message.tflDirectionFilter,
+              tfl_platform_filter: message.tflPlatformFilter
+            }
+          });
+          break;
+
+        case 'configUpdate':
+          console.log('🔄 Config update from device:', message.deviceId);
+          handleDeviceConfigUpdate(message);
+
+          // Broadcast config update to dashboard
+          io.emit('configUpdate', {
+            deviceId: message.deviceId,
+            config: {
+              station_code: message.stationCode,
+              station_name: message.stationName,
+              service_type: message.serviceType,
+              use_calling_at: message.useCallingAt,
+              show_station_name: message.showStationName,
+              extra_services: message.extraServices,
+              refresh_interval: message.refreshInterval,
+              scroll_speed: message.scrollSpeed,
+              rotation_speed: message.rotationSpeed,
+              tfl_line_filter: message.tflLineFilter,
+              tfl_direction_filter: message.tflDirectionFilter,
+              tfl_platform_filter: message.tflPlatformFilter
             }
           });
           break;
@@ -303,15 +334,11 @@ function handleDeviceRegister(ws, data) {
     INSERT OR REPLACE INTO devices
     (id, name, ip, firmware_version, station_code, station_name, service_type, rssi, uptime,
      free_heap, services, last_seen, status, first_seen, use_calling_at,
-     extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name)
+     extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name,
+     tfl_line_filter, tfl_direction_filter, tfl_platform_filter)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online',
             COALESCE((SELECT first_seen FROM devices WHERE id = ?), ?),
-            COALESCE((SELECT use_calling_at FROM devices WHERE id = ?), 1),
-            COALESCE((SELECT extra_services FROM devices WHERE id = ?), 0),
-            COALESCE((SELECT rotation_speed FROM devices WHERE id = ?), 5000),
-            COALESCE((SELECT refresh_interval FROM devices WHERE id = ?), 60),
-            COALESCE((SELECT scroll_speed FROM devices WHERE id = ?), 50),
-            COALESCE((SELECT show_station_name FROM devices WHERE id = ?), 1))
+            ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const now = Date.now();
@@ -330,12 +357,15 @@ function handleDeviceRegister(ws, data) {
     data.services,
     now,
     data.deviceId, now,
-    data.deviceId,
-    data.deviceId,
-    data.deviceId,
-    data.deviceId,
-    data.deviceId,
-    data.deviceId
+    data.useCallingAt !== undefined ? (data.useCallingAt ? 1 : 0) : 1,
+    data.extraServices || 0,
+    data.rotationSpeed || 5000,
+    data.refreshInterval || 60,
+    data.scrollSpeed || 50,
+    data.showStationName !== undefined ? (data.showStationName ? 1 : 0) : 1,
+    data.tflLineFilter || '',
+    data.tflDirectionFilter || '',
+    data.tflPlatformFilter || ''
   );
 
   stmt.finalize();
@@ -396,6 +426,40 @@ function handleDeviceStatus(data) {
 
 function handleDeviceLog(data) {
   logEvent(data.deviceId, 'log', data.message);
+}
+
+function handleDeviceConfigUpdate(data) {
+  db.run(
+    `UPDATE devices
+     SET station_code = ?, station_name = ?, service_type = ?,
+         use_calling_at = ?, show_station_name = ?, extra_services = ?,
+         refresh_interval = ?, scroll_speed = ?, rotation_speed = ?,
+         tfl_line_filter = ?, tfl_direction_filter = ?, tfl_platform_filter = ?
+     WHERE id = ?`,
+    [
+      data.stationCode,
+      data.stationName,
+      data.serviceType,
+      data.useCallingAt ? 1 : 0,
+      data.showStationName ? 1 : 0,
+      data.extraServices || 0,
+      data.refreshInterval || 60,
+      data.scrollSpeed || 50,
+      data.rotationSpeed || 5000,
+      data.tflLineFilter || '',
+      data.tflDirectionFilter || '',
+      data.tflPlatformFilter || '',
+      data.deviceId
+    ],
+    (err) => {
+      if (err) {
+        console.error('Error updating device config:', err);
+      } else {
+        console.log('✅ Device config updated in database:', data.deviceId);
+        logEvent(data.deviceId, 'config_change', `Config updated: ${data.stationCode} - ${data.serviceType}`);
+      }
+    }
+  );
 }
 
 function updateDeviceStatus(deviceId, status) {
