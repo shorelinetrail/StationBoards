@@ -2180,7 +2180,7 @@ void setup() {
     xTaskCreatePinnedToCore(
       monitoringTask,      // Task function
       "MonitoringTask",    // Task name
-      4096,                // Stack size (bytes)
+      10240,               // Stack size (bytes) - 10KB for SSL WebSocket operations
       NULL,                // Parameters
       1,                   // Priority (1 = low, same as loop)
       NULL,                // Task handle
