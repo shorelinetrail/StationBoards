@@ -1035,12 +1035,14 @@ bool initializeWiFi() {
 
   WiFi.begin(config.wifiSSID, config.wifiPassword);
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 100) {
+  int maxAttempts = 100;  // Maximum WiFi connection attempts (30 seconds)
+  while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
     delay(300);
     Serial.print(".");
     attempts++;
     if (attempts % 4 == 0) {
-      int progress = (attempts * 100) / 30;
+      // Fix: Cap progress at 100% (was going to 300%+ due to wrong divisor)
+      int progress = min(100, (attempts * 100) / maxAttempts);
       displayProgress("Connecting to WiFi...", 2, 5, progress);
     }
   }
@@ -2125,10 +2127,10 @@ void setup() {
   // Initialize WiFi
   displayProgress("Connecting to WiFi...", 3, 5, 40);
   if (!initializeWiFi()) {
-    Serial.println("❌ WiFi connection failed - Starting AP mode");
-    startAccessPoint();
-    displayAPScreen();
-    return;
+    Serial.println("⚠️  WiFi connection failed during setup");
+    Serial.println("⏭️  Continuing anyway - will retry in main loop");
+    // Don't immediately fall back to AP mode - WiFi might be temporarily down
+    // The main loop will retry connection, and user can configure via serial if needed
   }
   
   // Initialize time sync
@@ -2232,7 +2234,9 @@ void loop() {
         Serial.println("❌ WiFi disconnected");
         // Keep displaying previous data even when WiFi is down - no status changes
         fetchStateData.lastAttempt = currentTime;
-        if (!initializeWiFi()) startAccessPoint();
+        // Try to reconnect to WiFi but don't fall back to AP mode
+        // WiFi service might be temporarily down - keep retrying
+        initializeWiFi();
       }
     }
   }
