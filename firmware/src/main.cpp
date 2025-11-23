@@ -2227,8 +2227,8 @@ void setup() {
     monitorClient.setReconnectInterval(5000);
 
     // Enable automatic WebSocket ping/pong to keep connection alive
-    // Many servers disconnect after 8-15s without ping frames
-    monitorClient.enableHeartbeat(15000, 3000, 2);  // ping every 15s, timeout 3s, 2 retries
+    // Send pings frequently to prevent server timeout disconnections
+    monitorClient.enableHeartbeat(5000, 3000, 2);  // ping every 5s, timeout 3s, 2 retries
 
     // Start monitoring task on core 0 (opposite from main loop on core 1)
     // This ensures monitoring NEVER blocks the display, even if it hangs for seconds
