@@ -1826,11 +1826,20 @@ void setupWebServer() {
     // Handle TFL Platform Filter
     if (server.hasArg("tflPlatformFilter")) {
       String platformFilter = server.arg("tflPlatformFilter");
+      platformFilter.trim();
+
+      // VALIDATE: TFL stations MUST have a platform filter
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND && platformFilter.length() == 0) {
+        Serial.println("  ❌ TFL platform filter is required");
+        server.send(400, "text/plain", "Platform filter is required for TFL stations. Please select a specific platform.");
+        return;
+      }
+
       safeStrCopy(config.tflPlatformFilter, platformFilter, sizeof(config.tflPlatformFilter));
       if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setPlatformFilter(platformFilter);
       }
-      Serial.printf("  🚇 TFL platform filter: %s\n", platformFilter.length() > 0 ? platformFilter.c_str() : "All Platforms");
+      Serial.printf("  🚇 TFL platform filter: %s\n", platformFilter.c_str());
     }
 
     // Validate SSID
