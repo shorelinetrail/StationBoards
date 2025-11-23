@@ -556,16 +556,26 @@ function populateDeviceModal(data) {
     // Apply service-type specific UI adjustments
     const isTFL = config.service_type === 'TFL';
 
+    console.log('Populating config - Service type:', config.service_type, 'isTFL:', isTFL);
+
     // Update station label based on service type
     document.getElementById('configStationLabel').textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
 
     // Show/hide TFL filter fields
-    document.getElementById('configTflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
-    document.getElementById('configTflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
+    const lineFilterGroup = document.getElementById('configTflLineFilterGroup');
+    const platformFilterGroup = document.getElementById('configTflPlatformFilterGroup');
+
+    if (lineFilterGroup) lineFilterGroup.style.display = isTFL ? 'block' : 'none';
+    if (platformFilterGroup) platformFilterGroup.style.display = isTFL ? 'block' : 'none';
 
     if (isTFL) {
       document.getElementById('configTflLineFilter').value = config.tfl_line_filter || '';
       document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter || '';
+
+      // Populate platforms if line is selected
+      if (config.tfl_line_filter) {
+        populatePlatformOptions(config.tfl_line_filter, config.tfl_platform_filter);
+      }
     }
 
     // Disable "Calling At" mode for TFL services (not supported)
@@ -709,6 +719,46 @@ async function syncConfigFromDevice() {
 }
 
 /**
+ * Populate platform options based on selected line
+ */
+function populatePlatformOptions(selectedLine, currentPlatform = '') {
+  const platformSelect = document.getElementById('configTflPlatformFilter');
+  if (!platformSelect) return;
+
+  // Platform options per line (common platforms)
+  const platformsByLine = {
+    'bakerloo': ['Northbound', 'Southbound'],
+    'central': ['Eastbound', 'Westbound'],
+    'circle': ['Eastbound', 'Westbound'],
+    'district': ['Eastbound', 'Westbound'],
+    'hammersmith-city': ['Eastbound', 'Westbound'],
+    'jubilee': ['Eastbound', 'Westbound'],
+    'metropolitan': ['Eastbound', 'Westbound'],
+    'northern': ['Northbound', 'Southbound'],
+    'piccadilly': ['Eastbound', 'Westbound'],
+    'victoria': ['Northbound', 'Southbound'],
+    'waterloo-city': ['Eastbound', 'Westbound']
+  };
+
+  // Clear existing options
+  platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
+
+  // Add platforms for selected line
+  const platforms = platformsByLine[selectedLine] || [];
+  platforms.forEach(platform => {
+    const option = document.createElement('option');
+    option.value = platform;
+    option.textContent = platform;
+    if (currentPlatform && currentPlatform.includes(platform)) {
+      option.selected = true;
+    }
+    platformSelect.appendChild(option);
+  });
+
+  console.log('Populated platforms for line:', selectedLine, 'Options:', platforms.length);
+}
+
+/**
  * Update config form with values from device
  */
 function updateConfigForm(config) {
@@ -732,15 +782,23 @@ function updateConfigForm(config) {
   const isTFL = config.service_type === 'TFL';
 
   // Update station label
-  document.getElementById('configStationLabel').textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+  const stationLabel = document.getElementById('configStationLabel');
+  if (stationLabel) {
+    stationLabel.textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+  }
 
   // Show/hide TFL filter groups
-  document.getElementById('configTflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
-  document.getElementById('configTflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
+  const lineFilterGroup = document.getElementById('configTflLineFilterGroup');
+  const platformFilterGroup = document.getElementById('configTflPlatformFilterGroup');
+
+  if (lineFilterGroup) lineFilterGroup.style.display = isTFL ? 'block' : 'none';
+  if (platformFilterGroup) platformFilterGroup.style.display = isTFL ? 'block' : 'none';
 
   if (isTFL) {
     if (config.tfl_line_filter) {
       document.getElementById('configTflLineFilter').value = config.tfl_line_filter;
+      // Populate platforms for the selected line
+      populatePlatformOptions(config.tfl_line_filter, config.tfl_platform_filter);
     }
     if (config.tfl_platform_filter) {
       document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter;
@@ -1026,26 +1084,62 @@ function setupEventListeners() {
     serviceTypeSelect.addEventListener('change', (e) => {
       const isTFL = e.target.value === 'TFL';
 
+      console.log('Service type changed to:', e.target.value, 'isTFL:', isTFL);
+
       // Update station label
-      document.getElementById('configStationLabel').textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+      const stationLabel = document.getElementById('configStationLabel');
+      if (stationLabel) {
+        stationLabel.textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+      }
 
       // Show/hide TFL filter groups
-      document.getElementById('configTflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
-      document.getElementById('configTflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
+      const lineFilterGroup = document.getElementById('configTflLineFilterGroup');
+      const platformFilterGroup = document.getElementById('configTflPlatformFilterGroup');
+
+      if (lineFilterGroup) {
+        lineFilterGroup.style.display = isTFL ? 'block' : 'none';
+        console.log('Line filter group display:', lineFilterGroup.style.display);
+      }
+      if (platformFilterGroup) {
+        platformFilterGroup.style.display = isTFL ? 'block' : 'none';
+        console.log('Platform filter group display:', platformFilterGroup.style.display);
+      }
 
       // Disable calling at mode for TFL
       const callingAtSelect = document.getElementById('configUseCallingAt');
-      if (isTFL) {
-        callingAtSelect.disabled = true;
-        callingAtSelect.value = '0';
-      } else {
-        callingAtSelect.disabled = false;
+      if (callingAtSelect) {
+        if (isTFL) {
+          callingAtSelect.disabled = true;
+          callingAtSelect.value = '0';
+        } else {
+          callingAtSelect.disabled = false;
+        }
       }
 
       // Clear TFL filters when switching to National Rail
       if (!isTFL) {
-        document.getElementById('configTflLineFilter').value = '';
-        document.getElementById('configTflPlatformFilter').value = '';
+        const lineFilter = document.getElementById('configTflLineFilter');
+        const platformFilter = document.getElementById('configTflPlatformFilter');
+        if (lineFilter) lineFilter.value = '';
+        if (platformFilter) platformFilter.value = '';
+      }
+    });
+  }
+
+  // TFL Line filter change handler - populate platforms
+  const tflLineFilter = document.getElementById('configTflLineFilter');
+  if (tflLineFilter) {
+    tflLineFilter.addEventListener('change', (e) => {
+      const selectedLine = e.target.value;
+      console.log('TFL line changed to:', selectedLine);
+      if (selectedLine) {
+        populatePlatformOptions(selectedLine);
+      } else {
+        // Clear platforms if no line selected
+        const platformSelect = document.getElementById('configTflPlatformFilter');
+        if (platformSelect) {
+          platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
+        }
       }
     });
   }
