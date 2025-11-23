@@ -1799,10 +1799,10 @@ void setupWebServer() {
       String lineFilter = server.arg("tflLineFilter");
       lineFilter.trim();
 
-      // VALIDATE: TFL stations MUST have a line filter to prevent out-of-memory errors
+      // VALIDATE: TFL stations MUST have a line filter
       if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND && lineFilter.length() == 0) {
         Serial.println("  ❌ TFL line filter is required");
-        server.send(400, "text/plain", "Line filter is REQUIRED for TFL stations to reduce memory usage. Please select a specific tube line.");
+        server.send(400, "text/plain", "Line filter is required for TFL stations. Please select a specific tube line.");
         return;
       }
 
