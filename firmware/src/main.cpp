@@ -248,8 +248,8 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       {
         Serial.println("✅ Connected to monitoring server");
         monitoringState.connected = true;
-        
-        // Register device
+
+        // Register device with full config
         String registerMsg = "{";
         registerMsg += "\"type\":\"register\",";
         registerMsg += "\"deviceId\":\"" + config.deviceId + "\",";
@@ -259,12 +259,23 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         registerMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
         registerMsg += "\"stationName\":\"" + String(displayState.stationName) + "\",";
         registerMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
+        registerMsg += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
+        registerMsg += "\"showStationName\":" + String(config.showStationName ? "true" : "false") + ",";
+        registerMsg += "\"extraServices\":" + String(config.extraServices) + ",";
+        registerMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
+        registerMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
+        registerMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
+        // TFL-specific filters
+        registerMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
+        registerMsg += "\"tflDirectionFilter\":\"" + String(config.tflDirectionFilter) + "\",";
+        registerMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\",";
+        // Runtime status
         registerMsg += "\"rssi\":" + String(WiFi.RSSI()) + ",";
         registerMsg += "\"uptime\":" + String(millis() / 1000) + ",";
         registerMsg += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
         registerMsg += "\"services\":" + String(displayState.serviceCount);
         registerMsg += "}";
-        
+
         monitorClient.sendTXT(registerMsg);
         LOG_TO_MONITOR("info", "Connected to monitoring server");
       }
@@ -441,13 +452,17 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               configMsg += "\"type\":\"configResponse\",";
               configMsg += "\"deviceId\":\"" + config.deviceId + "\",";
               configMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
+              configMsg += "\"stationName\":\"" + String(displayState.stationName) + "\",";
               configMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
               configMsg += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
               configMsg += "\"showStationName\":" + String(config.showStationName ? "true" : "false") + ",";
               configMsg += "\"extraServices\":" + String(config.extraServices) + ",";
               configMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
               configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
-              configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed);
+              configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
+              configMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
+              configMsg += "\"tflDirectionFilter\":\"" + String(config.tflDirectionFilter) + "\",";
+              configMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\"";
               configMsg += "}";
 
               monitorClient.sendTXT(configMsg);
@@ -501,14 +516,18 @@ void sendMonitorHeartbeat() {
 
 // Send log message to monitoring server
 void sendMonitorLog(const String& level, const String& message) {
-  if (!monitoringState.connected || !monitoringState.logsEnabled) return;
+  if (!monitoringState.connected) return;
+
+  // Get Unix timestamp in milliseconds (if NTP synced, otherwise use millis)
+  time_t now = time(nullptr);
+  unsigned long timestamp = (now > 0) ? (now * 1000UL) : millis();
 
   String logMsg = "{";
   logMsg += "\"type\":\"log\",";
   logMsg += "\"deviceId\":\"" + config.deviceId + "\",";
   logMsg += "\"level\":\"" + level + "\",";
   logMsg += "\"message\":\"" + message + "\",";
-  logMsg += "\"timestamp\":" + String(millis());
+  logMsg += "\"timestamp\":" + String(timestamp);
   logMsg += "}";
 
   monitorClient.sendTXT(logMsg);
@@ -1954,7 +1973,10 @@ void setupWebServer() {
       configMsg += "\"extraServices\":" + String(config.extraServices) + ",";
       configMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
       configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
-      configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed);
+      configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
+      configMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
+      configMsg += "\"tflDirectionFilter\":\"" + String(config.tflDirectionFilter) + "\",";
+      configMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\"";
       configMsg += "}";
       monitorClient.sendTXT(configMsg);
       Serial.println("📡 Config update sent to monitoring server");
