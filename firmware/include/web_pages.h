@@ -1100,7 +1100,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <select id="tflLineFilter" name="tflLineFilter" required aria-describedby="tflline-help">
             <option value="">-- Select Line --</option>
           </select>
-          <span class="help-text" id="tflline-help">Line filter is REQUIRED for TFL stations to reduce memory usage</span>
+          <span class="help-text" id="tflline-help">Select a line to filter arrivals</span>
         </div>
 
         <div class="form-group" id="tflPlatformFilterGroup" style="display:none;">
@@ -2227,7 +2227,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         if (lines.length === 0) {
           // No lines found - reset to default state
-          lineFilter.innerHTML = '<option value="">All Lines</option>';
+          lineFilter.innerHTML = '<option value="">-- Select Line --</option>';
           lineFilter.disabled = false;
           platformFilter.innerHTML = '<option value="">All Platforms</option>';
           platformFilter.disabled = false;
@@ -2239,7 +2239,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         window.tflLinesData = lines;
 
         // Populate the line filter dropdown
-        lineFilter.innerHTML = '<option value="">All Lines</option>' +
+        lineFilter.innerHTML = '<option value="">-- Select Line --</option>' +
           lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
         lineFilter.disabled = false;
 
@@ -2255,7 +2255,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         showToast(`Available lines: ${lineNames}`, 'info');
       } catch (error) {
         // Error handling - reset to default state
-        lineFilter.innerHTML = '<option value="">All Lines</option>';
+        lineFilter.innerHTML = '<option value="">-- Select Line --</option>';
         lineFilter.disabled = false;
         platformFilter.innerHTML = '<option value="">All Platforms</option>';
         platformFilter.disabled = false;
