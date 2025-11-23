@@ -81,14 +81,19 @@ bool NationalRailProvider::parseResponse(const String& response,
   if (response.indexOf("soap:Fault") != -1) {
     Serial.println("❌ SOAP Fault detected");
 
-    // Extract fault details from the SOAP response
-    // Fault tags typically have no namespace prefix
+    // Extract fault details - support both SOAP 1.1 and SOAP 1.2 formats
+    // SOAP 1.1: <faultcode> and <faultstring>
+    // SOAP 1.2: <soap:Code><soap:Value> and <soap:Reason><soap:Text>
     String faultCode = extractTagValue(response, "faultcode", "");
     String faultString = extractTagValue(response, "faultstring", "");
 
     // Try with soap prefix if no namespace version failed
     if (faultCode.length() == 0) faultCode = extractTagValue(response, "faultcode", "soap");
     if (faultString.length() == 0) faultString = extractTagValue(response, "faultstring", "soap");
+
+    // SOAP 1.2 format
+    if (faultCode.length() == 0) faultCode = extractTagValue(response, "Value", "soap");
+    if (faultString.length() == 0) faultString = extractTagValue(response, "Text", "soap");
 
     if (faultCode.length() > 0) {
       Serial.println("   Code: " + faultCode);
