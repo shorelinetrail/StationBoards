@@ -1784,7 +1784,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const maxIdx = useCallingAt ? (showExtraService ? 4 : 3) : (showExtraService ? 6 : 4);
 
         if (data.services.length > startIdx) {
-          const currentIdx = data.alternatingService || startIdx;
+          // Fix: Ensure alternatingService index is within the available services array
+          let currentIdx = data.alternatingService || startIdx;
+          // Clamp to available services to prevent bottom line from disappearing
+          if (currentIdx >= data.services.length) {
+            currentIdx = startIdx;
+          }
+
           if (data.services[currentIdx]) {
             const service = data.services[currentIdx];
             const labels = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
@@ -1794,11 +1800,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             html += `<span><strong>${labels[currentIdx]}</strong> ${escapeHtml(service.std)} ${escapeHtml(service.destination)}</span>`;
             html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(service.etd))}</span>`;
             html += '</div>';
-
-            const numRotating = Math.min(data.services.length - startIdx, maxIdx - startIdx);
-            if (numRotating > 1) {
-              html += `<div style="margin-top: 5px; font-size: 10px; color: #888; font-style: italic;">↻ Rotates with ${numRotating - 1} more</div>`;
-            }
             html += '</div>';
           }
         }
