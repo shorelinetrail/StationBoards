@@ -217,6 +217,10 @@ void setupOTA();
 // String fitTextToWidth(...); // Template version in helpers.h handles this
 void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void sendMonitorHeartbeat();
+void sendMonitorLog(const String& level, const String& message);
+
+// Helper macro for easy logging
+#define LOG_TO_MONITOR(level, msg) sendMonitorLog(level, msg)
 
 // ============ NEW: WebSocket Functions ============
 
@@ -243,7 +247,8 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         registerMsg += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
         registerMsg += "\"firmwareVersion\":\"" + config.firmwareVersion + "\",";
         registerMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
-        registerMsg += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
+        registerMsg += "\"stationName\":\"" + String(displayState.stationName) + "\",";
+        registerMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
         registerMsg += "\"rssi\":" + String(WiFi.RSSI()) + ",";
         registerMsg += "\"uptime\":" + String(millis() / 1000) + ",";
         registerMsg += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
@@ -251,6 +256,7 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         registerMsg += "}";
         
         monitorClient.sendTXT(registerMsg);
+        LOG_TO_MONITOR("info", "Connected to monitoring server");
       }
       break;
       
@@ -282,12 +288,14 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             
             if (strcmp(command, "restart") == 0) {
               Serial.println("🔄 Remote restart requested");
+              LOG_TO_MONITOR("info", "Remote restart requested - device will reboot");
               delay(1000);
               ESP.restart();
             }
             else if (strcmp(command, "updateConfig") == 0) {
               Serial.println("⚙️ Remote config update");
-              
+              LOG_TO_MONITOR("info", "Remote config update received");
+
               if (doc.containsKey("stationCode")) {
                 String station = doc["stationCode"].as<String>();
                 station.toUpperCase();
@@ -313,7 +321,8 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               }
               
               config.save();
-              
+              LOG_TO_MONITOR("info", "Config updated and saved - Station: " + String(config.stationCode));
+
               // Reset alternating service
               if (config.useCallingAt) {
                 displayState.currentAlternatingService = 1;
@@ -328,37 +337,120 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               fetchStateData.lastSuccess = 0;
               fetchStateData.lastAttempt = 0;
             }
-            else if (strcmp(command, "otaUpdate") == 0) {
-              Serial.println("📦 OTA update from monitoring server");
-              const char* url = doc["url"];
-              
-              displayMessage("OTA Update", "Starting...");
-              
-              WiFiClientSecure client;
-              client.setInsecure();
-              
-              t_httpUpdate_return ret = httpUpdate.update(client, url);
-              
-              switch(ret) {
-                case HTTP_UPDATE_FAILED:
-                  Serial.printf("❌ OTA failed: %s\n", httpUpdate.getLastErrorString().c_str());
-                  displayMessage("OTA Failed", httpUpdate.getLastErrorString().c_str());
-                  delay(3000);
-                  break;
-                  
-                case HTTP_UPDATE_NO_UPDATES:
-                  Serial.println("⚠️ No updates available");
-                  displayMessage("No Updates", "");
-                  delay(2000);
-                  break;
-                  
-                case HTTP_UPDATE_OK:
-                  Serial.println("✅ OTA complete - restarting");
-                  displayMessage("Update Complete", "Restarting...");
-                  delay(1000);
-                  ESP.restart();
-                  break;
+            else if (strcmp(command, "ota") == 0) {
+              Serial.println("\n========================================");
+              Serial.println("📦 REMOTE OTA UPDATE STARTING");
+              Serial.println("========================================");
+
+              // Validate firmwareUrl
+              if (!doc.containsKey("firmwareUrl")) {
+                Serial.println("❌ No firmwareUrl provided");
+                break;
               }
+
+              String url = doc["firmwareUrl"].as<String>();
+              if (url.length() == 0) {
+                Serial.println("❌ Empty firmwareUrl");
+                break;
+              }
+
+              Serial.printf("📥 URL: %s\n", url.c_str());
+              Serial.printf("💾 Free heap: %d bytes\n", ESP.getFreeHeap());
+
+              LOG_TO_MONITOR("info", "OTA update starting - Free heap: " + String(ESP.getFreeHeap()) + " bytes");
+
+              // AGGRESSIVE CLEANUP - Free maximum memory
+              Serial.println("\n🧹 Freeing memory...");
+
+              // 1. Show OTA message on display
+              displayMessage("OTA Update", "Preparing...");
+              delay(2000);
+
+              // 2. Disconnect local WebSocket server and free clients
+              Serial.println("   - Stopping local WebSocket");
+              webSocket.disconnect();
+              webSocket.close();
+
+              // 3. Disconnect monitoring WebSocket
+              Serial.println("   - Stopping monitoring WebSocket");
+              LOG_TO_MONITOR("info", "Disconnecting for OTA - device will reboot if successful");
+              delay(500);  // Give time for log to send
+              monitorClient.disconnect();
+
+              // 4. Stop HTTP server
+              Serial.println("   - Stopping HTTP server");
+              server.stop();
+
+              // 5. Wait for everything to clean up
+              delay(2000);
+
+              Serial.printf("💾 Free heap after cleanup: %d bytes\n", ESP.getFreeHeap());
+
+              // Clear display and show update progress
+              u8g2.clearBuffer();
+              u8g2.setFont(u8g2_font_helvB08_tr);
+              u8g2.drawStr(0, 30, "OTA UPDATE");
+              u8g2.drawStr(0, 45, "Downloading...");
+              u8g2.sendBuffer();
+
+              Serial.println("\n🔒 Starting HTTPS download...");
+
+              // Use WiFiClientSecure with minimal configuration
+              WiFiClientSecure client;
+              client.setInsecure(); // Skip certificate validation
+              client.setTimeout(60000); // 60 second timeout
+
+              // Configure httpUpdate
+              httpUpdate.rebootOnUpdate(true); // Auto reboot on success
+
+              Serial.println("📡 Connecting to server...");
+
+              // Attempt update
+              t_httpUpdate_return ret = httpUpdate.update(client, url);
+
+              // Only reaches here on failure (success reboots automatically)
+              Serial.println("\n========================================");
+              Serial.printf("❌ UPDATE FAILED: %s\n", httpUpdate.getLastErrorString().c_str());
+              Serial.println("========================================");
+
+              u8g2.clearBuffer();
+              u8g2.drawStr(0, 20, "UPDATE FAILED");
+              u8g2.setFont(u8g2_font_6x10_tr);
+              u8g2.drawStr(0, 35, httpUpdate.getLastErrorString().c_str());
+              u8g2.drawStr(0, 50, "Restarting...");
+              u8g2.sendBuffer();
+
+              delay(5000);
+              ESP.restart(); // Restart to restore normal operation
+            }
+            else if (strcmp(command, "getConfig") == 0) {
+              Serial.println("📖 Config read request from monitoring server");
+
+              // Send current config back to server
+              String configMsg = "{";
+              configMsg += "\"type\":\"configResponse\",";
+              configMsg += "\"deviceId\":\"" + config.deviceId + "\",";
+              configMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
+              configMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
+              configMsg += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
+              configMsg += "\"showStationName\":" + String(config.showStationName ? "true" : "false") + ",";
+              configMsg += "\"extraServices\":" + String(config.extraServices) + ",";
+              configMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
+              configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
+              configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed);
+              configMsg += "}";
+
+              monitorClient.sendTXT(configMsg);
+              Serial.println("✅ Config sent to monitoring server");
+            }
+            else if (strcmp(command, "enableLogs") == 0) {
+              monitoringState.logsEnabled = true;
+              Serial.println("📡 Log streaming enabled");
+              LOG_TO_MONITOR("info", "Log streaming enabled from dashboard");
+            }
+            else if (strcmp(command, "disableLogs") == 0) {
+              monitoringState.logsEnabled = false;
+              Serial.println("📡 Log streaming disabled");
             }
           }
         }
@@ -378,7 +470,7 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 void sendMonitorHeartbeat() {
   if (!monitoringState.connected) return;
-  
+
   String heartbeat = "{";
   heartbeat += "\"type\":\"heartbeat\",";
   heartbeat += "\"deviceId\":\"" + config.deviceId + "\",";
@@ -386,14 +478,30 @@ void sendMonitorHeartbeat() {
   heartbeat += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
   heartbeat += "\"firmwareVersion\":\"" + config.firmwareVersion + "\",";
   heartbeat += "\"stationCode\":\"" + String(config.stationCode) + "\",";
-  heartbeat += "\"displayState.stationName\":\"" + String(displayState.stationName) + "\",";
+  heartbeat += "\"stationName\":\"" + String(displayState.stationName) + "\",";
+  heartbeat += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
   heartbeat += "\"rssi\":" + String(WiFi.RSSI()) + ",";
   heartbeat += "\"uptime\":" + String(millis() / 1000) + ",";
   heartbeat += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
   heartbeat += "\"services\":" + String(displayState.serviceCount);
   heartbeat += "}";
-  
+
   monitorClient.sendTXT(heartbeat);
+}
+
+// Send log message to monitoring server
+void sendMonitorLog(const String& level, const String& message) {
+  if (!monitoringState.connected || !monitoringState.logsEnabled) return;
+
+  String logMsg = "{";
+  logMsg += "\"type\":\"log\",";
+  logMsg += "\"deviceId\":\"" + config.deviceId + "\",";
+  logMsg += "\"level\":\"" + level + "\",";
+  logMsg += "\"message\":\"" + message + "\",";
+  logMsg += "\"timestamp\":" + String(millis());
+  logMsg += "}";
+
+  monitorClient.sendTXT(logMsg);
 }
 
 // ============ END MONITORING Functions ============
@@ -901,10 +1009,12 @@ bool initializeWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
+    LOG_TO_MONITOR("info", "WiFi connected: " + WiFi.localIP().toString());
     systemFlags.apMode = false;
     return true;
   } else {
     Serial.println("\n❌ WiFi Connection Failed");
+    LOG_TO_MONITOR("error", "WiFi connection failed");
     return false;
   }
   // ← FIXED: Removed unreachable "return connected;"
@@ -1016,10 +1126,26 @@ bool asyncFetchStart() {
       int backoffMs = 1000 * (1 << attempt);  // 2^attempt seconds
       Serial.println("⏳ Retry #" + String(attempt) + " after " + String(backoffMs/1000) + "s backoff...");
 
-      // Non-blocking delay - main loop continues to update display
+      // Responsive backoff - allow web interface and display to continue working
       unsigned long backoffStart = millis();
       while (millis() - backoffStart < backoffMs) {
-        delay(100);  // Yield to prevent watchdog
+        // Handle web server requests (allows settings changes during backoff)
+        server.handleClient();
+
+        // Handle WebSocket connections (allows realtime updates)
+        webSocket.loop();
+
+        // Update display (keeps clock and animations running)
+        updateDisplay();
+
+        // Allow monitoring connection to work
+        if (monitoringState.enabled) {
+          monitorClient.loop();
+        }
+
+        // Yield to system and wait a bit
+        yield();
+        delay(50);  // Check every 50ms instead of 100ms for better responsiveness
       }
 
       // Close any previous connection attempt
@@ -1113,9 +1239,11 @@ void handleFetchStateMachine() {
           fetchClient.stop();  // Ensure clean disconnect
           if (fetchStateData.buffer.length() > 100) {  // Valid response is always >100 bytes
             Serial.println("✅ Fetched: " + String(fetchStateData.buffer.length()) + " bytes in " + String(millis() - fetchStateData.startTime) + "ms");
+            LOG_TO_MONITOR("info", "API fetch successful: " + String(fetchStateData.buffer.length()) + " bytes");
             fetchStateData.state = FETCH_DONE;
           } else {
             Serial.println("❌ Invalid response size: " + String(fetchStateData.buffer.length()) + " bytes");
+            LOG_TO_MONITOR("error", "API fetch failed: invalid response size");
             fetchStateData.state = FETCH_FAIL;
           }
         }
@@ -1185,6 +1313,7 @@ bool parseAndDisplayResponse(const String& response) {
 
   if (!success) {
     Serial.println("❌ Failed to parse response from " + String(serviceProvider->getProviderName()));
+    LOG_TO_MONITOR("error", "Parse failed: " + String(serviceProvider->getProviderName()));
     return false;
   }
 
@@ -1201,9 +1330,11 @@ bool parseAndDisplayResponse(const String& response) {
   if (displayState.serviceCount > 0) {
     broadcastTrainUpdate();
     broadcastStatus("Data updated", "success");
+    LOG_TO_MONITOR("info", "Services parsed: " + String(displayState.serviceCount) + " services for " + String(displayState.stationName));
   } else {
     // Valid response but no services (could be filtered out or genuinely none)
     broadcastStatus("No services found", "info");
+    LOG_TO_MONITOR("warn", "No services found for " + String(displayState.stationName));
   }
 
   return true;  // Return true for successful parse, even if 0 services
@@ -1626,11 +1757,20 @@ void setupWebServer() {
     // Handle TFL Line Filter
     if (server.hasArg("tflLineFilter")) {
       String lineFilter = server.arg("tflLineFilter");
+      lineFilter.trim();
+
+      // VALIDATE: TFL stations MUST have a line filter to prevent out-of-memory errors
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND && lineFilter.length() == 0) {
+        Serial.println("  ❌ TFL line filter is required");
+        server.send(400, "text/plain", "Line filter is REQUIRED for TFL stations to reduce memory usage. Please select a specific tube line.");
+        return;
+      }
+
       safeStrCopy(config.tflLineFilter, lineFilter, sizeof(config.tflLineFilter));
       if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setLineFilter(lineFilter);
       }
-      Serial.printf("  🚇 TFL line filter: %s\n", lineFilter.length() > 0 ? lineFilter.c_str() : "All Lines");
+      Serial.printf("  🚇 TFL line filter: %s\n", lineFilter.c_str());
     }
 
     // Handle TFL Direction Filter
@@ -1985,7 +2125,14 @@ void setup() {
   if (monitoringState.enabled && !systemFlags.apMode) {
     Serial.println("🔌 Connecting to monitoring server...");
     Serial.println("   Host: " + monitoringState.serverHost + ":" + String(monitoringState.serverPort));
-    monitorClient.begin(monitoringState.serverHost, monitoringState.serverPort, "/ws");
+    Serial.println("   SSL: " + String(monitoringState.useSSL ? "enabled" : "disabled"));
+
+    if (monitoringState.useSSL) {
+      monitorClient.beginSSL(monitoringState.serverHost, monitoringState.serverPort, "/ws");
+    } else {
+      monitorClient.begin(monitoringState.serverHost, monitoringState.serverPort, "/ws");
+    }
+
     monitorClient.onEvent(monitorWebSocketEvent);
     monitorClient.setReconnectInterval(5000);
     delay(500);

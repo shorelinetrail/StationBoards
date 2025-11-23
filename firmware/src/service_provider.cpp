@@ -497,48 +497,80 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   size_t jsonLength = response.length() - jsonStart;
   Serial.println("📍 JSON starts at position: " + String(jsonStart) + ", length: " + String(jsonLength) + " bytes");
 
-  // Use zero-copy parsing with pointer to avoid memory allocation
-  const char* jsonStart_ptr = response.c_str() + jsonStart;
+  // MEMORY OPTIMIZATION: Extract JSON substring to free HTTP headers from memory
+  // This reduces memory pressure before large DynamicJsonDocument allocation
+  Serial.println("🔄 Extracting JSON substring to free headers (" + String(jsonStart) + " bytes)");
+  String jsonOnly = response.substring(jsonStart);
 
-  // Create a filter to only parse fields we need (dramatically reduces memory usage)
-  // TFL JSON has TONS of fields we don't use: currentLocation, vehicleId, bearing, etc.
-  // By filtering, we can use much smaller documents and avoid heap fragmentation
-  StaticJsonDocument<200> filter;
-  // Note: $type field removed - it contains problematic characters that cause InvalidInput
-  filter[0]["stationName"] = true;    // Station name (first arrival only)
-  filter[0]["lineName"] = true;       // e.g., "Northern"
-  filter[0]["lineId"] = true;         // e.g., "northern"
-  filter[0]["towards"] = true;        // e.g., "Edgware"
-  filter[0]["expectedArrival"] = true; // ISO timestamp
-  filter[0]["direction"] = true;      // "inbound" or "outbound"
-  filter[0]["timeToStation"] = true;  // Seconds until arrival
-  filter[0]["platformName"] = true;   // e.g., "Eastbound - Platform 5"
+  // Note: Can't modify const response, but substring creates new String with just JSON
+  // Original response buffer remains but will be cleaned up by caller
+  yield();
 
-  // With filtering, we extract only 8 fields per arrival, so the filtered document
-  // is much smaller than the source JSON. Start conservative to avoid heap fragmentation.
-  // Strategy: Start with 20KB, retry incrementally on IncompleteInput
-  size_t docSize = 20480;  // Start with 20KB for all responses
-
-  Serial.print("💾 Free heap: ");
+  Serial.print("💾 Free heap after substring: ");
   Serial.print(ESP.getFreeHeap());
   Serial.println(" bytes");
+
+  // Use zero-copy parsing with pointer
+  const char* jsonStart_ptr = jsonOnly.c_str();
+
+  // Create a filter to only parse fields we ACTUALLY USE (dramatically reduces memory usage)
+  // TFL JSON has TONS of fields we don't use: currentLocation, vehicleId, bearing, etc.
+  // By filtering, we can use much smaller documents and avoid heap fragmentation
+  //
+  // OPTIMIZED: Removed lineName (not used) and expectedArrival (not used)
+  // This reduces filtered data by ~25%
+  StaticJsonDocument<150> filter;
+  filter[0]["stationName"] = true;    // Station name (first arrival only, for display)
+  filter[0]["lineId"] = true;         // e.g., "northern" (for line filtering)
+  filter[0]["towards"] = true;        // e.g., "Edgware" (destination display)
+  filter[0]["direction"] = true;      // "inbound" or "outbound" (for direction filtering)
+  filter[0]["timeToStation"] = true;  // Seconds until arrival (for sorting and ETD calculation)
+  filter[0]["platformName"] = true;   // e.g., "Eastbound - Platform 5" (for platform filtering)
+
+  // With filtering, we extract only 6 fields per arrival (down from 8), so the filtered
+  // document is much smaller than the source JSON. However, major stations can still
+  // return large responses even with line filtering.
+  //
+  // HEAP FRAGMENTATION STRATEGY: Start with smaller size that can fit in fragmented heap,
+  // then progressively retry with larger sizes if IncompleteInput
+  // Optimized filtering may allow smaller initial allocation
+  size_t docSize = 12288;  // Start with 12KB (reduced from 16KB due to 25% less fields)
+
+  unsigned long freeHeap = ESP.getFreeHeap();
+  Serial.print("💾 Free heap: ");
+  Serial.print(freeHeap);
+  Serial.println(" bytes");
   Serial.println("📦 Allocating " + String(docSize) + " byte JSON document (filtered parsing)");
+
+  if (freeHeap < 80000) {
+    Serial.println("⚠️  WARNING: Low heap memory - allocation may fail due to fragmentation");
+  }
+
+  // Force garbage collection before large allocation
+  yield();
+  delay(10);
 
   DynamicJsonDocument doc(docSize);
   DeserializationError error = deserializeJson(doc, jsonStart_ptr, DeserializationOption::Filter(filter));
 
   // Retry logic for IncompleteInput or InvalidInput - increase size incrementally
+  // Note: NoMemory errors are NOT retried - they indicate heap fragmentation
+  // Progressive sizing with optimized filtering: 12KB → 16KB → 20KB → 24KB (4KB increments)
   int retryCount = 0;
   while (error && (error.code() == DeserializationError::IncompleteInput ||
                    error.code() == DeserializationError::InvalidInput) && retryCount < 3) {
     retryCount++;
-    size_t newSize = docSize + 8192; // Add 8KB per retry
-    if (newSize > 49152) newSize = 49152; // Cap at 48KB
+    size_t newSize = docSize + 4096; // Add 4KB per retry
+    if (newSize > 24576) newSize = 24576; // Cap at 24KB (reduced due to better filtering)
 
     Serial.println("⚠️  " + String(error.c_str()) + " error - retry #" + String(retryCount) + " with " + String(newSize) + " bytes");
     Serial.print("💾 Free heap: ");
     Serial.print(ESP.getFreeHeap());
     Serial.println(" bytes");
+
+    // Yield to help with garbage collection between attempts
+    yield();
+    delay(10);
 
     DynamicJsonDocument retryDoc(newSize);
     error = deserializeJson(retryDoc, jsonStart_ptr, DeserializationOption::Filter(filter));
@@ -560,7 +592,11 @@ bool TflUndergroundProvider::parseResponse(const String& response,
     Serial.println(" bytes");
 
     if (error.code() == DeserializationError::NoMemory) {
-      Serial.println("❌ Out of memory - try reducing line/platform filters or wait for quieter time");
+      Serial.println("❌ Out of memory - severe heap fragmentation detected");
+      Serial.println("💡 Suggestions:");
+      Serial.println("   1. Reduce line/platform filters to get smaller responses");
+      Serial.println("   2. Device may need restart to defragment heap");
+      Serial.println("   3. Try fetching during quieter times (fewer arrivals)");
     }
 
     // Show first 100 chars without String allocation to avoid memory issues
@@ -651,15 +687,15 @@ bool TflUndergroundProvider::parseResponse(const String& response,
   while (serviceCount < maxServices && arrivalsIndex < arrivalLimit) {
     JsonObject arrival = arrivals[sortedIndices[arrivalsIndex++]];
 
-    const char* lineName = arrival["lineName"];
+    // Only extract fields we actually use (optimized from 8 to 6 fields)
     const char* lineId = arrival["lineId"];
     const char* towards = arrival["towards"];
-    const char* expectedArrival = arrival["expectedArrival"];
     const char* direction = arrival["direction"];
     const char* platformName = arrival["platformName"];
     int timeToStation = arrival["timeToStation"] | 0;
 
-    if (!lineName || !towards || !expectedArrival) continue;
+    // Skip if essential fields are missing
+    if (!towards || !lineId) continue;
 
     // Filter by line if a line filter is set (client-side filtering)
     if (lineFilter.length() > 0) {

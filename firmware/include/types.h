@@ -16,6 +16,7 @@ struct ServiceData {
 enum FetchState {
   FETCH_IDLE,
   FETCH_START,
+  FETCH_RETRY_BACKOFF,  // Waiting for retry backoff period
   FETCH_WAITING,
   FETCH_READING,
   FETCH_DONE,
@@ -42,13 +43,17 @@ struct FetchStateData {
   unsigned long startTime;
   unsigned long lastAttempt;
   unsigned long lastSuccess;
+  int retryAttempt;              // Current retry attempt (0 = first try)
+  unsigned long retryBackoffEnd;  // Time when backoff period ends
 
   FetchStateData() :
     state(FETCH_IDLE),
     buffer(""),
     startTime(0),
     lastAttempt(0),
-    lastSuccess(0) {
+    lastSuccess(0),
+    retryAttempt(0),
+    retryBackoffEnd(0) {
     buffer.reserve(Net::FETCH_BUFFER_SIZE);
   }
 
@@ -56,6 +61,8 @@ struct FetchStateData {
     state = FETCH_IDLE;
     buffer = "";
     startTime = 0;
+    retryAttempt = 0;
+    retryBackoffEnd = 0;
   }
 
   bool isIdle() const { return state == FETCH_IDLE; }
@@ -153,17 +160,21 @@ struct WebSocketClients {
 struct MonitoringState {
   String serverHost;
   int serverPort;
+  bool useSSL;
   bool enabled;
   bool connected;
+  bool logsEnabled;
   unsigned long lastHeartbeat;
   unsigned long lastDisconnect;
   unsigned long lastLoop;
 
   MonitoringState() :
-    serverHost("192.168.0.75"),
-    serverPort(Net::MONITOR_PORT),
+    serverHost("stationboards.up.railway.app"),
+    serverPort(443),
+    useSSL(true),
     enabled(true),
     connected(false),
+    logsEnabled(false),
     lastHeartbeat(0),
     lastDisconnect(0),
     lastLoop(0) {}

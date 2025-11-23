@@ -413,6 +413,120 @@ Tested with up to **200 devices** simultaneously.
 - Initial release
 - Socket.IO for all connections
 
+## Cloud Deployment (Railway)
+
+### Why Railway?
+
+Railway is perfect for hosting the backend when you want to monitor boards from anywhere:
+- ✅ Full WebSocket support
+- ✅ Persistent storage for SQLite
+- ✅ Automatic HTTPS
+- ✅ Simple deployment from GitHub
+- ✅ Free tier available
+
+### Deploy to Railway
+
+1. **Push your code to GitHub** (if not already done)
+
+2. **Sign up at Railway**: https://railway.app
+
+3. **Create New Project**:
+   - Click "New Project"
+   - Choose "Deploy from GitHub repo"
+   - Select your StationBoards repository
+   - Railway will auto-detect the backend
+
+4. **Configure Root Directory**:
+   - Go to Settings → Service Settings
+   - Set **Root Directory**: `backend`
+   - Railway will use `backend/railway.json` for configuration
+
+5. **Deploy**!
+   - Railway automatically installs dependencies
+   - Starts server with `node server.js`
+   - Assigns a public URL like `https://stationboards-production.up.railway.app`
+
+6. **Configure Your ESP32 Devices**:
+   ```cpp
+   String monitorServerHost = "stationboards-production.up.railway.app";
+   int monitorServerPort = 443;  // HTTPS port
+   bool monitoringUseSSL = true;  // Enable SSL
+   ```
+
+### Environment Variables on Railway
+
+**Required for Production:**
+
+1. **Set Admin Password** (IMPORTANT!):
+   ```bash
+   # Generate password hash locally
+   node -e "console.log(require('bcryptjs').hashSync('your-secure-password', 10))"
+   ```
+
+   In Railway Dashboard → Variables:
+   - `ADMIN_PASSWORD_HASH`: Paste the hash from above
+   - `ADMIN_USERNAME`: Your username (default: "admin")
+   - `SESSION_SECRET`: Random string (e.g., generate with `openssl rand -base64 32`)
+
+2. **Default Credentials** (if not set):
+   - Username: `admin`
+   - Password: `admin123`
+   - ⚠️ **Change immediately in production!**
+
+Railway automatically sets `PORT` - no need to configure it.
+
+### Database Persistence
+
+Railway provides persistent volumes automatically. Your SQLite database will survive restarts and redeployments.
+
+### Monitoring Your Deployment
+
+- View logs in Railway dashboard
+- Check deployment status
+- Monitor resource usage
+- View connected devices at your Railway URL
+
+### Cost
+
+- **Free tier**: Generous limits for hobby use
+- **Pro plan**: ~$5-10/month for production use with multiple boards
+
+## Authentication & Security
+
+### Dashboard Login
+
+The dashboard is protected with username/password authentication:
+- **Login page**: Automatically shown when accessing the dashboard
+- **Session duration**: 7 days (30 days if "Remember me" is checked)
+- **Logout**: Click your username in dashboard (coming soon) or clear cookies
+
+### Device Connections
+
+ESP32 devices connect via WebSocket **without authentication**:
+- Devices use the `/ws` endpoint (unprotected)
+- Only the web dashboard requires login
+- This keeps firmware simple while protecting the dashboard
+
+### Changing Your Password
+
+1. **Generate new password hash**:
+   ```bash
+   node -e "console.log(require('bcryptjs').hashSync('your-new-password', 10))"
+   ```
+
+2. **Update on Railway**:
+   - Go to your service → Variables
+   - Update `ADMIN_PASSWORD_HASH` with the new hash
+   - Save (automatic redeploy)
+
+### Security Best Practices
+
+✅ **Always set** a strong password before deploying to production
+✅ **Use HTTPS** (Railway provides this automatically)
+✅ **Keep URL private** - don't share your Railway URL publicly
+✅ **Rotate passwords** periodically
+✅ **Monitor access** via Railway logs
+
 ## Support & Development
 
 ### View Logs

@@ -1094,13 +1094,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         <div class="form-group" id="tflLineFilterGroup" style="display:none;">
           <label for="tflLineFilter">
-            Filter by Tube Line
-            <span class="info-tooltip" title="Show only arrivals for selected tube line" aria-label="Information: Filter by tube line">?</span>
+            Filter by Tube Line <span style="color:red;">*</span>
+            <span class="info-tooltip" title="Select which tube line to display (required for TFL stations)" aria-label="Information: Filter by tube line">?</span>
           </label>
-          <select id="tflLineFilter" name="tflLineFilter" aria-describedby="tflline-help">
-            <option value="">All Lines</option>
+          <select id="tflLineFilter" name="tflLineFilter" required aria-describedby="tflline-help">
+            <option value="">-- Select Line --</option>
           </select>
-          <span class="help-text" id="tflline-help">Select a specific tube line to display, or show all lines</span>
+          <span class="help-text" id="tflline-help">Line filter is REQUIRED for TFL stations to reduce memory usage</span>
         </div>
 
         <div class="form-group" id="tflPlatformFilterGroup" style="display:none;">
@@ -1109,9 +1109,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="info-tooltip" title="Show only arrivals for selected platform" aria-label="Information: Filter by platform">?</span>
           </label>
           <select id="tflPlatformFilter" name="tflPlatformFilter" aria-describedby="tflplatform-help">
-            <option value="">All Platforms</option>
+            <option value="">-- All Platforms --</option>
           </select>
-          <span class="help-text" id="tflplatform-help">Select a specific platform to display, or show all platforms</span>
+          <span class="help-text" id="tflplatform-help">Optional: Select a platform to narrow down results</span>
         </div>
 
         <div class="button-group">

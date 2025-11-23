@@ -271,6 +271,23 @@ function setupWebSocket() {
     updateDeviceInList(data);
   });
 
+  socket.on('configResponse', (data) => {
+    console.log('Config response from device:', data);
+
+    // Update config form if modal is open for this device
+    if (AppState.currentDeviceId === data.deviceId) {
+      updateConfigForm(data.config);
+      showToast('Configuration synced from device', 'success');
+    }
+  });
+
+  socket.on('logUpdate', (data) => {
+    // Only display logs for currently viewed device
+    if (AppState.currentDeviceId === data.deviceId) {
+      appendLiveLog(data);
+    }
+  });
+
   socket.on('reconnect', (attemptNumber) => {
     console.log('Reconnected after', attemptNumber, 'attempts');
     showToast('Reconnected to server', 'success');
@@ -405,6 +422,11 @@ function createDeviceCard(device) {
           </div>
 
           <div class="metric-item">
+            <span class="metric-label">Service:</span>
+            <span class="metric-value">${escapeHtml(device.service_type || 'National Rail')}</span>
+          </div>
+
+          <div class="metric-item">
             <span class="metric-label">Signal:</span>
             <span class="metric-value">${rssiIcon} ${escapeHtml(device.rssi || 0)} dBm</span>
           </div>
@@ -412,11 +434,6 @@ function createDeviceCard(device) {
           <div class="metric-item">
             <span class="metric-label">Services:</span>
             <span class="metric-value">${escapeHtml(device.services_count || 0)}</span>
-          </div>
-
-          <div class="metric-item">
-            <span class="metric-label">Uptime:</span>
-            <span class="metric-value">${escapeHtml(uptime)}</span>
           </div>
 
           <div class="metric-item">
@@ -520,6 +537,7 @@ function populateDeviceModal(data) {
   document.getElementById('infoIpAddress').textContent = device.ip_address || 'Unknown';
   document.getElementById('infoFirmware').textContent = device.firmware_version || 'Unknown';
   document.getElementById('infoStation').textContent = `${device.station_code || 'N/A'} - ${device.station_name || 'Unknown'}`;
+  document.getElementById('infoServiceType').textContent = device.service_type || 'National Rail';
   document.getElementById('infoLastSeen').textContent = formatLastSeen(device.last_seen);
   document.getElementById('infoRSSI').innerHTML = `${getRSSIIcon(device.rssi)} ${device.rssi || 0} dBm`;
   document.getElementById('infoUptime').textContent = formatUptime(device.uptime);
@@ -536,6 +554,39 @@ function populateDeviceModal(data) {
     document.getElementById('configExtraServices').value = config.extra_services || 1;
     document.getElementById('configScrollSpeed').value = config.scroll_speed || 50;
     document.getElementById('configRotationSpeed').value = config.rotation_speed || 15;
+
+    // Apply service-type specific UI adjustments
+    const isTFL = device.service_type === 'TFL';
+
+    // Station Code help text
+    const stationCodeHelp = document.getElementById('stationCodeHelp');
+    if (isTFL) {
+      stationCodeHelp.textContent = 'TFL NaPTAN ID (e.g., 940GZZLUKSX for King\'s Cross)';
+    } else {
+      stationCodeHelp.textContent = 'National Rail CRS code (e.g., PAD for Paddington)';
+    }
+
+    // Disable "Calling At" mode for TFL services (not supported)
+    const callingAtSelect = document.getElementById('configUseCallingAt');
+    const callingAtWrapper = callingAtSelect.closest('.mb-3');
+
+    if (isTFL) {
+      callingAtSelect.disabled = true;
+      callingAtSelect.value = '0'; // Force to Standard mode
+
+      // Add visual indication
+      if (!callingAtWrapper.querySelector('.form-text')) {
+        const helpText = document.createElement('small');
+        helpText.className = 'form-text text-muted';
+        helpText.textContent = 'Calling At mode not available for TFL services';
+        callingAtWrapper.appendChild(helpText);
+      }
+    } else {
+      callingAtSelect.disabled = false;
+      // Remove help text if it exists
+      const helpText = callingAtWrapper.querySelector('.form-text');
+      if (helpText) helpText.remove();
+    }
   }
 
   // Logs tab
@@ -662,6 +713,59 @@ async function saveDeviceConfig(event) {
   }
 }
 
+/**
+ * Sync config from device (read actual device settings)
+ */
+async function syncConfigFromDevice() {
+  if (!AppState.currentDeviceId) {
+    showToast('No device selected', 'warning');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/devices/${AppState.currentDeviceId}/getConfig`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      showToast('Requesting config from device...', 'info');
+      // Config will be updated via socket.io when device responds
+    } else {
+      throw new Error('Device not connected');
+    }
+  } catch (err) {
+    console.error('Error syncing config:', err);
+    showToast('Error: Device not connected', 'danger');
+  }
+}
+
+/**
+ * Update config form with values from device
+ */
+function updateConfigForm(config) {
+  if (config.station_code) {
+    document.getElementById('configStationCode').value = config.station_code;
+  }
+  if (config.refresh_interval !== undefined) {
+    document.getElementById('configRefreshInterval').value = config.refresh_interval;
+  }
+  if (config.use_calling_at !== undefined) {
+    document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
+  }
+  if (config.show_station_name !== undefined) {
+    document.getElementById('configShowStationName').value = config.show_station_name ? '1' : '0';
+  }
+  if (config.extra_services !== undefined) {
+    document.getElementById('configExtraServices').value = config.extra_services;
+  }
+  if (config.scroll_speed !== undefined) {
+    document.getElementById('configScrollSpeed').value = config.scroll_speed;
+  }
+  if (config.rotation_speed !== undefined) {
+    document.getElementById('configRotationSpeed').value = config.rotation_speed;
+  }
+}
+
 // ==================== Device Actions ====================
 /**
  * Restart device
@@ -776,9 +880,14 @@ function renderFirmwareList() {
       <div class="d-flex justify-content-between align-items-center">
         <div class="firmware-info">
           <div class="firmware-version">Version ${escapeHtml(fw.version)}</div>
-          <div class="firmware-date">${escapeHtml(formatTimestamp(fw.uploaded_at))} • ${escapeHtml(formatBytes(fw.size))}</div>
+          <div class="firmware-date">${escapeHtml(formatTimestamp(fw.upload_date))} • ${escapeHtml(formatBytes(fw.size))}</div>
         </div>
-        <span class="badge bg-primary">${escapeHtml(fw.filename)}</span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-primary">${escapeHtml(fw.filename)}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteFirmware(${fw.id}, '${escapeAttr(fw.version)}')">
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </div>
       </div>
     </div>
   `).join('');
@@ -831,6 +940,32 @@ async function uploadFirmware(event) {
     showToast('Error uploading firmware', 'danger');
   } finally {
     setLoadingState(submitButton, false);
+  }
+}
+
+/**
+ * Delete firmware
+ */
+async function deleteFirmware(firmwareId, version) {
+  if (!confirm(`Are you sure you want to delete firmware version ${version}?\n\nThis action cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/firmware/${firmwareId}`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      showToast(`Firmware ${version} deleted successfully`, 'success');
+      await loadFirmware();
+    } else {
+      const error = await response.json();
+      throw new Error(error.error || 'Delete failed');
+    }
+  } catch (err) {
+    console.error('Error deleting firmware:', err);
+    showToast(`Error deleting firmware: ${err.message}`, 'danger');
   }
 }
 
@@ -902,6 +1037,94 @@ function setupEventListeners() {
   if (startOtaButton) {
     startOtaButton.addEventListener('click', startOTA);
   }
+}
+
+// ==================== Log Streaming ====================
+/**
+ * Enable log streaming from device
+ */
+async function enableLogStreaming() {
+  if (!AppState.currentDeviceId) {
+    showToast('No device selected', 'warning');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/devices/${AppState.currentDeviceId}/enableLogs`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      showToast('Log streaming started', 'success');
+      clearLiveLogs();
+      document.getElementById('liveLogsContent').innerHTML = '<div style="color: #4ec9b0;">Waiting for logs...</div>';
+    } else {
+      throw new Error('Device not connected');
+    }
+  } catch (err) {
+    console.error('Error enabling logs:', err);
+    showToast('Error: Device not connected', 'danger');
+  }
+}
+
+/**
+ * Disable log streaming from device
+ */
+async function disableLogStreaming() {
+  if (!AppState.currentDeviceId) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/devices/${AppState.currentDeviceId}/disableLogs`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      showToast('Log streaming stopped', 'info');
+    }
+  } catch (err) {
+    console.error('Error disabling logs:', err);
+  }
+}
+
+/**
+ * Append live log entry
+ */
+function appendLiveLog(data) {
+  const container = document.getElementById('liveLogsContent');
+  const logEntry = document.createElement('div');
+  logEntry.style.marginBottom = '2px';
+
+  // Color based on log level
+  const colors = {
+    error: '#f48771',
+    warn: '#dcdcaa',
+    info: '#4ec9b0',
+    debug: '#9cdcfe'
+  };
+  const color = colors[data.level] || '#d4d4d4';
+
+  const timestamp = new Date(data.timestamp).toLocaleTimeString();
+  logEntry.innerHTML = `<span style="color: #858585;">[${timestamp}]</span> <span style="color: ${color};">${escapeHtml(data.message)}</span>`;
+
+  container.appendChild(logEntry);
+
+  // Auto-scroll to bottom
+  const scrollContainer = document.getElementById('liveLogsContainer');
+  scrollContainer.scrollTop = scrollContainer.scrollHeight;
+
+  // Limit to 500 lines
+  while (container.children.length > 500) {
+    container.removeChild(container.firstChild);
+  }
+}
+
+/**
+ * Clear live logs
+ */
+function clearLiveLogs() {
+  document.getElementById('liveLogsContent').innerHTML = '<div style="color: #888;">Logs cleared</div>';
 }
 
 // ==================== Initialization ====================

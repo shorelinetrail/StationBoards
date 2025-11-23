@@ -125,6 +125,7 @@
                     <tr><th>IP Address:</th><td id="infoIpAddress"></td></tr>
                     <tr><th>Firmware:</th><td id="infoFirmware"></td></tr>
                     <tr><th>Station:</th><td id="infoStation"></td></tr>
+                    <tr><th>Service Type:</th><td id="infoServiceType"></td></tr>
                     <tr><th>Last Seen:</th><td id="infoLastSeen"></td></tr>
                   </table>
                 </div>
@@ -148,9 +149,10 @@
                 <div class="row">
                   <div class="col-md-6">
                     <h6>Station Settings</h6>
-                    <div class="mb-3">
+                    <div class="mb-3" id="stationCodeWrapper">
                       <label class="form-label">Station Code</label>
-                      <input type="text" class="form-control" id="configStationCode" maxlength="3">
+                      <input type="text" class="form-control" id="configStationCode" maxlength="15">
+                      <small class="text-muted" id="stationCodeHelp"></small>
                     </div>
                     <div class="mb-3">
                       <label class="form-label">Refresh Interval (seconds)</label>
@@ -200,15 +202,41 @@
                   </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary">
-                  <i class="bi bi-check-circle"></i> Save Configuration
-                </button>
+                <div class="d-flex gap-2">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Save Configuration
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="syncConfigFromDevice()">
+                    <i class="bi bi-arrow-clockwise"></i> Sync from Device
+                  </button>
+                </div>
               </form>
             </div>
 
             <!-- Logs Tab -->
             <div class="tab-pane fade" id="logsTab">
-              <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+              <div class="mb-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Live Serial Logs</h6>
+                <div class="btn-group" role="group">
+                  <button type="button" class="btn btn-sm btn-success" onclick="enableLogStreaming()">
+                    <i class="bi bi-play-fill"></i> Start
+                  </button>
+                  <button type="button" class="btn btn-sm btn-danger" onclick="disableLogStreaming()">
+                    <i class="bi bi-stop-fill"></i> Stop
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearLiveLogs()">
+                    <i class="bi bi-trash"></i> Clear
+                  </button>
+                </div>
+              </div>
+              <div id="liveLogsContainer" style="background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px;">
+                <div id="liveLogsContent">
+                  <div style="color: #888;">Click "Start" to begin streaming logs from device...</div>
+                </div>
+              </div>
+
+              <h6 class="mt-4">Historical Events</h6>
+              <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
                 <table class="table table-sm table-striped">
                   <thead>
                     <tr>
@@ -319,7 +347,6 @@
           integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
           crossorigin="anonymous"></script>
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"
-          integrity="sha384-BR1KpLNl/mgjOqAqCWDBRpJZPpuYvr2vRRN/z/g7dLPL51DP7sBvF+MNFQr8wmDM"
           crossorigin="anonymous"></script>
   <script src="/js/dashboard.js"></script>
 </body>

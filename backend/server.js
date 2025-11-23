@@ -6,9 +6,15 @@ const sqlite3 = require('sqlite3').verbose();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const session = require('express-session');
+const bcrypt = require('bcryptjs');
+const SQLiteStore = require('connect-sqlite3')(session);
 
 const app = express();
 const server = http.createServer(app);
+
+// Trust Railway proxy for secure cookies
+app.set('trust proxy', 1);
 
 // Socket.IO for web dashboard
 const io = socketIo(server);
@@ -32,6 +38,7 @@ db.serialize(() => {
     firmware_version TEXT,
     station_code TEXT,
     station_name TEXT,
+    service_type TEXT DEFAULT 'National Rail',
     rssi INTEGER,
     uptime INTEGER,
     free_heap INTEGER,
@@ -50,6 +57,7 @@ db.serialize(() => {
   // Add new columns if they don't exist (for existing databases)
   db.run(`ALTER TABLE devices ADD COLUMN scroll_speed INTEGER DEFAULT 50`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN show_station_name INTEGER DEFAULT 1`, () => {});
+  db.run(`ALTER TABLE devices ADD COLUMN service_type TEXT DEFAULT 'National Rail'`, () => {});
   
   // Data migration: Fix rotation_speed values
   // 1. Fix values in seconds (< 1000) → convert to milliseconds
@@ -83,9 +91,64 @@ db.serialize(() => {
   )`);
 });
 
+// ============================================================================
+// Authentication Setup
+// ============================================================================
+
+// Get credentials from environment variables (set in Railway)
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || null;
+
+// If no password hash is set, create one for default password "admin123"
+// IMPORTANT: Change this in production!
+let adminPasswordHash = ADMIN_PASSWORD_HASH;
+if (!adminPasswordHash) {
+  console.warn('⚠️  WARNING: Using default password! Set ADMIN_PASSWORD_HASH environment variable!');
+  adminPasswordHash = bcrypt.hashSync('admin123', 10);
+}
+
+// Session configuration
+const sessionMiddleware = session({
+  store: new SQLiteStore({
+    db: 'sessions.db',
+    dir: './'
+  }),
+  secret: process.env.SESSION_SECRET || 'stationboards-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  }
+});
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+  if (req.session && req.session.authenticated) {
+    return next();
+  }
+
+  // For API requests, return 401
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  // For page requests, redirect to login
+  res.redirect('/login.html');
+}
+
 // Middleware
 app.use(express.json());
-app.use(express.static('public'));
+app.use(sessionMiddleware);
+
+// Serve static files EXCEPT index.html (which requires auth)
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path === '/index.html') {
+    return next(); // Don't serve index.html statically, let the protected route handle it
+  }
+  express.static('public')(req, res, next);
+});
 app.use('/firmware', express.static('firmware'));
 
 // Multer for firmware uploads
@@ -98,7 +161,8 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    cb(null, `firmware-${req.body.version}.bin`);
+    // Use temporary filename - we'll rename it after we have access to req.body
+    cb(null, `temp-${Date.now()}.bin`);
   }
 });
 
@@ -170,9 +234,28 @@ wss.on('connection', (ws, req) => {
 
         case 'log':
           handleDeviceLog(message);
-          
+
           // Broadcast to dashboard
           io.emit('logUpdate', message);
+          break;
+
+        case 'configResponse':
+          console.log('📖 Config response from device:', message.deviceId);
+
+          // Broadcast config to dashboard
+          io.emit('configResponse', {
+            deviceId: message.deviceId,
+            config: {
+              station_code: message.stationCode,
+              service_type: message.serviceType,
+              use_calling_at: message.useCallingAt,
+              show_station_name: message.showStationName,
+              extra_services: message.extraServices,
+              refresh_interval: message.refreshInterval,
+              scroll_speed: message.scrollSpeed,
+              rotation_speed: message.rotationSpeed
+            }
+          });
           break;
 
         default:
@@ -217,11 +300,11 @@ wss.on('connection', (ws, req) => {
 
 function handleDeviceRegister(ws, data) {
   const stmt = db.prepare(`
-    INSERT OR REPLACE INTO devices 
-    (id, name, ip, firmware_version, station_code, station_name, rssi, uptime, 
-     free_heap, services, last_seen, status, first_seen, use_calling_at, 
+    INSERT OR REPLACE INTO devices
+    (id, name, ip, firmware_version, station_code, station_name, service_type, rssi, uptime,
+     free_heap, services, last_seen, status, first_seen, use_calling_at,
      extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online',
             COALESCE((SELECT first_seen FROM devices WHERE id = ?), ?),
             COALESCE((SELECT use_calling_at FROM devices WHERE id = ?), 1),
             COALESCE((SELECT extra_services FROM devices WHERE id = ?), 0),
@@ -232,7 +315,7 @@ function handleDeviceRegister(ws, data) {
   `);
 
   const now = Date.now();
-  
+
   stmt.run(
     data.deviceId,
     data.name || 'Board-' + data.deviceId.substring(0, 8),
@@ -240,6 +323,7 @@ function handleDeviceRegister(ws, data) {
     data.firmwareVersion,
     data.stationCode,
     data.stationName,
+    data.serviceType || 'National Rail',
     data.rssi,
     data.uptime,
     data.freeHeap,
@@ -266,7 +350,7 @@ function handleDeviceHeartbeat(data) {
   // Build dynamic SQL based on what fields are present
   let fields = ['rssi', 'uptime', 'free_heap', 'services', 'last_seen', 'status'];
   let values = [data.rssi, data.uptime, data.freeHeap, data.services, Date.now(), 'online'];
-  
+
   // If station info is provided, update it too
   if (data.stationCode) {
     fields.push('station_code');
@@ -276,12 +360,16 @@ function handleDeviceHeartbeat(data) {
     fields.push('station_name');
     values.push(data.stationName);
   }
-  
+  if (data.serviceType) {
+    fields.push('service_type');
+    values.push(data.serviceType);
+  }
+
   // Add deviceId for WHERE clause
   values.push(data.deviceId);
-  
+
   const updateSQL = `UPDATE devices SET ${fields.map(f => `${f} = ?`).join(', ')} WHERE id = ?`;
-  
+
   db.run(updateSQL, values, (err) => {
     if (err) {
       console.error('Error updating device heartbeat:', err);
@@ -290,7 +378,8 @@ function handleDeviceHeartbeat(data) {
       io.emit('deviceUpdate', {
         deviceId: data.deviceId,
         station_code: data.stationCode,
-        station_name: data.stationName
+        station_name: data.stationName,
+        service_type: data.serviceType
       });
     }
   });
@@ -373,15 +462,61 @@ io.on('connection', (socket) => {
 });
 
 // ============================================================================
-// REST API Endpoints
+// Authentication Routes (unprotected)
+// ============================================================================
+
+// Login endpoint
+app.post('/api/auth/login', (req, res) => {
+  const { username, password, remember } = req.body;
+
+  if (username === ADMIN_USERNAME && bcrypt.compareSync(password, adminPasswordHash)) {
+    req.session.authenticated = true;
+    req.session.username = username;
+
+    // Extend session if "remember me" is checked
+    if (remember) {
+      req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+    }
+
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid username or password' });
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
+});
+
+// Check authentication status
+app.get('/api/auth/status', (req, res) => {
+  res.json({
+    authenticated: !!(req.session && req.session.authenticated),
+    username: req.session?.username || null
+  });
+});
+
+// ============================================================================
+// Protected Routes - Dashboard and API
+// ============================================================================
+
+// Protect the main dashboard
+app.get('/', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ============================================================================
+// REST API Endpoints (all protected)
 // ============================================================================
 
 // Get server info (for constructing firmware URLs)
-app.get('/api/server-info', (req, res) => {
+app.get('/api/server-info', requireAuth, (req, res) => {
   const os = require('os');
   const interfaces = os.networkInterfaces();
   const addresses = [];
-  
+
   // Get all non-internal IPv4 addresses
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
@@ -390,21 +525,34 @@ app.get('/api/server-info', (req, res) => {
       }
     }
   }
-  
+
   // Prefer the first non-localhost address, fallback to localhost
   const serverIp = addresses.length > 0 ? addresses[0] : 'localhost';
   const port = PORT;
-  
+
+  // For Railway/production: use the actual request host (e.g., stationboards.up.railway.app)
+  // For local development: use the local IP
+  let baseUrl;
+  if (process.env.RAILWAY_PUBLIC_DOMAIN || req.get('host').includes('railway.app')) {
+    // Running on Railway - use public HTTPS URL
+    const protocol = req.protocol; // 'https' on Railway
+    const host = req.get('host'); // e.g., 'stationboards.up.railway.app'
+    baseUrl = `${protocol}://${host}`;
+  } else {
+    // Local development - use local IP
+    baseUrl = `http://${serverIp}:${port}`;
+  }
+
   res.json({
     ip: serverIp,
     port: port,
-    baseUrl: `http://${serverIp}:${port}`,
+    baseUrl: baseUrl,
     allAddresses: addresses
   });
 });
 
 // Get all devices
-app.get('/api/devices', (req, res) => {
+app.get('/api/devices', requireAuth, (req, res) => {
   db.all('SELECT * FROM devices ORDER BY name', (err, devices) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -420,7 +568,7 @@ app.get('/api/devices', (req, res) => {
 });
 
 // Get single device
-app.get('/api/devices/:id', (req, res) => {
+app.get('/api/devices/:id', requireAuth, (req, res) => {
   db.get('SELECT * FROM devices WHERE id = ?', [req.params.id], (err, device) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -485,7 +633,7 @@ app.get('/api/devices/:id', (req, res) => {
 });
 
 // Update device configuration
-app.post('/api/devices/:id/config', (req, res) => {
+app.post('/api/devices/:id/config', requireAuth, (req, res) => {
   const { stationCode, useCallingAt, extraServices, rotationSpeed, refreshInterval, scrollSpeed, showStationName } = req.body;
   
   // Validate rotation speed is in expected range (5-60 seconds)
@@ -590,7 +738,7 @@ app.post('/api/devices/:id/config', (req, res) => {
 });
 
 // Send command to device
-app.post('/api/devices/:id/command', (req, res) => {
+app.post('/api/devices/:id/command', requireAuth, (req, res) => {
   const { command, params } = req.body;
   const ws = wsClients.get(req.params.id);
   
@@ -609,15 +757,15 @@ app.post('/api/devices/:id/command', (req, res) => {
 });
 
 // Restart device
-app.post('/api/devices/:id/restart', (req, res) => {
+app.post('/api/devices/:id/restart', requireAuth, (req, res) => {
   const ws = wsClients.get(req.params.id);
-  
+
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'command',
       command: 'restart'
     }));
-    
+
     logEvent(req.params.id, 'command', 'Restart command sent');
     res.json({ success: true, message: 'Restart command sent' });
   } else {
@@ -625,8 +773,59 @@ app.post('/api/devices/:id/restart', (req, res) => {
   }
 });
 
+// Request config from device
+app.post('/api/devices/:id/getConfig', requireAuth, (req, res) => {
+  const ws = wsClients.get(req.params.id);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'command',
+      command: 'getConfig'
+    }));
+
+    console.log(`📖 Config request sent to device: ${req.params.id}`);
+    res.json({ success: true, message: 'Config request sent' });
+  } else {
+    res.status(503).json({ success: false, message: 'Device not connected' });
+  }
+});
+
+// Enable log streaming
+app.post('/api/devices/:id/enableLogs', requireAuth, (req, res) => {
+  const ws = wsClients.get(req.params.id);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'command',
+      command: 'enableLogs'
+    }));
+
+    console.log(`📡 Log streaming enabled for device: ${req.params.id}`);
+    res.json({ success: true, message: 'Log streaming enabled' });
+  } else {
+    res.status(503).json({ success: false, message: 'Device not connected' });
+  }
+});
+
+// Disable log streaming
+app.post('/api/devices/:id/disableLogs', requireAuth, (req, res) => {
+  const ws = wsClients.get(req.params.id);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'command',
+      command: 'disableLogs'
+    }));
+
+    console.log(`📡 Log streaming disabled for device: ${req.params.id}`);
+    res.json({ success: true, message: 'Log streaming disabled' });
+  } else {
+    res.status(503).json({ success: false, message: 'Device not connected' });
+  }
+});
+
 // OTA firmware update
-app.post('/api/devices/:id/ota', (req, res) => {
+app.post('/api/devices/:id/ota', requireAuth, (req, res) => {
   const { firmwareUrl } = req.body;
   const ws = wsClients.get(req.params.id);
   
@@ -655,7 +854,7 @@ app.post('/api/devices/:id/ota', (req, res) => {
 });
 
 // Get device events
-app.get('/api/devices/:id/events', (req, res) => {
+app.get('/api/devices/:id/events', requireAuth, (req, res) => {
   const limit = req.query.limit || 100;
   
   db.all(
@@ -672,25 +871,46 @@ app.get('/api/devices/:id/events', (req, res) => {
 });
 
 // Upload firmware
-app.post('/api/firmware/upload', upload.single('firmware'), (req, res) => {
+app.post('/api/firmware/upload', requireAuth, upload.single('firmware'), (req, res) => {
   const { version } = req.body;
-  const { filename, size } = req.file;
+  const { path: tempPath, size } = req.file;
 
-  db.run(
-    'INSERT INTO firmware (version, filename, upload_date, size) VALUES (?, ?, ?, ?)',
-    [version, filename, Date.now(), size],
-    (err) => {
-      if (err) {
-        res.status(500).json({ error: err.message });
-      } else {
-        res.json({ success: true, version, filename });
-      }
+  if (!version) {
+    // Delete temp file if version is missing
+    fs.unlinkSync(tempPath);
+    return res.status(400).json({ error: 'Version is required' });
+  }
+
+  const finalFilename = `firmware-${version}.bin`;
+  const finalPath = path.join('./firmware', finalFilename);
+
+  // Rename temp file to final filename
+  fs.rename(tempPath, finalPath, (err) => {
+    if (err) {
+      // Clean up temp file on error
+      fs.unlinkSync(tempPath);
+      return res.status(500).json({ error: 'Failed to save firmware file' });
     }
-  );
+
+    // Save to database
+    db.run(
+      'INSERT INTO firmware (version, filename, upload_date, size) VALUES (?, ?, ?, ?)',
+      [version, finalFilename, Date.now(), size],
+      (err) => {
+        if (err) {
+          // Clean up file if database insert fails
+          fs.unlinkSync(finalPath);
+          res.status(500).json({ error: err.message });
+        } else {
+          res.json({ success: true, version, filename: finalFilename });
+        }
+      }
+    );
+  });
 });
 
 // Get firmware list
-app.get('/api/firmware', (req, res) => {
+app.get('/api/firmware', requireAuth, (req, res) => {
   db.all('SELECT * FROM firmware ORDER BY upload_date DESC', (err, firmwares) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -700,8 +920,44 @@ app.get('/api/firmware', (req, res) => {
   });
 });
 
+// Delete firmware
+app.delete('/api/firmware/:id', requireAuth, (req, res) => {
+  const firmwareId = req.params.id;
+
+  // First, get the firmware details to know which file to delete
+  db.get('SELECT * FROM firmware WHERE id = ?', [firmwareId], (err, firmware) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (!firmware) {
+      return res.status(404).json({ error: 'Firmware not found' });
+    }
+
+    const filePath = path.join('./firmware', firmware.filename);
+
+    // Delete the file from disk
+    fs.unlink(filePath, (unlinkErr) => {
+      // Continue even if file doesn't exist (may have been manually deleted)
+      if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+        console.warn(`⚠️  Warning: Could not delete file ${firmware.filename}:`, unlinkErr.message);
+      }
+
+      // Delete from database
+      db.run('DELETE FROM firmware WHERE id = ?', [firmwareId], (dbErr) => {
+        if (dbErr) {
+          return res.status(500).json({ error: dbErr.message });
+        }
+
+        console.log(`🗑️  Deleted firmware: ${firmware.version} (${firmware.filename})`);
+        res.json({ success: true, message: 'Firmware deleted successfully' });
+      });
+    });
+  });
+});
+
 // Get statistics
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', requireAuth, (req, res) => {
   const stats = {
     totalDevices: 0,
     onlineDevices: 0,
