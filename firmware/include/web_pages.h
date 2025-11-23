@@ -1098,7 +1098,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="info-tooltip" title="Select which tube line to display (required for TFL stations)" aria-label="Information: Filter by tube line">?</span>
           </label>
           <select id="tflLineFilter" name="tflLineFilter" required aria-describedby="tflline-help">
-            <option value="">-- Select Line --</option>
+            <option value="" disabled selected>-- Select Line --</option>
           </select>
           <span class="help-text" id="tflline-help">Select a line to filter arrivals</span>
         </div>
@@ -1108,10 +1108,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             Filter by Platform
             <span class="info-tooltip" title="Show only arrivals for selected platform" aria-label="Information: Filter by platform">?</span>
           </label>
-          <select id="tflPlatformFilter" name="tflPlatformFilter" aria-describedby="tflplatform-help">
-            <option value="">-- Select Platform --</option>
+          <select id="tflPlatformFilter" name="tflPlatformFilter" required aria-describedby="tflplatform-help">
+            <option value="" disabled selected>-- Select Platform --</option>
           </select>
-          <span class="help-text" id="tflplatform-help">Optional: Select a platform to narrow down results</span>
+          <span class="help-text" id="tflplatform-help">Select a platform to filter arrivals</span>
         </div>
 
         <div class="button-group">
