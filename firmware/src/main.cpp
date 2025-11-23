@@ -227,6 +227,7 @@ void setupOTA();
 void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void sendMonitorHeartbeat();
 void sendMonitorLog(const String& level, const String& message);
+void monitoringTask(void* parameter);  // FreeRTOS task for monitoring
 
 // Helper macro for easy logging
 #define LOG_TO_MONITOR(level, msg) sendMonitorLog(level, msg)
@@ -511,6 +512,34 @@ void sendMonitorLog(const String& level, const String& message) {
   logMsg += "}";
 
   monitorClient.sendTXT(logMsg);
+}
+
+// FreeRTOS task for monitoring - runs on separate core to never block display
+// This task handles monitorClient.loop() and heartbeats independently
+// CRITICAL: This ensures the display NEVER hangs, even when monitoring blocks
+void monitoringTask(void* parameter) {
+  Serial.println("✅ Monitoring task started on core " + String(xPortGetCoreID()));
+
+  unsigned long lastHeartbeat = 0;
+
+  while (true) {
+    if (monitoringState.enabled) {
+      unsigned long currentTime = millis();
+
+      // Call monitorClient.loop() - can block up to 2s, but won't affect display
+      monitorClient.loop();
+
+      // Send heartbeat every 30 seconds
+      if (monitoringState.connected && currentTime - lastHeartbeat >= Timing::MONITOR_HEARTBEAT_INTERVAL) {
+        sendMonitorHeartbeat();
+        lastHeartbeat = currentTime;
+      }
+    }
+
+    // Use FreeRTOS delay to yield to other tasks
+    // Check every 100ms for responsiveness, but loop() inside will handle its own timing
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
 }
 
 // ============ END MONITORING Functions ============
@@ -2130,7 +2159,7 @@ void setup() {
   Serial.println("🌐 WebSocket ready on port 81");
   Serial.println("📊 Free heap: " + String(ESP.getFreeHeap()) + " bytes");
   
-  // Connect to monitoring server
+  // Connect to monitoring server and start monitoring task
   if (monitoringState.enabled && !systemFlags.apMode) {
     Serial.println("🔌 Connecting to monitoring server...");
     Serial.println("   Host: " + monitoringState.serverHost + ":" + String(monitoringState.serverPort));
@@ -2144,9 +2173,22 @@ void setup() {
 
     monitorClient.onEvent(monitorWebSocketEvent);
     monitorClient.setReconnectInterval(5000);
+
+    // Start monitoring task on core 0 (opposite from main loop on core 1)
+    // This ensures monitoring NEVER blocks the display, even if it hangs for seconds
+    Serial.println("🚀 Starting monitoring task on separate core...");
+    xTaskCreatePinnedToCore(
+      monitoringTask,      // Task function
+      "MonitoringTask",    // Task name
+      4096,                // Stack size (bytes)
+      NULL,                // Parameters
+      1,                   // Priority (1 = low, same as loop)
+      NULL,                // Task handle
+      0                    // Core 0 (main loop runs on core 1)
+    );
     delay(500);
   }
-  
+
   // Initial data fetch will happen automatically in loop
 }
 
@@ -2216,41 +2258,11 @@ void loop() {
       lastClockUpdate = currentTime;
     }
   }
-  
-  // Handle monitoring server connection
-  if (monitoringState.enabled) {
-    // CRITICAL: Monitoring operations are heavily throttled to prevent display hangs
-    // The display ALWAYS needs updates (clock updates every second), so we can't let
-    // monitoring block the main loop. monitorClient.loop() can block for up to 2s.
-    static unsigned long lastMonitorLoop = 0;
 
-    // Skip monitoring loop for 2 seconds after disconnect to prevent immediate
-    // reconnection blocking the display (reconnect interval is 5s anyway)
-    bool recentlyDisconnected = (currentTime - monitoringState.lastDisconnect < Timing::MONITOR_DISCONNECT_DELAY);
+  // NOTE: Monitoring now runs on separate FreeRTOS task (monitoringTask on core 0)
+  // This ensures the display NEVER hangs, even when monitoring blocks for up to 2 seconds
+  // See monitoringTask() function and setup() for task initialization
 
-    // Skip monitoring loop during active API fetches AND parsing to prevent blocking
-    // monitorClient.loop() can block for extended periods, especially during network issues
-    bool isActiveFetch = (fetchStateData.state == FETCH_WAITING ||
-                          fetchStateData.state == FETCH_READING ||
-                          fetchStateData.state == FETCH_DONE);
-
-    // Only call loop() every 5 seconds to minimize impact on display
-    // Even with WEBSOCKETS_TCP_TIMEOUT=2s, the blocking can cause display hangs
-    // By calling every 5s instead of every 500ms, we ensure smooth display updates
-    // Trade-off: Monitoring may disconnect and take longer to detect, but display is always responsive
-    if (!recentlyDisconnected && !isActiveFetch && currentTime - lastMonitorLoop > Timing::MONITOR_LOOP_THROTTLE) {
-      monitorClient.loop();
-      lastMonitorLoop = currentTime;
-    }
-    
-    // Send heartbeat to monitoring server (only if connected and not during active fetch)
-    // Skip heartbeat during fetch to prevent any potential blocking
-    if (!isActiveFetch && monitoringState.connected && currentTime - monitoringState.lastHeartbeat >= Timing::MONITOR_HEARTBEAT_INTERVAL) {
-      sendMonitorHeartbeat();
-      monitoringState.lastHeartbeat = currentTime;
-    }
-  }
-  
   // Broadcast metrics periodically
   if (currentTime - wsClients.lastMetricsBroadcast >= Timing::METRICS_BROADCAST_INTERVAL) {
     broadcastMetrics();
