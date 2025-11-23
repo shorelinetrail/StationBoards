@@ -2443,6 +2443,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         nationalRailPresets.style.display = isUnderground ? "none" : "grid";
         tflPresets.style.display = isUnderground ? "grid" : "none";
 
+        // Clear TFL filters when switching to National Rail
+        if (!isUnderground) {
+          document.getElementById('tflLineFilter').value = '';
+          document.getElementById('tflPlatformFilter').value = '';
+          // Clear direction filter if it exists
+          const directionFilter = document.getElementById('tflDirectionFilter');
+          if (directionFilter) {
+            directionFilter.value = '';
+          }
+        }
+
         // Disable "Calling At Mode" for TFL (option value="1")
         const callingAtOption = modeSelect.querySelector('option[value="1"]');
         if (callingAtOption) {
