@@ -316,6 +316,45 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               Serial.println("⚙️ Remote config update");
               LOG_TO_MONITOR("info", "Remote config update received");
 
+              // Track if service type changed (need to reinit service provider)
+              bool serviceTypeChanged = false;
+              int oldServiceType = config.serviceType;
+
+              // Process service type
+              if (doc.containsKey("serviceType")) {
+                String serviceTypeStr = doc["serviceType"].as<String>();
+                serviceTypeStr.trim();
+                Serial.println("📡 Service type from dashboard: " + serviceTypeStr);
+
+                if (serviceTypeStr == "National Rail") {
+                  config.serviceType = Config::SERVICE_NATIONAL_RAIL;
+                } else if (serviceTypeStr == "TFL") {
+                  config.serviceType = Config::SERVICE_TFL_UNDERGROUND;
+                }
+
+                if (config.serviceType != oldServiceType) {
+                  serviceTypeChanged = true;
+                  Serial.println("🔄 Service type changed: " + String(oldServiceType) + " → " + String(config.serviceType));
+                }
+              }
+
+              // Process TFL filters
+              if (doc.containsKey("tflLineFilter")) {
+                String lineFilter = doc["tflLineFilter"].as<String>();
+                lineFilter.trim();
+                strncpy(config.tflLineFilter, lineFilter.c_str(), sizeof(config.tflLineFilter) - 1);
+                config.tflLineFilter[sizeof(config.tflLineFilter) - 1] = '\0';
+                Serial.println("🚇 TFL Line filter: " + String(config.tflLineFilter));
+              }
+
+              if (doc.containsKey("tflPlatformFilter")) {
+                String platformFilter = doc["tflPlatformFilter"].as<String>();
+                platformFilter.trim();
+                strncpy(config.tflPlatformFilter, platformFilter.c_str(), sizeof(config.tflPlatformFilter) - 1);
+                config.tflPlatformFilter[sizeof(config.tflPlatformFilter) - 1] = '\0';
+                Serial.println("🚉 TFL Platform filter: " + String(config.tflPlatformFilter));
+              }
+
               if (doc.containsKey("stationCode")) {
                 String station = doc["stationCode"].as<String>();
                 station.toUpperCase();
@@ -339,9 +378,23 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               if (doc.containsKey("rotationSpeed")) {
                 config.rotationSpeed = doc["rotationSpeed"];
               }
-              
+
               config.save();
-              LOG_TO_MONITOR("info", "Config updated and saved - Station: " + String(config.stationCode));
+
+              String serviceTypeName = (config.serviceType == Config::SERVICE_NATIONAL_RAIL) ? "National Rail" : "TFL Underground";
+              LOG_TO_MONITOR("info", "Config updated - Service: " + serviceTypeName + ", Station: " + String(config.stationCode));
+
+              // Reinitialize service provider if service type changed
+              if (serviceTypeChanged) {
+                Serial.println("🔄 Reinitializing service provider...");
+                LOG_TO_MONITOR("info", "Switching to " + serviceTypeName);
+
+                if (config.serviceType == Config::SERVICE_NATIONAL_RAIL) {
+                  serviceProvider = &nationalRailService;
+                } else {
+                  serviceProvider = &tflService;
+                }
+              }
 
               // Reset alternating service
               if (config.useCallingAt) {
@@ -351,7 +404,7 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               } else {
                 displayState.currentAlternatingService = 2;
               }
-              
+
               // Clear data and force refresh
               displayState.serviceCount = 0;
               fetchStateData.lastSuccess = 0;
