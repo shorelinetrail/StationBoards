@@ -179,30 +179,31 @@ const wsClients = new Map(); // deviceId -> WebSocket
 
 wss.on('connection', (ws, req) => {
   console.log('📱 New WebSocket connection from:', req.socket.remoteAddress);
-  
+
   let deviceId = null;
   let heartbeatInterval = null;
 
   ws.on('message', (data) => {
     try {
       const message = JSON.parse(data.toString());
-      console.log('📨 Received from device:', message.type);
+      console.log('📨 Received from device:', message.type, message.deviceId || '');
 
       switch (message.type) {
         case 'register':
           handleDeviceRegister(ws, message);
           deviceId = message.deviceId;
-          
+
           // Store WebSocket connection
           wsClients.set(deviceId, ws);
-          
+          console.log(`✓ Device registered in wsClients: ${deviceId} (total: ${wsClients.size})`);
+
           // Send acknowledgment
           ws.send(JSON.stringify({
             type: 'registered',
             success: true,
             message: 'Device registered successfully'
           }));
-          
+
           // Notify web dashboard
           io.emit('deviceUpdate', {
             deviceId: deviceId,
@@ -212,7 +213,14 @@ wss.on('connection', (ws, req) => {
 
         case 'heartbeat':
           handleDeviceHeartbeat(message);
-          
+
+          // If deviceId not set yet, set it from heartbeat (handles reconnections)
+          if (!deviceId && message.deviceId) {
+            deviceId = message.deviceId;
+            wsClients.set(deviceId, ws);
+            console.log(`✓ Device tracked via heartbeat: ${deviceId} (total: ${wsClients.size})`);
+          }
+
           // Echo heartbeat acknowledgment
           ws.send(JSON.stringify({
             type: 'heartbeat_ack',
@@ -817,7 +825,13 @@ app.post('/api/devices/:id/restart', requireAuth, (req, res) => {
 
 // Request config from device
 app.post('/api/devices/:id/getConfig', requireAuth, (req, res) => {
-  const ws = wsClients.get(req.params.id);
+  const deviceId = req.params.id;
+  const ws = wsClients.get(deviceId);
+
+  console.log(`📖 Config request for device: ${deviceId}`);
+  console.log(`   Tracked devices: [${Array.from(wsClients.keys()).join(', ')}]`);
+  console.log(`   WebSocket exists: ${!!ws}`);
+  console.log(`   WebSocket state: ${ws ? ws.readyState : 'N/A'} (1 = OPEN)`);
 
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
@@ -825,9 +839,10 @@ app.post('/api/devices/:id/getConfig', requireAuth, (req, res) => {
       command: 'getConfig'
     }));
 
-    console.log(`📖 Config request sent to device: ${req.params.id}`);
+    console.log(`   ✓ Config request sent to device`);
     res.json({ success: true, message: 'Config request sent' });
   } else {
+    console.log(`   ❌ Device not connected or WebSocket not OPEN`);
     res.status(503).json({ success: false, message: 'Device not connected' });
   }
 });
