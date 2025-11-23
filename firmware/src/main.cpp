@@ -2228,10 +2228,13 @@ void loop() {
     // reconnection blocking the display (reconnect interval is 5s anyway)
     bool recentlyDisconnected = (currentTime - monitoringState.lastDisconnect < Timing::MONITOR_DISCONNECT_DELAY);
 
-    // CRITICAL FIX: Skip monitoring loop during active API fetches to prevent blocking
+    // CRITICAL FIX: Skip monitoring loop during active API fetches AND parsing to prevent blocking
     // monitorClient.loop() can block for extended periods, especially during network issues
-    // This was causing 11+ second delays when fetching from TFL API
-    bool isActiveFetch = (fetchStateData.state == FETCH_WAITING || fetchStateData.state == FETCH_READING);
+    // This was causing 11+ second delays between fetch completion and parse start
+    // IMPORTANT: Must include FETCH_DONE to prevent blocking between setting FETCH_DONE and processing it
+    bool isActiveFetch = (fetchStateData.state == FETCH_WAITING ||
+                          fetchStateData.state == FETCH_READING ||
+                          fetchStateData.state == FETCH_DONE);
 
     // Only call loop() every 500ms to reduce blocking impact, and not right after disconnect or during fetch
     // Combined with WEBSOCKETS_TCP_TIMEOUT=2000ms, worst case blocking is ~2 seconds
