@@ -1109,7 +1109,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <span class="info-tooltip" title="Show only arrivals for selected platform" aria-label="Information: Filter by platform">?</span>
           </label>
           <select id="tflPlatformFilter" name="tflPlatformFilter" aria-describedby="tflplatform-help">
-            <option value="">-- All Platforms --</option>
+            <option value="">-- Select Platform --</option>
           </select>
           <span class="help-text" id="tflplatform-help">Optional: Select a platform to narrow down results</span>
         </div>
@@ -1570,7 +1570,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1') {
         document.getElementById('tflLineFilter').value = '';
-        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
+        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">-- Select Platform --</option>';
         document.getElementById('tflPlatformFilter').value = '';
         console.log('Cleared line and platform filters for new station (not yet applied)');
 
@@ -1969,7 +1969,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1') {
         document.getElementById('tflLineFilter').value = '';
-        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
+        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">-- Select Platform --</option>';
         document.getElementById('tflPlatformFilter').value = '';
         console.log('Cleared line and platform filters for new station (not yet applied)');
 
@@ -2229,7 +2229,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           // No lines found - reset to default state
           lineFilter.innerHTML = '<option value="">-- Select Line --</option>';
           lineFilter.disabled = false;
-          platformFilter.innerHTML = '<option value="">All Platforms</option>';
+          platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
           platformFilter.disabled = false;
           showToast('No tube lines found for this station', 'warning');
           return;
@@ -2244,7 +2244,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         lineFilter.disabled = false;
 
         // Reset platform filter and re-enable
-        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
         platformFilter.disabled = false;
 
         // Don't auto-select any line - let the user choose
@@ -2257,7 +2257,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         // Error handling - reset to default state
         lineFilter.innerHTML = '<option value="">-- Select Line --</option>';
         lineFilter.disabled = false;
-        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
         platformFilter.disabled = false;
       }
     };
@@ -2397,7 +2397,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const platformFilter = document.getElementById('tflPlatformFilter');
 
       // Clear platform filter first
-      platformFilter.innerHTML = '<option value="">All Platforms</option>';
+      platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
       platformFilter.value = '';
 
       // If no line selected or no lines data, return
@@ -2414,7 +2414,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Populate platform dropdown
-      platformFilter.innerHTML = '<option value="">All Platforms</option>' +
+      platformFilter.innerHTML = '<option value="">-- Select Platform --</option>' +
         selectedLine.platforms.map(platform =>
           `<option value="${escapeHtml(platform)}">${escapeHtml(platform)}</option>`
         ).join('');
@@ -2567,7 +2567,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           } else {
             // Clear platform filter if no line selected
             const platformFilter = document.getElementById('tflPlatformFilter');
-            platformFilter.innerHTML = '<option value="">All Platforms</option>';
+            platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
             platformFilter.value = '';
           }
           // Note: Don't auto-apply - wait for user to click Apply button
