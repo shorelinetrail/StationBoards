@@ -2549,6 +2549,23 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             return;
           }
 
+          // Validate TFL filters if TFL station type is selected
+          const serviceTypeSelect = document.getElementById('serviceType');
+          if (serviceTypeSelect && serviceTypeSelect.value === 'tfl') {
+            const lineFilter = document.getElementById('tflLineFilter');
+            const platformFilter = document.getElementById('tflPlatformFilter');
+
+            if (!lineFilter || !lineFilter.value || lineFilter.value === '') {
+              showToast("Please select a tube line", "error");
+              return;
+            }
+
+            if (!platformFilter || !platformFilter.value || platformFilter.value === '') {
+              showToast("Please select a platform", "error");
+              return;
+            }
+          }
+
           autoApplySettings();
 
           // Note: Don't refetch lines - they're already loaded when station was selected
