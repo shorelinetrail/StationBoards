@@ -1994,18 +1994,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         }
       });
 
-      const intervalInput = document.getElementById("interval");
-      intervalInput.addEventListener("input", (e) => {
-        const val = parseInt(e.target.value);
-        if (val >= 30 && val <= 600) {
-          e.target.classList.add("success");
-          e.target.classList.remove("error");
-        } else {
-          e.target.classList.add("error");
-          e.target.classList.remove("success");
-        }
-      });
-
       // Update preview when display settings change
       ["mode", "extra"].forEach(id => {
         document.getElementById(id).addEventListener("change", () => {
