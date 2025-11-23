@@ -548,7 +548,7 @@ function populateDeviceModal(data) {
   if (config) {
     document.getElementById('configDeviceId').value = device.id;
     document.getElementById('configServiceType').value = config.service_type || 'National Rail';
-    document.getElementById('configStationCode').value = config.station_code || '';
+    document.getElementById('configStationName').value = config.station_name || 'Unknown';
     document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
     document.getElementById('configShowStationName').value = config.show_station_name ? '1' : '0';
     document.getElementById('configExtraServices').value = config.extra_services || 0;
@@ -618,66 +618,11 @@ async function saveDeviceConfig(event) {
     return;
   }
 
-  // Clear previous validation errors
-  ['configStationCode', 'configRefreshInterval', 'configScrollSpeed', 'configRotationSpeed'].forEach(clearValidationError);
-
-  // Get values
-  const stationCode = document.getElementById('configStationCode').value.trim().toUpperCase();
-  const refreshInterval = document.getElementById('configRefreshInterval').value;
-  const scrollSpeed = document.getElementById('configScrollSpeed').value;
-  const rotationSpeed = document.getElementById('configRotationSpeed').value;
-
-  // Validate station code
-  const stationCodeValidation = validateStationCode(stationCode);
-  if (!stationCodeValidation.valid) {
-    showValidationError('configStationCode', stationCodeValidation.error);
-    return;
-  }
-
-  // Validate refresh interval
-  const refreshValidation = validateRange(
-    refreshInterval,
-    CONFIG.VALIDATION.REFRESH_INTERVAL_MIN,
-    CONFIG.VALIDATION.REFRESH_INTERVAL_MAX,
-    'Refresh interval'
-  );
-  if (!refreshValidation.valid) {
-    showValidationError('configRefreshInterval', refreshValidation.error);
-    return;
-  }
-
-  // Validate scroll speed
-  const scrollValidation = validateRange(
-    scrollSpeed,
-    CONFIG.VALIDATION.SCROLL_SPEED_MIN,
-    CONFIG.VALIDATION.SCROLL_SPEED_MAX,
-    'Scroll speed'
-  );
-  if (!scrollValidation.valid) {
-    showValidationError('configScrollSpeed', scrollValidation.error);
-    return;
-  }
-
-  // Validate rotation speed
-  const rotationValidation = validateRange(
-    rotationSpeed,
-    CONFIG.VALIDATION.ROTATION_SPEED_MIN,
-    CONFIG.VALIDATION.ROTATION_SPEED_MAX,
-    'Rotation speed'
-  );
-  if (!rotationValidation.valid) {
-    showValidationError('configRotationSpeed', rotationValidation.error);
-    return;
-  }
-
+  // Get display settings (only editable fields)
   const config = {
-    stationCode: stationCode,
-    refreshInterval: refreshValidation.value,
     useCallingAt: document.getElementById('configUseCallingAt').value === '1',
     showStationName: document.getElementById('configShowStationName').value === '1',
-    extraServices: parseInt(document.getElementById('configExtraServices').value),
-    scrollSpeed: scrollValidation.value,
-    rotationSpeed: rotationValidation.value
+    extraServices: parseInt(document.getElementById('configExtraServices').value)
   };
 
   try {
@@ -745,8 +690,8 @@ function updateConfigForm(config) {
   if (config.service_type) {
     document.getElementById('configServiceType').value = config.service_type;
   }
-  if (config.station_code) {
-    document.getElementById('configStationCode').value = config.station_code;
+  if (config.station_name) {
+    document.getElementById('configStationName').value = config.station_name;
   }
   if (config.use_calling_at !== undefined) {
     document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';

@@ -675,37 +675,27 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
   });
 });
 
-// Update device configuration
+// Update device configuration (display settings only)
 app.post('/api/devices/:id/config', requireAuth, (req, res) => {
-  const { stationCode, useCallingAt, extraServices, rotationSpeed, refreshInterval, scrollSpeed, showStationName } = req.body;
-  
-  // Validate rotation speed is in expected range (5-60 seconds)
-  const rotationSpeedSeconds = parseInt(rotationSpeed);
-  if (isNaN(rotationSpeedSeconds) || rotationSpeedSeconds < 5 || rotationSpeedSeconds > 60) {
-    return res.status(400).json({ error: 'Rotation speed must be between 5 and 60 seconds' });
-  }
-  
-  // Convert to milliseconds for storage and device
-  const rotationSpeedMs = rotationSpeedSeconds * 1000;
-  
-  console.log(`💾 Config update for ${req.params.id}: rotation_speed ${rotationSpeedSeconds}s (${rotationSpeedMs}ms)`);
-  
+  const { useCallingAt, extraServices, showStationName } = req.body;
+
+  console.log(`💾 Config update for ${req.params.id}`);
+
   // First, get the current values to see what actually changed
-  db.get('SELECT station_code, use_calling_at, extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name FROM devices WHERE id = ?', 
-    [req.params.id], 
+  db.get('SELECT use_calling_at, extra_services, show_station_name FROM devices WHERE id = ?',
+    [req.params.id],
     (err, oldConfig) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
-      
-      // Now update the database
+
+      // Update only the display settings (station settings are read-only)
       db.run(
-        `UPDATE devices 
-         SET station_code = ?, use_calling_at = ?, extra_services = ?, 
-             rotation_speed = ?, refresh_interval = ?, scroll_speed = ?, show_station_name = ?
+        `UPDATE devices
+         SET use_calling_at = ?, extra_services = ?, show_station_name = ?
          WHERE id = ?`,
-        [stationCode, useCallingAt ? 1 : 0, extraServices, rotationSpeedMs, refreshInterval, scrollSpeed, showStationName ? 1 : 0, req.params.id],
+        [useCallingAt ? 1 : 0, extraServices, showStationName ? 1 : 0, req.params.id],
         (err) => {
           if (err) {
             res.status(500).json({ error: err.message });
@@ -715,63 +705,42 @@ app.post('/api/devices/:id/config', requireAuth, (req, res) => {
             if (ws && ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({
                 type: 'command',
-                command: 'updateConfig',
-                stationCode,
+                command: 'updateDisplayConfig',
                 useCallingAt,
                 extraServices,
-                rotationSpeed: rotationSpeedMs, // Send in milliseconds
-                refreshInterval,
-                scrollSpeed,
                 showStationName
               }));
             }
-            
+
             // Compare old vs new and log only what changed
             const changes = [];
             if (oldConfig) {
-              if (oldConfig.station_code !== stationCode) {
-                changes.push(`station: ${oldConfig.station_code || 'none'} → ${stationCode}`);
-              }
               if ((oldConfig.use_calling_at === 1) !== useCallingAt) {
                 changes.push(`calling_at: ${oldConfig.use_calling_at ? 'on' : 'off'} → ${useCallingAt ? 'on' : 'off'}`);
               }
               if (oldConfig.extra_services !== extraServices) {
                 changes.push(`extra_services: ${oldConfig.extra_services} → ${extraServices}`);
               }
-              if (oldConfig.rotation_speed !== rotationSpeedMs) {
-                const oldSec = oldConfig.rotation_speed ? oldConfig.rotation_speed / 1000 : 0;
-                changes.push(`rotation: ${oldSec}s → ${rotationSpeedSeconds}s`);
-              }
-              if (oldConfig.refresh_interval !== refreshInterval) {
-                changes.push(`refresh: ${oldConfig.refresh_interval}s → ${refreshInterval}s`);
-              }
-              if (oldConfig.scroll_speed !== scrollSpeed) {
-                changes.push(`scroll_speed: ${oldConfig.scroll_speed}ms → ${scrollSpeed}ms`);
-              }
               if ((oldConfig.show_station_name === 1) !== showStationName) {
                 changes.push(`show_name: ${oldConfig.show_station_name ? 'on' : 'off'} → ${showStationName ? 'on' : 'off'}`);
               }
             }
-            
-            const logMessage = changes.length > 0 
-              ? `Configuration changed: ${changes.join(', ')}`
-              : 'Configuration saved (no changes)';
-            
+
+            const logMessage = changes.length > 0
+              ? `Display config changed: ${changes.join(', ')}`
+              : 'Display config saved (no changes)';
+
             logEvent(req.params.id, 'config_change', logMessage);
             console.log(`✓ ${logMessage} for ${req.params.id}`);
-            
-            // Broadcast update to all web clients (keeping milliseconds for consistency with DB)
+
+            // Broadcast update to all web clients
             io.emit('deviceUpdate', {
               deviceId: req.params.id,
-              station_code: stationCode,
               use_calling_at: useCallingAt ? 1 : 0,
               extra_services: extraServices,
-              rotation_speed: rotationSpeedMs, // Store in milliseconds
-              refresh_interval: refreshInterval,
-              scroll_speed: scrollSpeed,
               show_station_name: showStationName ? 1 : 0
             });
-            
+
             res.json({ success: true });
           }
         }
