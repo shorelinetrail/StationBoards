@@ -9,6 +9,15 @@
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>         // ← FIXED: Added missing include
 #include <WebSocketsServer.h>
+
+// Override WebSocket TCP timeout to prevent long hangs when monitoring server is unavailable
+// Default is 5000ms, but we want faster failure detection to avoid blocking the device
+// This timeout affects: initial connection attempt, reconnection attempts, and handshake timeout
+// IMPORTANT: Keep this low to ensure the display never hangs even when server is down
+#ifndef WEBSOCKETS_TCP_TIMEOUT
+#define WEBSOCKETS_TCP_TIMEOUT (2000)  // 2 seconds - fast failure for better responsiveness
+#endif
+
 #include <WebSocketsClient.h>
 #include <HTTPUpdate.h>
 #include "config.h"
@@ -2211,14 +2220,18 @@ void loop() {
   // Handle monitoring server connection
   if (monitoringState.enabled) {
     // Throttle monitoring loop to prevent blocking on reconnection attempts
+    // IMPORTANT: Even with WEBSOCKETS_TCP_TIMEOUT set to 2s, we still throttle here
+    // to minimize impact on display responsiveness during connection/reconnection
     static unsigned long lastMonitorLoop = 0;
-    
-    // Skip monitoring loop for 2 seconds after disconnect to prevent immediate 
-    // reconnection blocking the display
-    bool recentlyDisconnected = (currentTime - monitoringState.lastDisconnect < 2000);
-    
+
+    // Skip monitoring loop for 2 seconds after disconnect to prevent immediate
+    // reconnection blocking the display (reconnect interval is 5s anyway)
+    bool recentlyDisconnected = (currentTime - monitoringState.lastDisconnect < Timing::MONITOR_DISCONNECT_DELAY);
+
     // Only call loop() every 500ms to reduce blocking impact, and not right after disconnect
-    if (!recentlyDisconnected && currentTime - lastMonitorLoop > 500) {
+    // Combined with WEBSOCKETS_TCP_TIMEOUT=2000ms, worst case blocking is ~2 seconds
+    // spread across multiple loop() iterations due to this throttling
+    if (!recentlyDisconnected && currentTime - lastMonitorLoop > Timing::MONITOR_LOOP_THROTTLE) {
       monitorClient.loop();
       lastMonitorLoop = currentTime;
     }
