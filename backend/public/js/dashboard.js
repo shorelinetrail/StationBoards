@@ -548,7 +548,7 @@ function populateDeviceModal(data) {
   if (config) {
     document.getElementById('configDeviceId').value = device.id;
     document.getElementById('configServiceType').value = config.service_type || 'National Rail';
-    document.getElementById('configStationName').value = config.station_name || 'Unknown';
+    document.getElementById('configStationCode').value = config.station_code || '';
     document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
     document.getElementById('configShowStationName').value = config.show_station_name ? '1' : '0';
     document.getElementById('configExtraServices').value = config.extra_services || 0;
@@ -556,9 +556,12 @@ function populateDeviceModal(data) {
     // Apply service-type specific UI adjustments
     const isTFL = config.service_type === 'TFL';
 
+    // Update station label based on service type
+    document.getElementById('configStationLabel').textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+
     // Show/hide TFL filter fields
-    document.getElementById('tflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
-    document.getElementById('tflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
+    document.getElementById('configTflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
+    document.getElementById('configTflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
 
     if (isTFL) {
       document.getElementById('configTflLineFilter').value = config.tfl_line_filter || '';
@@ -618,12 +621,34 @@ async function saveDeviceConfig(event) {
     return;
   }
 
-  // Get display settings (only editable fields)
+  // Get all configuration values
+  const serviceType = document.getElementById('configServiceType').value;
+  const stationCode = document.getElementById('configStationCode').value.trim().toUpperCase();
+  const isTFL = serviceType === 'TFL';
+
+  // Build config object
   const config = {
+    serviceType: serviceType,
+    stationCode: stationCode,
     useCallingAt: document.getElementById('configUseCallingAt').value === '1',
     showStationName: document.getElementById('configShowStationName').value === '1',
     extraServices: parseInt(document.getElementById('configExtraServices').value)
   };
+
+  // Add TFL filters if applicable
+  if (isTFL) {
+    config.tflLineFilter = document.getElementById('configTflLineFilter').value;
+    config.tflPlatformFilter = document.getElementById('configTflPlatformFilter').value;
+  } else {
+    config.tflLineFilter = '';
+    config.tflPlatformFilter = '';
+  }
+
+  // Validate station code
+  if (!stationCode) {
+    showToast('Station code is required', 'warning');
+    return;
+  }
 
   try {
     AppState.activeRequests.add('saveConfig');
@@ -690,8 +715,8 @@ function updateConfigForm(config) {
   if (config.service_type) {
     document.getElementById('configServiceType').value = config.service_type;
   }
-  if (config.station_name) {
-    document.getElementById('configStationName').value = config.station_name;
+  if (config.station_code) {
+    document.getElementById('configStationCode').value = config.station_code;
   }
   if (config.use_calling_at !== undefined) {
     document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
@@ -705,8 +730,13 @@ function updateConfigForm(config) {
 
   // Handle TFL filters
   const isTFL = config.service_type === 'TFL';
-  document.getElementById('tflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
-  document.getElementById('tflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
+
+  // Update station label
+  document.getElementById('configStationLabel').textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+
+  // Show/hide TFL filter groups
+  document.getElementById('configTflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
+  document.getElementById('configTflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
 
   if (isTFL) {
     if (config.tfl_line_filter) {
@@ -988,6 +1018,36 @@ function setupEventListeners() {
   const startOtaButton = document.querySelector('[data-action="start-ota"]');
   if (startOtaButton) {
     startOtaButton.addEventListener('click', startOTA);
+  }
+
+  // Service type change handler
+  const serviceTypeSelect = document.getElementById('configServiceType');
+  if (serviceTypeSelect) {
+    serviceTypeSelect.addEventListener('change', (e) => {
+      const isTFL = e.target.value === 'TFL';
+
+      // Update station label
+      document.getElementById('configStationLabel').textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+
+      // Show/hide TFL filter groups
+      document.getElementById('configTflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
+      document.getElementById('configTflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
+
+      // Disable calling at mode for TFL
+      const callingAtSelect = document.getElementById('configUseCallingAt');
+      if (isTFL) {
+        callingAtSelect.disabled = true;
+        callingAtSelect.value = '0';
+      } else {
+        callingAtSelect.disabled = false;
+      }
+
+      // Clear TFL filters when switching to National Rail
+      if (!isTFL) {
+        document.getElementById('configTflLineFilter').value = '';
+        document.getElementById('configTflPlatformFilter').value = '';
+      }
+    });
   }
 }
 

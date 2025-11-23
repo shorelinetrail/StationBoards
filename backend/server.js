@@ -675,14 +675,14 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
   });
 });
 
-// Update device configuration (display settings only)
+// Update device configuration (full config)
 app.post('/api/devices/:id/config', requireAuth, (req, res) => {
-  const { useCallingAt, extraServices, showStationName } = req.body;
+  const { serviceType, stationCode, useCallingAt, extraServices, showStationName, tflLineFilter, tflPlatformFilter } = req.body;
 
   console.log(`💾 Config update for ${req.params.id}`);
 
   // First, get the current values to see what actually changed
-  db.get('SELECT use_calling_at, extra_services, show_station_name FROM devices WHERE id = ?',
+  db.get('SELECT station_code, service_type, use_calling_at, extra_services, show_station_name, tfl_line_filter, tfl_platform_filter FROM devices WHERE id = ?',
     [req.params.id],
     (err, oldConfig) => {
       if (err) {
@@ -690,12 +690,22 @@ app.post('/api/devices/:id/config', requireAuth, (req, res) => {
         return;
       }
 
-      // Update only the display settings (station settings are read-only)
+      // Update all configuration settings
       db.run(
         `UPDATE devices
-         SET use_calling_at = ?, extra_services = ?, show_station_name = ?
+         SET station_code = ?, service_type = ?, use_calling_at = ?, extra_services = ?, show_station_name = ?,
+             tfl_line_filter = ?, tfl_platform_filter = ?
          WHERE id = ?`,
-        [useCallingAt ? 1 : 0, extraServices, showStationName ? 1 : 0, req.params.id],
+        [
+          stationCode || '',
+          serviceType || 'National Rail',
+          useCallingAt ? 1 : 0,
+          extraServices || 0,
+          showStationName ? 1 : 0,
+          tflLineFilter || '',
+          tflPlatformFilter || '',
+          req.params.id
+        ],
         (err) => {
           if (err) {
             res.status(500).json({ error: err.message });
@@ -705,16 +715,26 @@ app.post('/api/devices/:id/config', requireAuth, (req, res) => {
             if (ws && ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({
                 type: 'command',
-                command: 'updateDisplayConfig',
+                command: 'updateConfig',
+                serviceType,
+                stationCode,
                 useCallingAt,
                 extraServices,
-                showStationName
+                showStationName,
+                tflLineFilter,
+                tflPlatformFilter
               }));
             }
 
             // Compare old vs new and log only what changed
             const changes = [];
             if (oldConfig) {
+              if (oldConfig.station_code !== stationCode) {
+                changes.push(`station: ${oldConfig.station_code || 'none'} → ${stationCode}`);
+              }
+              if (oldConfig.service_type !== serviceType) {
+                changes.push(`service: ${oldConfig.service_type || 'National Rail'} → ${serviceType}`);
+              }
               if ((oldConfig.use_calling_at === 1) !== useCallingAt) {
                 changes.push(`calling_at: ${oldConfig.use_calling_at ? 'on' : 'off'} → ${useCallingAt ? 'on' : 'off'}`);
               }
@@ -724,11 +744,17 @@ app.post('/api/devices/:id/config', requireAuth, (req, res) => {
               if ((oldConfig.show_station_name === 1) !== showStationName) {
                 changes.push(`show_name: ${oldConfig.show_station_name ? 'on' : 'off'} → ${showStationName ? 'on' : 'off'}`);
               }
+              if (oldConfig.tfl_line_filter !== tflLineFilter) {
+                changes.push(`tfl_line: ${oldConfig.tfl_line_filter || 'none'} → ${tflLineFilter || 'none'}`);
+              }
+              if (oldConfig.tfl_platform_filter !== tflPlatformFilter) {
+                changes.push(`tfl_platform: ${oldConfig.tfl_platform_filter || 'none'} → ${tflPlatformFilter || 'none'}`);
+              }
             }
 
             const logMessage = changes.length > 0
-              ? `Display config changed: ${changes.join(', ')}`
-              : 'Display config saved (no changes)';
+              ? `Configuration changed: ${changes.join(', ')}`
+              : 'Configuration saved (no changes)';
 
             logEvent(req.params.id, 'config_change', logMessage);
             console.log(`✓ ${logMessage} for ${req.params.id}`);
@@ -736,9 +762,13 @@ app.post('/api/devices/:id/config', requireAuth, (req, res) => {
             // Broadcast update to all web clients
             io.emit('deviceUpdate', {
               deviceId: req.params.id,
+              station_code: stationCode,
+              service_type: serviceType,
               use_calling_at: useCallingAt ? 1 : 0,
               extra_services: extraServices,
-              show_station_name: showStationName ? 1 : 0
+              show_station_name: showStationName ? 1 : 0,
+              tfl_line_filter: tflLineFilter || '',
+              tfl_platform_filter: tflPlatformFilter || ''
             });
 
             res.json({ success: true });
