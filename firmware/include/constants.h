@@ -94,7 +94,7 @@ namespace Timing {
   // Display refresh rates
   const unsigned long DISPLAY_UPDATE_INTERVAL = 200;      // milliseconds
   const unsigned long METRICS_BROADCAST_INTERVAL = 10000; // 10 seconds
-  const unsigned long SNAPSHOT_BROADCAST_INTERVAL = 2000; // 2 seconds
+  const unsigned long SNAPSHOT_BROADCAST_INTERVAL = 1000; // 1 second - web live display refresh
   const unsigned long AP_DISPLAY_UPDATE = 30000;          // 30 seconds
   const unsigned long MONITOR_HEARTBEAT_INTERVAL = 30000; // 30 seconds
   // MONITOR_LOOP_THROTTLE removed - monitoring now runs on separate FreeRTOS task
