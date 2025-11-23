@@ -13,7 +13,7 @@ namespace Display {
   const int CLIP_WINDOW_END = 255;
 
   // Default Y positions (configurable via web interface)
-  const int DEFAULT_Y_TOP = 12;    // When station name hidden
+  const int DEFAULT_Y_TOP = 14;    // When station name hidden
   const int DEFAULT_Y_1ST = 26;    // First service line
   const int DEFAULT_Y_2ND = 38;    // Second service line
   const int DEFAULT_Y_ALT = 50;    // Alternating services line
