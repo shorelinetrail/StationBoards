@@ -1715,16 +1715,27 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       document.getElementById("lastUpdate").textContent = now.toLocaleTimeString();
 
       const useCallingAt = document.getElementById("mode").value === "1";
+      const showStationName = document.getElementById("showstation").value === "1";
       const showExtraService = document.getElementById("extra").value === "1";
 
       let html = '<div style="font-size: 14px; line-height: 1.8;">';
 
-      html += '<div style="text-align: center; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 16px;">';
-      html += escapeHtml(data.stationName || "Unknown Station");
-      html += '</div>';
+      // Only show station name if enabled
+      if (showStationName) {
+        html += '<div style="text-align: center; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 16px;">';
+        html += escapeHtml(data.stationName || "Unknown Station");
+        html += '</div>';
+      }
 
       if (data.serviceCount > 0 && data.services && data.services.length > 0) {
-        if (data.services[0]) {
+        // If station name hidden, show first service at top
+        if (!showStationName && data.services[0]) {
+          html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #111; border-radius: 4px;">';
+          html += `<span><strong>1st</strong> ${escapeHtml(data.services[0].std)} ${escapeHtml(data.services[0].destination)}</span>`;
+          html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(data.services[0].etd))}</span>`;
+          html += '</div>';
+        } else if (data.services[0]) {
+          // Station name visible, show first service normally
           html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #111; border-radius: 4px;">';
           html += `<span><strong>1st</strong> ${escapeHtml(data.services[0].std)} ${escapeHtml(data.services[0].destination)}</span>`;
           html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(data.services[0].etd))}</span>`;
@@ -1737,15 +1748,25 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           html += '</div>';
         }
 
-        if (!useCallingAt && data.services[1]) {
-          html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #111; border-radius: 4px;">';
-          html += `<span><strong>2nd</strong> ${escapeHtml(data.services[1].std)} ${escapeHtml(data.services[1].destination)}</span>`;
-          html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(data.services[1].etd))}</span>`;
-          html += '</div>';
+        // Show second service (if not in calling at mode)
+        if (!useCallingAt) {
+          // Adjust index based on whether station name is shown
+          const secondIdx = showStationName ? 1 : (useCallingAt ? 1 : 2);
+          if (data.services[secondIdx]) {
+            const label = showStationName ? "2nd" : (useCallingAt ? "2nd" : "3rd");
+            html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #111; border-radius: 4px;">';
+            html += `<span><strong>${label}</strong> ${escapeHtml(data.services[secondIdx].std)} ${escapeHtml(data.services[secondIdx].destination)}</span>`;
+            html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(data.services[secondIdx].etd))}</span>`;
+            html += '</div>';
+          }
         }
 
-        const startIdx = useCallingAt ? 1 : 2;
-        const maxIdx = useCallingAt ? (showExtraService ? 4 : 3) : (showExtraService ? 6 : 4);
+        // Calculate alternating service indices based on mode and station name visibility
+        const serviceOffset = showStationName ? 0 : 1;
+        const startIdx = useCallingAt ? (1 + serviceOffset) : (2 + serviceOffset);
+        const maxIdx = useCallingAt ?
+          (showExtraService ? (4 + serviceOffset) : (3 + serviceOffset)) :
+          (showExtraService ? (6 + serviceOffset) : (4 + serviceOffset));
 
         if (data.services.length > startIdx) {
           // Fix: Ensure alternatingService index is within the available services array
