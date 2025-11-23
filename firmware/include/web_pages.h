@@ -1125,31 +1125,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         <h2>Display Options</h2>
         <p style="margin-top: 0; margin-bottom: 20px; color: #666; font-size: 14px;">These settings apply automatically when changed</p>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="interval">
-              Refresh Interval (seconds)
-              <span class="info-tooltip" title="How often to fetch new departure data" aria-label="Information: How often to fetch new departure data">?</span>
-            </label>
-            <input type="number" id="interval" name="interval" value="{INTERVAL}" min="30" max="600" required aria-describedby="interval-help">
-            <span class="help-text" id="interval-help">Recommended: 60-120 seconds</span>
-          </div>
-
-          <div class="form-group">
-            <label for="scrollspeed">
-              Scroll Speed
-              <span class="info-tooltip" title="Controls how fast text scrolls across the display" aria-label="Information: Controls how fast text scrolls across the display">?</span>
-            </label>
-            <select id="scrollspeed" name="scrollspeed" aria-describedby="scrollspeed-help">
-              <option value="10"{SCROLL_SEL_10}>10ms (fastest)</option>
-              <option value="25"{SCROLL_SEL_25}>25ms (fast)</option>
-              <option value="50"{SCROLL_SEL_50}>50ms (moderate)</option>
-              <option value="100"{SCROLL_SEL_100}>100ms (smooth)</option>
-            </select>
-            <span class="help-text" id="scrollspeed-help">Delay between scroll steps - lower is faster, higher is smoother</span>
-          </div>
-        </div>
-
         <div class="form-group">
           <label for="mode">Display Mode</label>
           <select id="mode" name="mode" aria-describedby="mode-help">
@@ -1177,16 +1152,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <option value="3"{EXTRA_SEL_3}>Rotate 3 extra services</option>
             <option value="4"{EXTRA_SEL_4}>Rotate 4 extra services</option>
           </select>
-          <span class="help-text" id="extra-help">The bottom line of the display automatically cycles through additional departures at the rotation speed below</span>
-        </div>
-
-        <div class="form-group">
-          <label for="rotationspeed">
-            Bottom Line Rotation Speed (seconds)
-            <span class="info-tooltip" title="How long each service is displayed before rotating to the next" aria-label="Information: How long each service is displayed">?</span>
-          </label>
-          <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" required aria-describedby="rotationspeed-help">
-          <span class="help-text" id="rotationspeed-help">Recommended: 12-18 seconds. How often the bottom line alternates between services</span>
+          <span class="help-text" id="extra-help">The bottom line of the display automatically cycles through additional departures</span>
         </div>
       </div>
 
@@ -1218,10 +1184,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       <div class="tab-content" id="tab-1" role="tabpanel" aria-labelledby="tab-btn-1">
         <form method="POST" action="/save" id="networkForm">
           <input type="hidden" name="station" id="station-hidden" value="{STATION}">
-          <input type="hidden" name="interval" id="interval-hidden" value="{INTERVAL}">
           <input type="hidden" name="mode" id="mode-hidden" value="">
           <input type="hidden" name="extra" id="extra-hidden" value="">
-          <input type="hidden" name="scrollspeed" id="scrollspeed-hidden" value="{SCROLL}">
 
           <div class="card">
             <h2>📡 WiFi Configuration</h2>
@@ -2046,10 +2010,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // Copy current settings to hidden fields
         document.getElementById("station-hidden").value = document.getElementById("station").value;
-        document.getElementById("interval-hidden").value = document.getElementById("interval").value;
         document.getElementById("mode-hidden").value = document.getElementById("mode").value;
         document.getElementById("extra-hidden").value = document.getElementById("extra").value;
-        document.getElementById("scrollspeed-hidden").value = document.getElementById("scrollspeed").value;
 
         const btn = document.getElementById("saveBtn");
         btn.disabled = true;
@@ -2103,12 +2065,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       formData.append('tflPlatformFilter', document.getElementById('tflPlatformFilter').value);
       formData.append('station', stationValue);
       console.log('autoApplySettings: Sending station=', stationValue, 'tflLineFilter=', document.getElementById('tflLineFilter').value, 'tflPlatformFilter=', document.getElementById('tflPlatformFilter').value);
-      formData.append('interval', document.getElementById('interval').value);
       formData.append('mode', document.getElementById('mode').value);
       formData.append('showstation', document.getElementById('showstation').value);
       formData.append('extra', document.getElementById('extra').value);
-      formData.append('scrollspeed', document.getElementById('scrollspeed').value);
-      formData.append('rotationspeed', document.getElementById('rotationspeed').value);
 
       const ytopField = document.getElementById('ytop');
       if (ytopField) formData.append('ytop', ytopField.value);
@@ -2443,22 +2402,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         });
       }
 
-      // Setup auto-apply for scroll speed dropdown
-      const scrollspeedSelect = document.getElementById('scrollspeed');
-      if (scrollspeedSelect) {
-        scrollspeedSelect.addEventListener('change', () => {
-          autoApplySettings();
-        });
-      }
-
-      // Setup auto-apply for rotation speed input
-      const rotationspeedInput = document.getElementById('rotationspeed');
-      if (rotationspeedInput) {
-        rotationspeedInput.addEventListener('input', () => {
-          autoApplySettings();
-        });
-      }
-
       // Setup preset category tabs
       document.querySelectorAll('.preset-category-tab').forEach(tab => {
         tab.addEventListener('click', function() {
@@ -2545,7 +2488,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Auto-apply for display options only (station settings require Apply button)
-      const autoApplyFields = ["interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3"];
+      const autoApplyFields = ["mode", "showstation", "extra", "ytop", "y1", "y2", "y3"];
       autoApplyFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {

@@ -33,7 +33,7 @@ public:
   int extraServices = 0;  // Number of extra services on bottom line (0-4)
   int refreshInterval = 60;  // Seconds between API calls
   int scrollSpeed = 50;  // Milliseconds for scrolling text
-  int rotationSpeed = 15;  // Seconds between service rotations
+  int rotationSpeed = 10;  // Seconds between service rotations
   
   // Display Positions
   int yPosTop = 12;  // Y position for top service when station name is hidden
