@@ -1094,8 +1094,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         <div class="form-group" id="tflLineFilterGroup" style="display:none;">
           <label for="tflLineFilter">
-            Filter by Tube Line <span style="color:red;">*</span>
-            <span class="info-tooltip" title="Select which tube line to display (required for TFL stations)" aria-label="Information: Filter by tube line">?</span>
+            Select Tube Line
+            <span class="info-tooltip" title="Select which tube line to display (required for TFL stations)" aria-label="Information: Select tube line">?</span>
           </label>
           <select id="tflLineFilter" name="tflLineFilter" required aria-describedby="tflline-help">
             <option value="" disabled selected>-- Select Line --</option>
