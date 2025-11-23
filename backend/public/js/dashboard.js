@@ -547,23 +547,24 @@ function populateDeviceModal(data) {
   // Config tab
   if (config) {
     document.getElementById('configDeviceId').value = device.id;
+    document.getElementById('configServiceType').value = config.service_type || 'National Rail';
     document.getElementById('configStationCode').value = config.station_code || '';
-    document.getElementById('configRefreshInterval').value = config.refresh_interval || 60;
     document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
     document.getElementById('configShowStationName').value = config.show_station_name ? '1' : '0';
-    document.getElementById('configExtraServices').value = config.extra_services || 1;
-    document.getElementById('configScrollSpeed').value = config.scroll_speed || 50;
-    document.getElementById('configRotationSpeed').value = config.rotation_speed || 15;
+    document.getElementById('configExtraServices').value = config.extra_services || 0;
 
     // Apply service-type specific UI adjustments
-    const isTFL = device.service_type === 'TFL';
+    const isTFL = config.service_type === 'TFL';
 
-    // Station Code help text
-    const stationCodeHelp = document.getElementById('stationCodeHelp');
+    // Show/hide TFL filter fields
+    document.getElementById('tflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
+    document.getElementById('tflDirectionFilterGroup').style.display = isTFL ? 'block' : 'none';
+    document.getElementById('tflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
+
     if (isTFL) {
-      stationCodeHelp.textContent = 'TFL NaPTAN ID (e.g., 940GZZLUKSX for King\'s Cross)';
-    } else {
-      stationCodeHelp.textContent = 'National Rail CRS code (e.g., PAD for Paddington)';
+      document.getElementById('configTflLineFilter').value = config.tfl_line_filter || '';
+      document.getElementById('configTflDirectionFilter').value = config.tfl_direction_filter || '';
+      document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter || '';
     }
 
     // Disable "Calling At" mode for TFL services (not supported)
@@ -743,11 +744,11 @@ async function syncConfigFromDevice() {
  * Update config form with values from device
  */
 function updateConfigForm(config) {
+  if (config.service_type) {
+    document.getElementById('configServiceType').value = config.service_type;
+  }
   if (config.station_code) {
     document.getElementById('configStationCode').value = config.station_code;
-  }
-  if (config.refresh_interval !== undefined) {
-    document.getElementById('configRefreshInterval').value = config.refresh_interval;
   }
   if (config.use_calling_at !== undefined) {
     document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
@@ -758,11 +759,23 @@ function updateConfigForm(config) {
   if (config.extra_services !== undefined) {
     document.getElementById('configExtraServices').value = config.extra_services;
   }
-  if (config.scroll_speed !== undefined) {
-    document.getElementById('configScrollSpeed').value = config.scroll_speed;
-  }
-  if (config.rotation_speed !== undefined) {
-    document.getElementById('configRotationSpeed').value = config.rotation_speed;
+
+  // Handle TFL filters
+  const isTFL = config.service_type === 'TFL';
+  document.getElementById('tflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
+  document.getElementById('tflDirectionFilterGroup').style.display = isTFL ? 'block' : 'none';
+  document.getElementById('tflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
+
+  if (isTFL) {
+    if (config.tfl_line_filter) {
+      document.getElementById('configTflLineFilter').value = config.tfl_line_filter;
+    }
+    if (config.tfl_direction_filter) {
+      document.getElementById('configTflDirectionFilter').value = config.tfl_direction_filter;
+    }
+    if (config.tfl_platform_filter) {
+      document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter;
+    }
   }
 }
 

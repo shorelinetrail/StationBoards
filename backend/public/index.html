@@ -149,66 +149,66 @@
                 <div class="row">
                   <div class="col-md-6">
                     <h6>Station Settings</h6>
+                    <div class="mb-3">
+                      <label class="form-label">Service Type</label>
+                      <input type="text" class="form-control" id="configServiceType" readonly>
+                      <small class="text-muted">Service type is configured on the device</small>
+                    </div>
                     <div class="mb-3" id="stationCodeWrapper">
                       <label class="form-label">Station Code</label>
-                      <input type="text" class="form-control" id="configStationCode" maxlength="15">
-                      <small class="text-muted" id="stationCodeHelp"></small>
+                      <input type="text" class="form-control" id="configStationCode" maxlength="15" readonly>
+                      <small class="text-muted" id="stationCodeHelp">Configure on device web interface</small>
                     </div>
-                    <div class="mb-3">
-                      <label class="form-label">Refresh Interval (seconds)</label>
-                      <input type="number" class="form-control" id="configRefreshInterval" min="30" max="300">
+                    <div class="mb-3" id="tflLineFilterGroup" style="display:none;">
+                      <label class="form-label">TFL Line Filter</label>
+                      <input type="text" class="form-control" id="configTflLineFilter" readonly>
+                    </div>
+                    <div class="mb-3" id="tflDirectionFilterGroup" style="display:none;">
+                      <label class="form-label">TFL Direction</label>
+                      <input type="text" class="form-control" id="configTflDirectionFilter" readonly>
+                    </div>
+                    <div class="mb-3" id="tflPlatformFilterGroup" style="display:none;">
+                      <label class="form-label">TFL Platform</label>
+                      <input type="text" class="form-control" id="configTflPlatformFilter" readonly>
                     </div>
                   </div>
-                  
+
                   <div class="col-md-6">
                     <h6>Display Settings</h6>
                     <div class="mb-3">
                       <label class="form-label">Display Mode</label>
-                      <select class="form-select" id="configUseCallingAt">
+                      <select class="form-select" id="configUseCallingAt" disabled>
                         <option value="0">Standard</option>
                         <option value="1">Calling At</option>
                       </select>
+                      <small class="text-muted">Configure on device web interface</small>
                     </div>
                     <div class="mb-3">
                       <label class="form-label">Show Station Name</label>
-                      <select class="form-select" id="configShowStationName">
+                      <select class="form-select" id="configShowStationName" disabled>
                         <option value="1">Yes</option>
                         <option value="0">No</option>
                       </select>
+                      <small class="text-muted">Configure on device web interface</small>
                     </div>
                     <div class="mb-3">
                       <label class="form-label">Extra Services</label>
-                      <select class="form-select" id="configExtraServices">
+                      <select class="form-select" id="configExtraServices" disabled>
+                        <option value="0">0</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
+                        <option value="4">4</option>
                       </select>
+                      <small class="text-muted">Configure on device web interface</small>
                     </div>
                   </div>
                 </div>
 
-                <div class="row">
-                  <div class="col-md-6">
-                    <div class="mb-3">
-                      <label class="form-label">Scroll Speed (ms)</label>
-                      <input type="number" class="form-control" id="configScrollSpeed" min="10" max="200">
-                    </div>
-                  </div>
-                  <div class="col-md-6">
-                    <div class="mb-3">
-                      <label class="form-label">Rotation Speed (seconds)</label>
-                      <input type="number" class="form-control" id="configRotationSpeed" min="5" max="60">
-                    </div>
-                  </div>
-                </div>
-
-                <div class="d-flex gap-2">
-                  <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-check-circle"></i> Save Configuration
-                  </button>
-                  <button type="button" class="btn btn-outline-secondary" onclick="syncConfigFromDevice()">
-                    <i class="bi bi-arrow-clockwise"></i> Sync from Device
-                  </button>
+                <div class="alert alert-info">
+                  <i class="bi bi-info-circle"></i>
+                  <strong>Note:</strong> All configuration must be done through the device's web interface.
+                  This panel shows read-only status for monitoring purposes.
                 </div>
               </form>
             </div>
