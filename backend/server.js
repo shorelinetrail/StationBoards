@@ -255,9 +255,6 @@ wss.on('connection', (ws, req) => {
               use_calling_at: message.useCallingAt,
               show_station_name: message.showStationName,
               extra_services: message.extraServices,
-              refresh_interval: message.refreshInterval,
-              scroll_speed: message.scrollSpeed,
-              rotation_speed: message.rotationSpeed,
               tfl_line_filter: message.tflLineFilter,
               tfl_direction_filter: message.tflDirectionFilter,
               tfl_platform_filter: message.tflPlatformFilter
@@ -279,9 +276,6 @@ wss.on('connection', (ws, req) => {
               use_calling_at: message.useCallingAt,
               show_station_name: message.showStationName,
               extra_services: message.extraServices,
-              refresh_interval: message.refreshInterval,
-              scroll_speed: message.scrollSpeed,
-              rotation_speed: message.rotationSpeed,
               tfl_line_filter: message.tflLineFilter,
               tfl_direction_filter: message.tflDirectionFilter,
               tfl_platform_filter: message.tflPlatformFilter
@@ -672,27 +666,12 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
               station_code: device.station_code,
               station_name: device.station_name,
               service_type: device.service_type,
-              refresh_interval: device.refresh_interval,
               use_calling_at: device.use_calling_at === 1,
               show_station_name: device.show_station_name === 1,
               extra_services: device.extra_services,
-              scroll_speed: device.scroll_speed || 50,
               tfl_line_filter: device.tfl_line_filter || '',
               tfl_direction_filter: device.tfl_direction_filter || '',
-              tfl_platform_filter: device.tfl_platform_filter || '',
-              // Convert rotation_speed from milliseconds to seconds
-              // Handle edge cases: NULL, 0, or values already in seconds
-              rotation_speed: (() => {
-                const rs = device.rotation_speed;
-                // NULL or 0 → use default 5 seconds
-                if (!rs || rs === 0) return 5;
-                // Value already in seconds (< 100) → use as-is
-                if (rs < 100) return rs;
-                // Value in milliseconds (>= 1000) → convert to seconds
-                if (rs >= 1000) return rs / 1000;
-                // Ambiguous range (100-999) → assume seconds, use as-is
-                return rs;
-              })()
+              tfl_platform_filter: device.tfl_platform_filter || ''
             },
             logs: formattedLogs
           });
