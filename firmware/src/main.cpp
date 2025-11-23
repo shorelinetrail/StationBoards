@@ -2219,26 +2219,25 @@ void loop() {
   
   // Handle monitoring server connection
   if (monitoringState.enabled) {
-    // Throttle monitoring loop to prevent blocking on reconnection attempts
-    // IMPORTANT: Even with WEBSOCKETS_TCP_TIMEOUT set to 2s, we still throttle here
-    // to minimize impact on display responsiveness during connection/reconnection
+    // CRITICAL: Monitoring operations are heavily throttled to prevent display hangs
+    // The display ALWAYS needs updates (clock updates every second), so we can't let
+    // monitoring block the main loop. monitorClient.loop() can block for up to 2s.
     static unsigned long lastMonitorLoop = 0;
 
     // Skip monitoring loop for 2 seconds after disconnect to prevent immediate
     // reconnection blocking the display (reconnect interval is 5s anyway)
     bool recentlyDisconnected = (currentTime - monitoringState.lastDisconnect < Timing::MONITOR_DISCONNECT_DELAY);
 
-    // CRITICAL FIX: Skip monitoring loop during active API fetches AND parsing to prevent blocking
+    // Skip monitoring loop during active API fetches AND parsing to prevent blocking
     // monitorClient.loop() can block for extended periods, especially during network issues
-    // This was causing 11+ second delays between fetch completion and parse start
-    // IMPORTANT: Must include FETCH_DONE to prevent blocking between setting FETCH_DONE and processing it
     bool isActiveFetch = (fetchStateData.state == FETCH_WAITING ||
                           fetchStateData.state == FETCH_READING ||
                           fetchStateData.state == FETCH_DONE);
 
-    // Only call loop() every 500ms to reduce blocking impact, and not right after disconnect or during fetch
-    // Combined with WEBSOCKETS_TCP_TIMEOUT=2000ms, worst case blocking is ~2 seconds
-    // spread across multiple loop() iterations due to this throttling
+    // Only call loop() every 5 seconds to minimize impact on display
+    // Even with WEBSOCKETS_TCP_TIMEOUT=2s, the blocking can cause display hangs
+    // By calling every 5s instead of every 500ms, we ensure smooth display updates
+    // Trade-off: Monitoring may disconnect and take longer to detect, but display is always responsive
     if (!recentlyDisconnected && !isActiveFetch && currentTime - lastMonitorLoop > Timing::MONITOR_LOOP_THROTTLE) {
       monitorClient.loop();
       lastMonitorLoop = currentTime;

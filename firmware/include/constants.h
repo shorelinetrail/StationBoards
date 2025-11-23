@@ -97,7 +97,7 @@ namespace Timing {
   const unsigned long SNAPSHOT_BROADCAST_INTERVAL = 2000; // 2 seconds
   const unsigned long AP_DISPLAY_UPDATE = 30000;          // 30 seconds
   const unsigned long MONITOR_HEARTBEAT_INTERVAL = 30000; // 30 seconds
-  const unsigned long MONITOR_LOOP_THROTTLE = 500;        // milliseconds
+  const unsigned long MONITOR_LOOP_THROTTLE = 5000;       // 5 seconds - reduced frequency to prevent display hangs
   const unsigned long MONITOR_DISCONNECT_DELAY = 2000;    // milliseconds
 
   // Animation timing
