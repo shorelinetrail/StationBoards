@@ -1508,8 +1508,8 @@ void updateDisplay() {
       int indexA = displayState.currentAlternatingService;
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      String labelA = getServiceLabel(indexA, serviceOffset);
-      String labelB = getServiceLabel(indexB, serviceOffset);
+      String labelA = getServiceLabel(indexA);
+      String labelB = getServiceLabel(indexB);
 
       displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
                                 labelA.c_str(), labelB.c_str(), config.yPosAlt,
@@ -1527,7 +1527,7 @@ void updateDisplay() {
       if (serviceIdx >= displayState.serviceCount) break;
 
       int yPos = (i == 0) ? config.yPos1st : config.yPos2nd;
-      String label = getServiceLabel(i, serviceOffset);
+      String label = getServiceLabel(serviceIdx);
 
       displayServiceLine(displayState.services[serviceIdx], label.c_str(), yPos, u8g2);
     }
@@ -1541,8 +1541,8 @@ void updateDisplay() {
       int indexA = displayState.currentAlternatingService;
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      String labelA = getServiceLabel(indexA, serviceOffset);
-      String labelB = getServiceLabel(indexB, serviceOffset);
+      String labelA = getServiceLabel(indexA);
+      String labelB = getServiceLabel(indexB);
 
       displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
                                 labelA.c_str(), labelB.c_str(), config.yPosAlt,
