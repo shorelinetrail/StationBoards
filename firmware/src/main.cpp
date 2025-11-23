@@ -390,9 +390,9 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
                 LOG_TO_MONITOR("info", "Switching to " + serviceTypeName);
 
                 if (config.serviceType == Config::SERVICE_NATIONAL_RAIL) {
-                  serviceProvider = &nationalRailService;
+                  serviceProvider = &nationalRailProvider;
                 } else {
-                  serviceProvider = &tflService;
+                  serviceProvider = &tflUndergroundProvider;
                 }
               }
 
