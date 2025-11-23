@@ -569,12 +569,13 @@ function populateDeviceModal(data) {
     if (platformFilterGroup) platformFilterGroup.style.display = isTFL ? 'block' : 'none';
 
     if (isTFL) {
-      document.getElementById('configTflLineFilter').value = config.tfl_line_filter || '';
-      document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter || '';
-
-      // Populate platforms if line is selected
-      if (config.tfl_line_filter) {
-        populatePlatformOptions(config.tfl_line_filter, config.tfl_platform_filter);
+      // Fetch TFL lines and platforms from API if we have a station code
+      if (config.station_code) {
+        populateTflLines(config.station_code, config.tfl_line_filter || '', config.tfl_platform_filter || '');
+      } else {
+        // No station code, just set the values if they exist
+        document.getElementById('configTflLineFilter').value = config.tfl_line_filter || '';
+        document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter || '';
       }
     }
 
@@ -719,43 +720,154 @@ async function syncConfigFromDevice() {
 }
 
 /**
- * Populate platform options based on selected line
+ * Fetch available tube lines and platforms from TFL API for a station
  */
-function populatePlatformOptions(selectedLine, currentPlatform = '') {
+async function fetchTflStationLines(stationId) {
+  console.log('fetchTflStationLines called with:', stationId);
+
+  // Use Arrivals endpoint to get lines that actually have services at this station
+  const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}/Arrivals`;
+
+  console.log('Fetching arrivals from TFL API:', apiUrl);
+
+  try {
+    const response = await fetch(apiUrl);
+    console.log('Response status:', response.status);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const arrivals = await response.json();
+    console.log(`Received ${arrivals.length} arrivals`);
+
+    // Extract unique lines and platforms from arrivals
+    const linesByIdMap = new Map();
+    const platformsByLine = new Map();
+
+    arrivals.forEach(arrival => {
+      const lineId = arrival.lineId;
+      const lineName = arrival.lineName;
+      const platform = arrival.platformName;
+
+      if (lineId && lineName) {
+        linesByIdMap.set(lineId, lineName);
+
+        if (platform) {
+          if (!platformsByLine.has(lineId)) {
+            platformsByLine.set(lineId, new Set());
+          }
+          platformsByLine.get(lineId).add(platform);
+        }
+      }
+    });
+
+    // Convert to array format
+    const tubeLines = Array.from(linesByIdMap.entries()).map(([id, name]) => ({
+      id: id,
+      name: name,
+      platforms: Array.from(platformsByLine.get(id) || []).sort()
+    }));
+
+    // Sort alphabetically by name
+    tubeLines.sort((a, b) => a.name.localeCompare(b.name));
+
+    console.log('Station has', tubeLines.length, 'tube lines with active services:', tubeLines.map(l => `${l.name} (${l.platforms.length} platforms)`));
+    return tubeLines;
+
+  } catch (error) {
+    console.error('Error fetching TFL station lines:', error);
+    showToast('Failed to fetch tube lines: ' + error.message, 'danger');
+    return [];
+  }
+}
+
+/**
+ * Populate line dropdown with lines from TFL API
+ */
+async function populateTflLines(stationId, currentLine = '', currentPlatform = '') {
+  const lineSelect = document.getElementById('configTflLineFilter');
+  const platformSelect = document.getElementById('configTflPlatformFilter');
+
+  if (!lineSelect || !platformSelect) return;
+
+  // Show loading state
+  lineSelect.innerHTML = '<option value="">Loading lines...</option>';
+  lineSelect.disabled = true;
+  platformSelect.innerHTML = '<option value="">Loading platforms...</option>';
+  platformSelect.disabled = true;
+
+  try {
+    const lines = await fetchTflStationLines(stationId);
+
+    if (lines.length === 0) {
+      // No lines found - reset to default state
+      lineSelect.innerHTML = '<option value="">-- No lines found --</option>';
+      lineSelect.disabled = false;
+      platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
+      platformSelect.disabled = false;
+      showToast('No tube lines found for this station', 'warning');
+      return;
+    }
+
+    // Populate line dropdown
+    lineSelect.innerHTML = '<option value="">-- Select Line --</option>';
+    lines.forEach(line => {
+      const option = document.createElement('option');
+      option.value = line.id;
+      option.textContent = line.name;
+      option.dataset.platforms = JSON.stringify(line.platforms);
+      if (currentLine === line.id) {
+        option.selected = true;
+      }
+      lineSelect.appendChild(option);
+    });
+    lineSelect.disabled = false;
+
+    // If a line was selected, populate its platforms
+    if (currentLine) {
+      const selectedLine = lines.find(l => l.id === currentLine);
+      if (selectedLine) {
+        populatePlatformOptionsFromData(selectedLine.platforms, currentPlatform);
+      }
+    } else {
+      platformSelect.innerHTML = '<option value="">-- Select Line First --</option>';
+      platformSelect.disabled = false;
+    }
+
+    console.log('Populated', lines.length, 'lines for station', stationId);
+
+  } catch (error) {
+    console.error('Error populating TFL lines:', error);
+    lineSelect.innerHTML = '<option value="">-- Error loading lines --</option>';
+    lineSelect.disabled = false;
+    platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
+    platformSelect.disabled = false;
+  }
+}
+
+/**
+ * Populate platform options from API data
+ */
+function populatePlatformOptionsFromData(platforms, currentPlatform = '') {
   const platformSelect = document.getElementById('configTflPlatformFilter');
   if (!platformSelect) return;
 
-  // Platform options per line (common platforms)
-  const platformsByLine = {
-    'bakerloo': ['Northbound', 'Southbound'],
-    'central': ['Eastbound', 'Westbound'],
-    'circle': ['Eastbound', 'Westbound'],
-    'district': ['Eastbound', 'Westbound'],
-    'hammersmith-city': ['Eastbound', 'Westbound'],
-    'jubilee': ['Eastbound', 'Westbound'],
-    'metropolitan': ['Eastbound', 'Westbound'],
-    'northern': ['Northbound', 'Southbound'],
-    'piccadilly': ['Eastbound', 'Westbound'],
-    'victoria': ['Northbound', 'Southbound'],
-    'waterloo-city': ['Eastbound', 'Westbound']
-  };
-
-  // Clear existing options
   platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
 
-  // Add platforms for selected line
-  const platforms = platformsByLine[selectedLine] || [];
   platforms.forEach(platform => {
     const option = document.createElement('option');
     option.value = platform;
     option.textContent = platform;
-    if (currentPlatform && currentPlatform.includes(platform)) {
+    if (currentPlatform === platform) {
       option.selected = true;
     }
     platformSelect.appendChild(option);
   });
 
-  console.log('Populated platforms for line:', selectedLine, 'Options:', platforms.length);
+  platformSelect.disabled = false;
+
+  console.log('Populated', platforms.length, 'platforms');
 }
 
 /**
@@ -794,15 +906,9 @@ function updateConfigForm(config) {
   if (lineFilterGroup) lineFilterGroup.style.display = isTFL ? 'block' : 'none';
   if (platformFilterGroup) platformFilterGroup.style.display = isTFL ? 'block' : 'none';
 
-  if (isTFL) {
-    if (config.tfl_line_filter) {
-      document.getElementById('configTflLineFilter').value = config.tfl_line_filter;
-      // Populate platforms for the selected line
-      populatePlatformOptions(config.tfl_line_filter, config.tfl_platform_filter);
-    }
-    if (config.tfl_platform_filter) {
-      document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter;
-    }
+  if (isTFL && config.station_code) {
+    // Fetch TFL lines and platforms from API
+    populateTflLines(config.station_code, config.tfl_line_filter || '', config.tfl_platform_filter || '');
   }
 }
 
@@ -1116,8 +1222,15 @@ function setupEventListeners() {
         }
       }
 
-      // Clear TFL filters when switching to National Rail
-      if (!isTFL) {
+      // Fetch TFL lines when switching to TFL (if we have a station code)
+      if (isTFL) {
+        const stationCode = document.getElementById('configStationCode').value.trim();
+        if (stationCode.length >= 3) {
+          console.log('Fetching TFL lines for station:', stationCode);
+          populateTflLines(stationCode);
+        }
+      } else {
+        // Clear TFL filters when switching to National Rail
         const lineFilter = document.getElementById('configTflLineFilter');
         const platformFilter = document.getElementById('configTflPlatformFilter');
         if (lineFilter) lineFilter.value = '';
@@ -1126,14 +1239,37 @@ function setupEventListeners() {
     });
   }
 
-  // TFL Line filter change handler - populate platforms
+  // Station code change handler - fetch TFL lines when station changes
+  const stationCodeInput = document.getElementById('configStationCode');
+  if (stationCodeInput) {
+    let stationCodeTimeout = null;
+    stationCodeInput.addEventListener('input', (e) => {
+      const serviceType = document.getElementById('configServiceType').value;
+      const stationCode = e.target.value.trim();
+
+      // Only fetch TFL lines if service type is TFL and we have a station code
+      if (serviceType === 'TFL' && stationCode.length >= 3) {
+        // Debounce the API call
+        clearTimeout(stationCodeTimeout);
+        stationCodeTimeout = setTimeout(() => {
+          console.log('Station code changed, fetching TFL lines for:', stationCode);
+          populateTflLines(stationCode);
+        }, 500); // Wait 500ms after user stops typing
+      }
+    });
+  }
+
+  // TFL Line filter change handler - populate platforms from dataset
   const tflLineFilter = document.getElementById('configTflLineFilter');
   if (tflLineFilter) {
     tflLineFilter.addEventListener('change', (e) => {
-      const selectedLine = e.target.value;
-      console.log('TFL line changed to:', selectedLine);
-      if (selectedLine) {
-        populatePlatformOptions(selectedLine);
+      const selectedOption = e.target.selectedOptions[0];
+      console.log('TFL line changed to:', e.target.value);
+
+      if (selectedOption && selectedOption.dataset.platforms) {
+        // Parse platforms from the data attribute
+        const platforms = JSON.parse(selectedOption.dataset.platforms);
+        populatePlatformOptionsFromData(platforms);
       } else {
         // Clear platforms if no line selected
         const platformSelect = document.getElementById('configTflPlatformFilter');
