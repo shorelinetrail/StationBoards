@@ -37,7 +37,7 @@ namespace Net {
   // Timeouts (milliseconds)
   const unsigned long WIFI_CONNECT_TIMEOUT = 30000;     // 30 seconds
   const unsigned long API_CONNECT_TIMEOUT = 8000;       // 8 seconds
-  const unsigned long API_RESPONSE_TIMEOUT = 10000;     // 10 seconds (reduced from 15s with optimized reading)
+  const unsigned long API_RESPONSE_TIMEOUT = 15000;     // 15 seconds
   const unsigned long NTP_SYNC_TIMEOUT = 10000;         // 10 seconds
 
   // Retry intervals

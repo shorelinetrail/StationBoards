@@ -1232,29 +1232,15 @@ void handleFetchStateMachine() {
         // AGGRESSIVE CACHING: Read data in background without blocking display
         // Main loop handles display updates independently for zero pauses
 
-        // OPTIMIZED: Read more aggressively to handle slow-drip TCP data
-        // TFL API often sends data in small packets with delays between them
-        // Stay in read loop longer instead of exiting immediately when no data available
-        unsigned long readStartTime = millis();
-        const unsigned long maxReadTime = 100;  // Spend up to 100ms reading per state machine call
-
-        while (millis() - readStartTime < maxReadTime) {
-          if (fetchClient.available()) {
-            // Read up to 512 bytes at a time
-            uint8_t buffer[512];
-            int bytesRead = fetchClient.read(buffer, sizeof(buffer));
-            if (bytesRead > 0) {
-              fetchStateData.buffer.concat((const char*)buffer, bytesRead);
-            }
-            yield();  // Yield to prevent watchdog
-          } else if (fetchClient.connected()) {
-            // No data available but still connected - wait briefly for more
-            delay(1);  // 1ms wait allows data to arrive without blocking too long
-            yield();
-          } else {
-            // Connection closed, exit read loop
-            break;
+        // Read in chunks for much better performance (10-20x faster than char-by-char)
+        while (fetchClient.available()) {
+          // Read up to 512 bytes at a time
+          uint8_t buffer[512];
+          int bytesRead = fetchClient.read(buffer, sizeof(buffer));
+          if (bytesRead > 0) {
+            fetchStateData.buffer.concat((const char*)buffer, bytesRead);
           }
+          yield();  // Yield to prevent watchdog
         }
 
         // Check if done - connection closed and no more data
@@ -1271,9 +1257,8 @@ void handleFetchStateMachine() {
           }
         }
 
-        // Timeout for reading - with optimized reading, this should rarely be hit
-        // Reduced from 15s since aggressive reading makes fetches much faster
-        if (millis() - fetchStateData.startTime > Net::API_RESPONSE_TIMEOUT) {
+        // Timeout for reading - API server can be slow with large responses
+        if (millis() - fetchStateData.startTime > 15000) {
           fetchClient.stop();
           if (fetchStateData.buffer.length() > 100) {
             // Got data but took too long - still use it
@@ -2243,16 +2228,22 @@ void loop() {
     // reconnection blocking the display (reconnect interval is 5s anyway)
     bool recentlyDisconnected = (currentTime - monitoringState.lastDisconnect < Timing::MONITOR_DISCONNECT_DELAY);
 
-    // Only call loop() every 500ms to reduce blocking impact, and not right after disconnect
+    // CRITICAL FIX: Skip monitoring loop during active API fetches to prevent blocking
+    // monitorClient.loop() can block for extended periods, especially during network issues
+    // This was causing 11+ second delays when fetching from TFL API
+    bool isActiveFetch = (fetchStateData.state == FETCH_WAITING || fetchStateData.state == FETCH_READING);
+
+    // Only call loop() every 500ms to reduce blocking impact, and not right after disconnect or during fetch
     // Combined with WEBSOCKETS_TCP_TIMEOUT=2000ms, worst case blocking is ~2 seconds
     // spread across multiple loop() iterations due to this throttling
-    if (!recentlyDisconnected && currentTime - lastMonitorLoop > Timing::MONITOR_LOOP_THROTTLE) {
+    if (!recentlyDisconnected && !isActiveFetch && currentTime - lastMonitorLoop > Timing::MONITOR_LOOP_THROTTLE) {
       monitorClient.loop();
       lastMonitorLoop = currentTime;
     }
     
-    // Send heartbeat to monitoring server (only if connected)
-    if (monitoringState.connected && currentTime - monitoringState.lastHeartbeat >= Timing::MONITOR_HEARTBEAT_INTERVAL) {
+    // Send heartbeat to monitoring server (only if connected and not during active fetch)
+    // Skip heartbeat during fetch to prevent any potential blocking
+    if (!isActiveFetch && monitoringState.connected && currentTime - monitoringState.lastHeartbeat >= Timing::MONITOR_HEARTBEAT_INTERVAL) {
       sendMonitorHeartbeat();
       monitoringState.lastHeartbeat = currentTime;
     }
