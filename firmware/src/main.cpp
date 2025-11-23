@@ -1232,15 +1232,29 @@ void handleFetchStateMachine() {
         // AGGRESSIVE CACHING: Read data in background without blocking display
         // Main loop handles display updates independently for zero pauses
 
-        // Read in chunks for much better performance (10-20x faster than char-by-char)
-        while (fetchClient.available()) {
-          // Read up to 512 bytes at a time
-          uint8_t buffer[512];
-          int bytesRead = fetchClient.read(buffer, sizeof(buffer));
-          if (bytesRead > 0) {
-            fetchStateData.buffer.concat((const char*)buffer, bytesRead);
+        // OPTIMIZED: Read more aggressively to handle slow-drip TCP data
+        // TFL API often sends data in small packets with delays between them
+        // Stay in read loop longer instead of exiting immediately when no data available
+        unsigned long readStartTime = millis();
+        const unsigned long maxReadTime = 100;  // Spend up to 100ms reading per state machine call
+
+        while (millis() - readStartTime < maxReadTime) {
+          if (fetchClient.available()) {
+            // Read up to 512 bytes at a time
+            uint8_t buffer[512];
+            int bytesRead = fetchClient.read(buffer, sizeof(buffer));
+            if (bytesRead > 0) {
+              fetchStateData.buffer.concat((const char*)buffer, bytesRead);
+            }
+            yield();  // Yield to prevent watchdog
+          } else if (fetchClient.connected()) {
+            // No data available but still connected - wait briefly for more
+            delay(1);  // 1ms wait allows data to arrive without blocking too long
+            yield();
+          } else {
+            // Connection closed, exit read loop
+            break;
           }
-          yield();  // Yield to prevent watchdog
         }
 
         // Check if done - connection closed and no more data
@@ -1257,8 +1271,9 @@ void handleFetchStateMachine() {
           }
         }
 
-        // Timeout for reading - API server can be slow with large responses
-        if (millis() - fetchStateData.startTime > 15000) {
+        // Timeout for reading - with optimized reading, this should rarely be hit
+        // Reduced from 15s since aggressive reading makes fetches much faster
+        if (millis() - fetchStateData.startTime > Net::API_RESPONSE_TIMEOUT) {
           fetchClient.stop();
           if (fetchStateData.buffer.length() > 100) {
             // Got data but took too long - still use it
