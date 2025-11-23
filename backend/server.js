@@ -59,7 +59,6 @@ db.serialize(() => {
   db.run(`ALTER TABLE devices ADD COLUMN show_station_name INTEGER DEFAULT 1`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN service_type TEXT DEFAULT 'National Rail'`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN tfl_line_filter TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE devices ADD COLUMN tfl_direction_filter TEXT DEFAULT ''`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN tfl_platform_filter TEXT DEFAULT ''`, () => {});
   
   // Data migration: Fix rotation_speed values
@@ -256,7 +255,6 @@ wss.on('connection', (ws, req) => {
               show_station_name: message.showStationName,
               extra_services: message.extraServices,
               tfl_line_filter: message.tflLineFilter,
-              tfl_direction_filter: message.tflDirectionFilter,
               tfl_platform_filter: message.tflPlatformFilter
             }
           });
@@ -277,7 +275,6 @@ wss.on('connection', (ws, req) => {
               show_station_name: message.showStationName,
               extra_services: message.extraServices,
               tfl_line_filter: message.tflLineFilter,
-              tfl_direction_filter: message.tflDirectionFilter,
               tfl_platform_filter: message.tflPlatformFilter
             }
           });
@@ -329,10 +326,10 @@ function handleDeviceRegister(ws, data) {
     (id, name, ip, firmware_version, station_code, station_name, service_type, rssi, uptime,
      free_heap, services, last_seen, status, first_seen, use_calling_at,
      extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name,
-     tfl_line_filter, tfl_direction_filter, tfl_platform_filter)
+     tfl_line_filter, tfl_platform_filter)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online',
             COALESCE((SELECT first_seen FROM devices WHERE id = ?), ?),
-            ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const now = Date.now();
@@ -358,7 +355,6 @@ function handleDeviceRegister(ws, data) {
     data.scrollSpeed || 50,
     data.showStationName !== undefined ? (data.showStationName ? 1 : 0) : 1,
     data.tflLineFilter || '',
-    data.tflDirectionFilter || '',
     data.tflPlatformFilter || ''
   );
 
@@ -428,7 +424,7 @@ function handleDeviceConfigUpdate(data) {
      SET station_code = ?, station_name = ?, service_type = ?,
          use_calling_at = ?, show_station_name = ?, extra_services = ?,
          refresh_interval = ?, scroll_speed = ?, rotation_speed = ?,
-         tfl_line_filter = ?, tfl_direction_filter = ?, tfl_platform_filter = ?
+         tfl_line_filter = ?, tfl_platform_filter = ?
      WHERE id = ?`,
     [
       data.stationCode,
@@ -441,7 +437,6 @@ function handleDeviceConfigUpdate(data) {
       data.scrollSpeed || 50,
       data.rotationSpeed || 5000,
       data.tflLineFilter || '',
-      data.tflDirectionFilter || '',
       data.tflPlatformFilter || '',
       data.deviceId
     ],
@@ -670,7 +665,6 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
               show_station_name: device.show_station_name === 1,
               extra_services: device.extra_services,
               tfl_line_filter: device.tfl_line_filter || '',
-              tfl_direction_filter: device.tfl_direction_filter || '',
               tfl_platform_filter: device.tfl_platform_filter || ''
             },
             logs: formattedLogs

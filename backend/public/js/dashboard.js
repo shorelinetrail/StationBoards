@@ -558,12 +558,10 @@ function populateDeviceModal(data) {
 
     // Show/hide TFL filter fields
     document.getElementById('tflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
-    document.getElementById('tflDirectionFilterGroup').style.display = isTFL ? 'block' : 'none';
     document.getElementById('tflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
 
     if (isTFL) {
       document.getElementById('configTflLineFilter').value = config.tfl_line_filter || '';
-      document.getElementById('configTflDirectionFilter').value = config.tfl_direction_filter || '';
       document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter || '';
     }
 
@@ -763,15 +761,11 @@ function updateConfigForm(config) {
   // Handle TFL filters
   const isTFL = config.service_type === 'TFL';
   document.getElementById('tflLineFilterGroup').style.display = isTFL ? 'block' : 'none';
-  document.getElementById('tflDirectionFilterGroup').style.display = isTFL ? 'block' : 'none';
   document.getElementById('tflPlatformFilterGroup').style.display = isTFL ? 'block' : 'none';
 
   if (isTFL) {
     if (config.tfl_line_filter) {
       document.getElementById('configTflLineFilter').value = config.tfl_line_filter;
-    }
-    if (config.tfl_direction_filter) {
-      document.getElementById('configTflDirectionFilter').value = config.tfl_direction_filter;
     }
     if (config.tfl_platform_filter) {
       document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter;
