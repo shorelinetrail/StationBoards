@@ -720,6 +720,18 @@ async function syncConfigFromDevice() {
 }
 
 /**
+ * Common TFL station codes for reference
+ */
+const TFL_EXAMPLES = {
+  '940GZZLUPAC': 'Piccadilly Circus',
+  '940GZZLULVT': 'Liverpool Street',
+  '940GZZLUKSX': 'Kings Cross St Pancras',
+  '940GZZLUWSM': 'Westminster',
+  '940GZZLUBND': 'Bond Street',
+  '940GZZLUOXC': 'Oxford Circus'
+};
+
+/**
  * Fetch available tube lines and platforms from TFL API for a station
  */
 async function fetchTflStationLines(stationId) {
@@ -735,11 +747,20 @@ async function fetchTflStationLines(stationId) {
     console.log('Response status:', response.status);
 
     if (!response.ok) {
+      if (response.status === 404) {
+        const examples = Object.entries(TFL_EXAMPLES).slice(0, 3).map(([code, name]) => `${code} (${name})`).join(', ');
+        throw new Error(`Station '${stationId}' not found. Use a TFL NaPTAN code like: ${examples}`);
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const arrivals = await response.json();
     console.log(`Received ${arrivals.length} arrivals`);
+
+    if (arrivals.length === 0) {
+      console.warn('No arrivals found for station:', stationId);
+      throw new Error(`No tube services found for '${stationId}'. The station may not be served by Underground lines.`);
+    }
 
     // Extract unique lines and platforms from arrivals
     const linesByIdMap = new Map();
