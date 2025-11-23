@@ -166,7 +166,7 @@ struct MonitoringState {
   bool logsEnabled;
   unsigned long lastHeartbeat;
   unsigned long lastDisconnect;
-  unsigned long lastLoop;
+  // lastLoop removed - no longer needed with FreeRTOS task
 
   MonitoringState() :
     serverHost("stationboards.up.railway.app"),
@@ -176,19 +176,15 @@ struct MonitoringState {
     connected(false),
     logsEnabled(false),
     lastHeartbeat(0),
-    lastDisconnect(0),
-    lastLoop(0) {}
+    lastDisconnect(0) {}
 
   bool shouldSendHeartbeat(unsigned long currentTime) const {
     return connected &&
            (currentTime - lastHeartbeat >= Timing::MONITOR_HEARTBEAT_INTERVAL);
   }
 
-  bool shouldRunLoop(unsigned long currentTime) const {
-    bool recentlyDisconnected = (currentTime - lastDisconnect < Timing::MONITOR_DISCONNECT_DELAY);
-    return !recentlyDisconnected &&
-           (currentTime - lastLoop > Timing::MONITOR_LOOP_THROTTLE);
-  }
+  // NOTE: shouldRunLoop() removed - monitoring now runs on separate FreeRTOS task
+  // The main loop no longer calls monitorClient.loop(), so this helper is not needed
 };
 
 // ============ System State Flags ============
