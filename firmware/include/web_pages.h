@@ -1056,7 +1056,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
                 <button type="button" class="preset-btn" data-station="SRA" data-name="Stansted Airport" aria-label="Select Stansted Airport station">Stansted</button>
                 <button type="button" class="preset-btn" data-station="LTN" data-name="Luton Airport Parkway" aria-label="Select Luton Airport station">Luton</button>
                 <button type="button" class="preset-btn" data-station="HWV" data-name="Heathrow Terminals 2 & 3" aria-label="Select Heathrow terminals station">Heathrow</button>
-                <button type="button" class="preset-btn" data-station="BHX" data-name="Birmingham International" aria-label="Select Birmingham Airport station">Birmingham Arpt</button>
+                <button type="button" class="preset-btn" data-station="BHI" data-name="Birmingham International" aria-label="Select Birmingham Airport station">Birmingham Arpt</button>
                 <button type="button" class="preset-btn" data-station="MIA" data-name="Manchester Airport" aria-label="Select Manchester Airport station">Manchester Arpt</button>
               </div>
 
