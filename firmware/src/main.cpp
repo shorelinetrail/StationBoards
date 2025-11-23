@@ -1938,8 +1938,27 @@ void setupWebServer() {
       displayState.currentAlternatingService = 2;  // Standard mode, station shown: start from service[2]
     }
     displayState.callingAtScrollOffset = 0;
-    
+
     config.save();
+
+    // Notify monitoring server of config update
+    if (monitoringState.connected) {
+      String configMsg = "{";
+      configMsg += "\"type\":\"configUpdate\",";
+      configMsg += "\"deviceId\":\"" + config.deviceId + "\",";
+      configMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
+      configMsg += "\"stationName\":\"" + String(displayState.stationName) + "\",";
+      configMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
+      configMsg += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
+      configMsg += "\"showStationName\":" + String(config.showStationName ? "true" : "false") + ",";
+      configMsg += "\"extraServices\":" + String(config.extraServices) + ",";
+      configMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
+      configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
+      configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed);
+      configMsg += "}";
+      monitorClient.sendTXT(configMsg);
+      Serial.println("📡 Config update sent to monitoring server");
+    }
 
     bool stationChanged = (oldStation != String(config.stationCode));
     bool lineFilterChanged = (oldLineFilter != String(config.tflLineFilter)) && (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
