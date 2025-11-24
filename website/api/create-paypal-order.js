@@ -61,15 +61,19 @@ export default async function handler(req, res) {
     customer_email,
     customer_name,
     quantity,
-    total_price
+    total_price,
+    shipping_address,
+    shipping_city,
+    shipping_postcode,
+    shipping_country
   } = req.body;
 
   // Validate required fields
-  if (!order_id || !order_number || !customer_email || !total_price) {
+  if (!order_id || !order_number || !customer_email || !total_price || !shipping_address || !shipping_city || !shipping_postcode) {
     return res.status(400).json({
       success: false,
       error: 'Missing required fields',
-      required: ['order_id', 'order_number', 'customer_email', 'total_price']
+      required: ['order_id', 'order_number', 'customer_email', 'total_price', 'shipping_address', 'shipping_city', 'shipping_postcode']
     });
   }
 
@@ -112,7 +116,19 @@ export default async function handler(req, res) {
                 quantity: quantity.toString(),
                 category: 'PHYSICAL_GOODS'
               }
-            ]
+            ],
+            shipping: {
+              name: {
+                full_name: customer_name || 'Customer'
+              },
+              address: {
+                address_line_1: shipping_address.split('\n')[0] || shipping_address,
+                address_line_2: shipping_address.split('\n')[1] || undefined,
+                admin_area_2: shipping_city,
+                postal_code: shipping_postcode,
+                country_code: shipping_country === 'United Kingdom' ? 'GB' : 'IE'
+              }
+            }
           }
         ],
         application_context: {
