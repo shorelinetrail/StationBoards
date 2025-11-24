@@ -228,12 +228,28 @@ function showDemoDepartures() {
   const time2 = new Date(now.getTime() + mins2 * 60000);
   const std2 = `${String(time2.getHours()).padStart(2, '0')}:${String(time2.getMinutes()).padStart(2, '0')}`;
 
-  // Rotate through different destinations
+  // Rotate through different destinations with realistic journey times (minutes from Kings Cross)
   const destinations = [
-    { name: 'Edinburgh', calling: ['Peterborough', 'York', 'Darlington', 'Newcastle'] },
-    { name: 'Leeds', calling: ['Stevenage', 'Peterborough', 'Doncaster', 'Wakefield'] },
-    { name: 'Cambridge', calling: ['Finsbury Park', 'Stevenage', 'Hitchin', 'Royston'] },
-    { name: 'Newcastle', calling: ['Peterborough', 'York', 'Darlington', 'Durham'] }
+    {
+      name: 'Edinburgh',
+      calling: ['Peterborough', 'York', 'Darlington', 'Newcastle'],
+      times: [50, 100, 145, 175] // minutes from departure
+    },
+    {
+      name: 'Leeds',
+      calling: ['Stevenage', 'Peterborough', 'Doncaster', 'Wakefield'],
+      times: [25, 50, 95, 115]
+    },
+    {
+      name: 'Cambridge',
+      calling: ['Finsbury Park', 'Stevenage', 'Hitchin', 'Royston'],
+      times: [7, 25, 35, 45]
+    },
+    {
+      name: 'Newcastle',
+      calling: ['Peterborough', 'York', 'Darlington', 'Durham'],
+      times: [50, 100, 145, 165]
+    }
   ];
 
   const hour = now.getHours();
@@ -242,22 +258,19 @@ function showDemoDepartures() {
 
   // ETD varies slightly
   const etd1 = mins1 <= 1 ? 'On time' : mins1 <= 5 ? `${mins1} min` : 'On time';
-  const etd2 = mins2 <= 20 ? 'On time' : `${Math.floor(mins2 / 60)}h ${mins2 % 60}m`;
+  const etd2 = 'Delayed'; // Always show Delayed for second train
 
-  // Generate calling point times (approximately 10-15 minutes between stops)
-  function generateCallingTimes(departureTime, stationCount) {
-    const times = [];
-    let currentTime = new Date(departureTime.getTime());
-    for (let i = 0; i < stationCount; i++) {
-      currentTime = new Date(currentTime.getTime() + (10 + Math.random() * 5) * 60000);
-      const hh = String(currentTime.getHours()).padStart(2, '0');
-      const mm = String(currentTime.getMinutes()).padStart(2, '0');
-      times.push(`${hh}:${mm}`);
-    }
-    return times;
+  // Generate calling point times using realistic journey times
+  function generateCallingTimes(departureTime, destination) {
+    return destination.times.map(mins => {
+      const arrivalTime = new Date(departureTime.getTime() + mins * 60000);
+      const hh = String(arrivalTime.getHours()).padStart(2, '0');
+      const mm = String(arrivalTime.getMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    });
   }
 
-  const callingTimes1 = generateCallingTimes(time1, dest1.calling.length);
+  const callingTimes1 = generateCallingTimes(time1, dest1);
   const callingText1 = dest1.calling.map((station, i) => `${station} (${callingTimes1[i]})`).join(', ');
 
   const html = `
