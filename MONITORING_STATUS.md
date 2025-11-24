@@ -8,11 +8,39 @@ The board monitoring system is **working perfectly** and ready for production us
 
 ## How It Works
 
+### Complete Architecture
+
+```
+ESP32 Board  →  Backend Server  →  Cloud API  →  Admin Dashboard
+(Customer     (Customer's PC/     (stationboards    (Website)
+ Home WiFi)    Raspberry Pi)       .co.uk)
+```
+
 ### 1. ESP32 Board Side
-ESP32 boards periodically send heartbeat requests to report their online status:
+ESP32 boards connect to your **local backend monitoring system** via WebSocket:
+
+```javascript
+// ESP32 connects via WebSocket
+ws://192.168.1.100:3000/ws
+
+// Sends periodic heartbeat message
+{
+  "type": "heartbeat",
+  "deviceId": "ESP32-A1B2C3D4",
+  "rssi": -45,
+  "uptime": 123456,
+  "freeHeap": 200000,
+  "services": 5
+}
+```
+
+**Recommended heartbeat interval:** Every 30-60 seconds
+
+### 2. Backend Server Side
+The backend server (running on customer's local network) receives the heartbeat and forwards it to the cloud:
 
 ```http
-POST /api/board-heartbeat
+POST https://stationboards.co.uk/api/board-heartbeat
 Content-Type: application/json
 
 {
@@ -20,9 +48,16 @@ Content-Type: application/json
 }
 ```
 
-**Recommended heartbeat interval:** Every 2-5 minutes
+**Configuration:**
+```bash
+# Set environment variable
+export CLOUD_MONITORING_URL=https://stationboards.co.uk/api/board-heartbeat
 
-### 2. API Endpoint
+# Start backend
+npm start
+```
+
+### 3. Cloud API Endpoint
 **File:** `/website/api/board-heartbeat.js`
 
 The endpoint:
@@ -42,7 +77,7 @@ The endpoint:
 }
 ```
 
-### 3. Database Function
+### 4. Database Function
 **File:** `/supabase/add-monitoring.sql`
 
 The `board_heartbeat()` function:
@@ -55,7 +90,7 @@ The `board_heartbeat()` function:
   - `assigned` → `active` (when board comes online after assignment)
 - Logs first activation in order history
 
-### 4. Admin Dashboard Display
+### 5. Admin Dashboard Display
 **Files:** `/website/admin/index.html`, `/website/admin/admin-script.js`
 
 The dashboard shows:

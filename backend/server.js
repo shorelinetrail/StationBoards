@@ -109,6 +109,84 @@ if (!adminPasswordHash) {
   adminPasswordHash = bcrypt.hashSync('admin123', 10);
 }
 
+// ============================================================================
+// Cloud Monitoring Integration
+// ============================================================================
+
+// Optional cloud monitoring endpoint (for stationboards.co.uk integration)
+const CLOUD_MONITORING_URL = process.env.CLOUD_MONITORING_URL || '';
+const CLOUD_MONITORING_ENABLED = !!CLOUD_MONITORING_URL;
+
+if (CLOUD_MONITORING_ENABLED) {
+  console.log('☁️  Cloud monitoring enabled:', CLOUD_MONITORING_URL);
+} else {
+  console.log('📍 Cloud monitoring disabled (local only)');
+}
+
+/**
+ * Forward device heartbeat to cloud monitoring system
+ * This integrates the local backend with the website's monitoring dashboard
+ */
+async function forwardHeartbeatToCloud(deviceId) {
+  if (!CLOUD_MONITORING_ENABLED) return;
+
+  try {
+    const https = require('https');
+    const http = require('http');
+
+    const url = new URL(CLOUD_MONITORING_URL);
+    const protocol = url.protocol === 'https:' ? https : http;
+
+    const data = JSON.stringify({
+      board_id: deviceId
+    });
+
+    const options = {
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': data.length
+      }
+    };
+
+    const req = protocol.request(options, (res) => {
+      let responseData = '';
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try {
+            const json = JSON.parse(responseData);
+            if (json.success) {
+              console.log(`☁️  Cloud heartbeat sent for ${deviceId}`);
+            } else {
+              console.warn(`⚠️  Cloud heartbeat failed for ${deviceId}:`, json.error);
+            }
+          } catch (e) {
+            console.error(`❌ Cloud heartbeat parse error:`, responseData);
+          }
+        } else {
+          console.error(`❌ Cloud heartbeat HTTP ${res.statusCode} for ${deviceId}`);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error(`❌ Cloud heartbeat network error for ${deviceId}:`, error.message);
+    });
+
+    req.write(data);
+    req.end();
+
+  } catch (error) {
+    console.error(`❌ Cloud heartbeat error for ${deviceId}:`, error.message);
+  }
+}
+
 // Session configuration
 const sessionMiddleware = session({
   store: new SQLiteStore({
@@ -401,14 +479,19 @@ function handleDeviceHeartbeat(data) {
   db.run(updateSQL, values, (err) => {
     if (err) {
       console.error('Error updating device heartbeat:', err);
-    } else if (data.stationCode || data.stationName) {
-      // Broadcast station update to web clients
-      io.emit('deviceUpdate', {
-        deviceId: data.deviceId,
-        station_code: data.stationCode,
-        station_name: data.stationName,
-        service_type: data.serviceType
-      });
+    } else {
+      // Forward heartbeat to cloud monitoring (if enabled)
+      forwardHeartbeatToCloud(data.deviceId);
+
+      if (data.stationCode || data.stationName) {
+        // Broadcast station update to web clients
+        io.emit('deviceUpdate', {
+          deviceId: data.deviceId,
+          station_code: data.stationCode,
+          station_name: data.stationName,
+          service_type: data.serviceType
+        });
+      }
     }
   });
 }
