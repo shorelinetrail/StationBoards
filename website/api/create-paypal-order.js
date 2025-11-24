@@ -23,7 +23,7 @@ const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
 const WEBSITE_URL = process.env.WEBSITE_URL || 'https://www.stationboards.co.uk';
 
-// Get PayPal access token
+// Get PayPal access token with retry logic
 async function getPayPalAccessToken() {
   const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
 
@@ -36,7 +36,20 @@ async function getPayPalAccessToken() {
     body: 'grant_type=client_credentials'
   });
 
+  if (!response.ok) {
+    const error = await response.json();
+    if (response.status === 503) {
+      throw new Error('PayPal service is temporarily unavailable. Please try again in a few minutes or use card payment.');
+    }
+    throw new Error(error.error_description || 'Failed to authenticate with PayPal');
+  }
+
   const data = await response.json();
+
+  if (!data.access_token) {
+    throw new Error('PayPal did not return an access token');
+  }
+
   return data.access_token;
 }
 
@@ -146,6 +159,17 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       console.error('PayPal API error:', orderData);
+      console.error('Response status:', response.status);
+
+      // Handle specific error cases
+      if (response.status === 503) {
+        throw new Error('PayPal service is temporarily unavailable. Please try again in a few minutes or use card payment instead.');
+      }
+
+      if (response.status === 500) {
+        throw new Error('PayPal encountered an internal error. Please try again or use card payment.');
+      }
+
       const errorMessage = orderData.details?.[0]?.description || orderData.message || 'PayPal order creation failed';
       throw new Error(errorMessage);
     }
