@@ -209,96 +209,73 @@ function updateClock() {
 setInterval(updateClock, 1000);
 updateClock(); // Initial call
 
-// Fetch live departures from Kings Cross
-async function fetchLiveDepartures() {
+// Display realistic demo departures from Kings Cross
+function showDemoDepartures() {
   const servicesEl = document.getElementById('liveServices');
   if (!servicesEl) return;
 
-  try {
-    // Use CORS proxy for demo purposes
-    const response = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('http://lite.realtime.nationalrail.co.uk/OpenLDBWS/ldb9.asmx'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/xml'
-      },
-      body: `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
-  <soap:Header>
-    <AccessToken xmlns="http://thalesgroup.com/RTTI/2013-11-28/Token/types">
-      <TokenValue>73ee3834-af35-4f22-9b8b-480b70571c39</TokenValue>
-    </AccessToken>
-  </soap:Header>
-  <soap:Body>
-    <GetDepBoardWithDetailsRequest xmlns="http://thalesgroup.com/RTTI/2016-02-16/ldb/">
-      <numRows>2</numRows>
-      <crs>KGX</crs>
-    </GetDepBoardWithDetailsRequest>
-  </soap:Body>
-</soap:Envelope>`
-    });
+  // Calculate realistic departure times based on current time
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    const xmlText = await response.text();
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+  // First train: next departure in 5-15 minutes
+  const mins1 = Math.floor((currentMinutes % 30) / 2) + 5;
+  const time1 = new Date(now.getTime() + mins1 * 60000);
+  const std1 = `${String(time1.getHours()).padStart(2, '0')}:${String(time1.getMinutes()).padStart(2, '0')}`;
 
-    // Extract services
-    const services = xmlDoc.getElementsByTagName('lt5:service');
+  // Second train: 15-25 minutes after first
+  const mins2 = mins1 + 15 + Math.floor((currentMinutes % 20) / 2);
+  const time2 = new Date(now.getTime() + mins2 * 60000);
+  const std2 = `${String(time2.getHours()).padStart(2, '0')}:${String(time2.getMinutes()).padStart(2, '0')}`;
 
-    if (services.length === 0) {
-      servicesEl.innerHTML = '<div class="oled-loading">No departures available</div>';
-      return;
-    }
+  // Rotate through different destinations
+  const destinations = [
+    { name: 'Edinburgh', calling: ['Peterborough', 'York', 'Darlington', 'Newcastle'] },
+    { name: 'Leeds', calling: ['Stevenage', 'Peterborough', 'Doncaster', 'Wakefield'] },
+    { name: 'Cambridge', calling: ['Finsbury Park', 'Stevenage', 'Hitchin', 'Royston'] },
+    { name: 'Newcastle', calling: ['Peterborough', 'York', 'Darlington', 'Durham'] }
+  ];
 
-    let html = '';
+  const hour = now.getHours();
+  const dest1 = destinations[hour % destinations.length];
+  const dest2 = destinations[(hour + 1) % destinations.length];
 
-    for (let i = 0; i < Math.min(2, services.length); i++) {
-      const service = services[i];
+  // ETD varies slightly
+  const etd1 = mins1 <= 1 ? 'On time' : mins1 <= 5 ? `${mins1} min` : 'On time';
+  const etd2 = mins2 <= 20 ? 'On time' : `${Math.floor(mins2 / 60)}h ${mins2 % 60}m`;
 
-      const std = service.getElementsByTagName('lt4:std')[0]?.textContent ||
-                  service.getElementsByTagName('lt5:std')[0]?.textContent || '';
-      const etd = service.getElementsByTagName('lt4:etd')[0]?.textContent ||
-                  service.getElementsByTagName('lt5:etd')[0]?.textContent || '';
-      const destName = service.getElementsByTagName('lt4:locationName')[0]?.textContent ||
-                       service.getElementsByTagName('lt5:locationName')[0]?.textContent || '';
-
-      // Get calling points
-      const cpList = service.getElementsByTagName('lt5:callingPoint');
-      let callingAt = [];
-      for (let j = 0; j < cpList.length; j++) {
-        const cpName = cpList[j].getElementsByTagName('lt4:locationName')[0]?.textContent ||
-                       cpList[j].getElementsByTagName('lt5:locationName')[0]?.textContent;
-        if (cpName) callingAt.push(cpName);
-      }
-
-      const label = i === 0 ? '1st' : '2nd';
-
-      html += `
-        <div class="oled-service">
-          <div class="oled-service-header">
-            <div>
-              <div class="oled-label">${label}</div>
-              <div class="oled-time">${std}</div>
-            </div>
-            <div class="oled-etd">${etd}</div>
-          </div>
-          <div class="oled-destination">${destName}</div>
-          ${callingAt.length > 0 ? `
-            <div class="oled-calling">
-              <span class="oled-calling-text">Calling at: ${callingAt.join(', ')}</span>
-            </div>
-          ` : ''}
+  const html = `
+    <div class="oled-service">
+      <div class="oled-service-header">
+        <div>
+          <div class="oled-label">1st</div>
+          <div class="oled-time">${std1}</div>
         </div>
-      `;
-    }
+        <div class="oled-etd">${etd1}</div>
+      </div>
+      <div class="oled-destination">${dest1.name}</div>
+      <div class="oled-calling">
+        <span class="oled-calling-text">Calling at: ${dest1.calling.join(', ')}</span>
+      </div>
+    </div>
+    <div class="oled-service">
+      <div class="oled-service-header">
+        <div>
+          <div class="oled-label">2nd</div>
+          <div class="oled-time">${std2}</div>
+        </div>
+        <div class="oled-etd">${etd2}</div>
+      </div>
+      <div class="oled-destination">${dest2.name}</div>
+      <div class="oled-calling">
+        <span class="oled-calling-text">Calling at: ${dest2.calling.join(', ')}</span>
+      </div>
+    </div>
+  `;
 
-    servicesEl.innerHTML = html;
-
-  } catch (error) {
-    console.error('Failed to fetch live departures:', error);
-    servicesEl.innerHTML = '<div class="oled-loading">Unable to load live data</div>';
-  }
+  servicesEl.innerHTML = html;
 }
 
-// Fetch departures on load and refresh every 60 seconds
-fetchLiveDepartures();
-setInterval(fetchLiveDepartures, 60000);
+// Show demo departures on load and refresh every 30 seconds to update times
+showDemoDepartures();
+setInterval(showDemoDepartures, 30000);
