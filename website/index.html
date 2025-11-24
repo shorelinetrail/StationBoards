@@ -16,10 +16,13 @@
         <span class="logo">🚉</span>
         <span class="brand-name">StationBoards.co.uk</span>
       </div>
-      <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#how-it-works">How It Works</a>
-        <a href="#pricing">Pricing</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+        <span id="menuIcon">☰</span>
+      </button>
+      <div class="nav-links" id="mobileMenu">
+        <a href="#features" onclick="closeMobileMenu()">Features</a>
+        <a href="#how-it-works" onclick="closeMobileMenu()">How It Works</a>
+        <a href="#pricing" onclick="closeMobileMenu()">Pricing</a>
         <a href="/track.html">Track Order</a>
         <a href="/checkout.html" class="btn-primary">Order Now</a>
       </div>

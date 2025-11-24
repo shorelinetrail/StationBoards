@@ -1,3 +1,28 @@
+// Mobile Menu Toggle
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const icon = document.getElementById('menuIcon');
+  menu.classList.toggle('mobile-open');
+  icon.textContent = menu.classList.contains('mobile-open') ? '✕' : '☰';
+}
+
+function closeMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const icon = document.getElementById('menuIcon');
+  menu.classList.remove('mobile-open');
+  icon.textContent = '☰';
+}
+
+// Close mobile menu when clicking outside
+document.addEventListener('click', function(event) {
+  const menu = document.getElementById('mobileMenu');
+  const toggle = document.querySelector('.mobile-menu-toggle');
+
+  if (menu && toggle && !menu.contains(event.target) && !toggle.contains(event.target)) {
+    closeMobileMenu();
+  }
+});
+
 // Smooth scrolling for anchor links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   anchor.addEventListener('click', function (e) {

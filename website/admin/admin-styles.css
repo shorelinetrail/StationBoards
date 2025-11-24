@@ -592,9 +592,13 @@ body {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 968px) {
   .container {
     padding: 1rem;
+  }
+
+  .header-content {
+    padding: 0 1rem;
   }
 
   .page-header {
@@ -614,6 +618,36 @@ body {
 
   .tabs {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 1rem;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    white-space: nowrap;
+    min-height: 48px;
+  }
+
+  /* Larger touch targets for mobile */
+  .btn-primary,
+  .btn-secondary,
+  .btn-success,
+  .btn-danger,
+  .btn-warning {
+    min-height: 48px;
+    padding: 0.875rem 1.5rem;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea,
+  .filter-select {
+    min-height: 48px;
+    font-size: 16px; /* Prevents iOS zoom */
   }
 
   .modal-content {
@@ -621,8 +655,112 @@ body {
     max-height: calc(100vh - 2rem);
   }
 
+  .modal-header {
+    padding: 1rem 1.5rem;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Order cards stack better on mobile */
+  .order-info {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stats cards single column on small screens */
+  .stats-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .stat-value {
+    font-size: 2.5rem;
+  }
+
+  /* Action buttons stack */
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons button {
+    width: 100%;
+  }
+
+  /* Form actions stack */
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .form-actions button {
+    width: 100%;
+  }
+
+  /* Header actions stack */
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .user-email {
+    order: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Single column stats on very small screens */
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Login box smaller padding */
+  .login-box {
+    padding: 2rem 1.5rem;
+    margin: 1rem;
+  }
+
+  .login-box h1 {
+    font-size: 1.5rem;
+  }
+
+  /* Reduce padding on cards */
+  .order-card {
+    padding: 1rem;
+  }
+
+  /* Smaller modals */
+  .modal-header h2 {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Very small screens */
+  .logo {
+    font-size: 1.25rem;
+  }
+
+  .tab {
+    padding: 0.875rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .page-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .order-number {
+    font-size: 1rem;
+  }
+
+  .status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.625rem;
   }
 }
 
@@ -746,13 +884,40 @@ body {
 }
 
 /* Responsive Analytics */
-@media (max-width: 768px) {
+@media (max-width: 968px) {
   .charts-row {
     grid-template-columns: 1fr;
   }
 
+  .chart-card {
+    padding: 1rem;
+  }
+
   .chart-card canvas {
     max-height: 250px;
+  }
+
+  .analytics-section {
+    padding: 1rem;
+  }
+
+  .activity-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .activity-icon {
+    margin-bottom: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-icon {
+    font-size: 1.5rem;
+  }
+
+  .chart-card h3 {
+    font-size: 1rem;
   }
 }
 
@@ -1016,5 +1181,41 @@ body {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+}
+
+@media (max-width: 968px) {
+  .api-status-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .section-card {
+    padding: 1rem;
+  }
+
+  .shipment-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .btn-icon {
+    min-width: 48px;
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  .status-indicator {
+    font-size: 0.9rem;
+  }
+
+  .section-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .tracking-link {
+    font-size: 0.85rem;
   }
 }

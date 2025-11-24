@@ -807,3 +807,252 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== MOBILE OPTIMIZATIONS ===== */
+
+/* Mobile Navigation */
+.mobile-menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: var(--text-dark);
+}
+
+@media (max-width: 968px) {
+  .mobile-menu-toggle {
+    display: block;
+  }
+
+  .nav-links {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    background: white;
+    flex-direction: column;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-100%);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    gap: 1rem;
+  }
+
+  .nav-links.mobile-open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .nav-links a {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 0.75rem;
+  }
+
+  .nav-links .btn-primary {
+    width: 100%;
+  }
+
+  /* Larger touch targets */
+  .btn-primary, .btn-secondary {
+    min-height: 48px;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+  }
+
+  /* Hero adjustments */
+  .hero {
+    padding: 6rem 0 3rem;
+  }
+
+  .hero h1 {
+    font-size: 2rem;
+    line-height: 1.2;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+
+  .hero-features {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .feature-badge {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+  }
+
+  /* OLED Display Mobile */
+  .board-preview {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .oled-display {
+    height: 140px;
+    max-width: 100%;
+    font-size: 0.7rem;
+  }
+
+  .oled-header {
+    font-size: 0.9rem;
+  }
+
+  .oled-clock {
+    font-size: 0.85rem;
+  }
+
+  /* Features Section */
+  .features-grid {
+    gap: 1.5rem;
+  }
+
+  .feature-card {
+    padding: 1.5rem;
+  }
+
+  /* Pricing */
+  .pricing-card {
+    padding: 2rem 1.5rem;
+  }
+
+  /* FAQ */
+  .faq-item {
+    padding: 1.25rem;
+  }
+
+  /* Forms - larger touch targets */
+  input, textarea, select {
+    min-height: 48px;
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  /* Order form mobile */
+  .order-form {
+    padding: 2rem 1.5rem;
+  }
+
+  /* Footer */
+  footer {
+    padding: 2rem 0;
+  }
+
+  .footer-content {
+    text-align: center;
+  }
+}
+
+/* Small mobile (iPhone SE, etc) */
+@media (max-width: 375px) {
+  .container {
+    padding: 0 1rem;
+  }
+
+  .hero h1 {
+    font-size: 1.75rem;
+  }
+
+  .btn-large {
+    font-size: 0.95rem;
+    padding: 0.875rem 1.25rem;
+  }
+
+  .oled-display {
+    height: 120px;
+    font-size: 0.65rem;
+    padding: 0.5rem;
+  }
+
+  .stat-value {
+    font-size: 2rem;
+  }
+}
+
+/* Touch device improvements */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger clickable areas */
+  button, a, input, select {
+    min-height: 44px;
+  }
+
+  /* Remove hover effects on touch */
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .feature-card:hover {
+    transform: none;
+  }
+
+  /* Better tap highlights */
+  * {
+    -webkit-tap-highlight-color: rgba(102, 126, 234, 0.2);
+  }
+
+  /* Sticky elements on mobile */
+  .navbar {
+    position: sticky;
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-width: 968px) and (orientation: landscape) {
+  .hero {
+    padding: 4rem 0 2rem;
+  }
+
+  .hero h1 {
+    font-size: 1.75rem;
+  }
+
+  .board-preview {
+    max-width: 80%;
+    margin: 0 auto;
+  }
+}
+
+/* iPad and tablet optimization */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .container {
+    max-width: 900px;
+  }
+
+  .hero .container {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .specs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Print styles */
+@media print {
+  .navbar,
+  .hero-cta,
+  footer,
+  .btn-primary,
+  .btn-secondary {
+    display: none;
+  }
+
+  body {
+    color: #000;
+    background: #fff;
+  }
+
+  .container {
+    max-width: 100%;
+  }
+}
