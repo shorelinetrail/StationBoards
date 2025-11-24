@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Your Order - StationBoards.co.uk</title>
+  <link rel="stylesheet" href="track.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo">
+        <h1>🚉 StationBoards.co.uk</h1>
+      </div>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/track.html" class="active">Track Order</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <!-- Track Order Form -->
+      <div id="trackForm" class="track-section">
+        <div class="track-header">
+          <h2>Track Your Order</h2>
+          <p>Enter your email address and order number to view your order status</p>
+        </div>
+
+        <form id="orderTrackingForm">
+          <div class="form-group">
+            <label for="email">Email Address *</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              placeholder="your.email@example.com"
+              autocomplete="email">
+          </div>
+
+          <div class="form-group">
+            <label for="orderNumber">Order Number *</label>
+            <input
+              type="text"
+              id="orderNumber"
+              name="orderNumber"
+              required
+              placeholder="SB-20250124-A7F2"
+              pattern="SB-\d{8}-[A-Z0-9]{4}"
+              title="Format: SB-20250124-A7F2">
+            <span class="help-text">You received this in your order confirmation email</span>
+          </div>
+
+          <button type="submit" class="btn-primary" id="trackButton">
+            <span id="buttonText">Track Order</span>
+            <span id="buttonSpinner" class="spinner" style="display: none;"></span>
+          </button>
+        </form>
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+      </div>
+
+      <!-- Order Details (Hidden Initially) -->
+      <div id="orderDetails" class="order-details" style="display: none;">
+        <!-- Content populated by JavaScript -->
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 StationBoards.co.uk - All rights reserved</p>
+      <p>
+        <a href="mailto:hello@stationboards.co.uk">Contact Support</a>
+      </p>
+    </div>
+  </footer>
+
+  <script src="track.js"></script>
+</body>
+</html>

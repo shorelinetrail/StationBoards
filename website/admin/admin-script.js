@@ -330,17 +330,40 @@ async function showOrderDetail(orderId) {
                 <tr>
                   <th>Board ID</th>
                   <th>Status</th>
+                  <th>Online</th>
+                  <th>Last Seen</th>
                   <th>Assigned</th>
                 </tr>
               </thead>
               <tbody>
-                ${order.boards.map(board => `
+                ${order.boards.map(board => {
+                  // Check if board is online (seen in last 5 minutes)
+                  const isOnline = board.last_seen && (new Date() - new Date(board.last_seen) < 5 * 60 * 1000);
+
+                  // Format last seen time
+                  const formatLastSeen = (lastSeen) => {
+                    if (!lastSeen) return 'Never';
+                    const diff = Date.now() - new Date(lastSeen).getTime();
+                    if (diff < 60000) return 'Just now';
+                    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+                    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+                    return new Date(lastSeen).toLocaleDateString();
+                  };
+
+                  return `
                   <tr>
                     <td class="board-id">${board.board_id}</td>
                     <td><span class="status-badge status-${board.status}">${board.status}</span></td>
+                    <td>
+                      <span class="online-indicator ${isOnline ? 'online' : 'offline'}" title="${isOnline ? 'Online' : 'Offline'}">
+                        ${isOnline ? '●' : '○'}
+                      </span>
+                    </td>
+                    <td class="last-seen">${formatLastSeen(board.last_seen)}</td>
                     <td>${new Date(board.assigned_at).toLocaleString()}</td>
                   </tr>
-                `).join('')}
+                `;
+                }).join('')}
               </tbody>
             </table>
           </div>
@@ -507,33 +530,60 @@ function displayBoardsTable(boardsToDisplay) {
     return;
   }
 
+  // Helper function to check if board is online (seen in last 5 minutes)
+  const isOnline = (lastSeen) => {
+    if (!lastSeen) return false;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return new Date(lastSeen) > fiveMinutesAgo;
+  };
+
+  // Helper function to format last seen time
+  const formatLastSeen = (lastSeen) => {
+    if (!lastSeen) return 'Never';
+    const date = new Date(lastSeen);
+    const now = Date.now();
+    const diff = now - date.getTime();
+
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return date.toLocaleDateString();
+  };
+
   boardsTable.innerHTML = `
     <table>
       <thead>
         <tr>
           <th>Board ID</th>
           <th>Status</th>
+          <th>Online</th>
+          <th>Last Seen</th>
           <th>Order</th>
           <th>Firmware</th>
-          <th>Hardware</th>
-          <th>Manufactured</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        ${boardsToDisplay.map(board => `
+        ${boardsToDisplay.map(board => {
+          const online = isOnline(board.last_seen);
+          return `
           <tr>
             <td class="board-id">${board.board_id}</td>
             <td><span class="status-badge status-${board.status}">${board.status}</span></td>
+            <td>
+              <span class="online-indicator ${online ? 'online' : 'offline'}" title="${online ? 'Online' : 'Offline'}">
+                ${online ? '●' : '○'}
+              </span>
+            </td>
+            <td class="last-seen">${formatLastSeen(board.last_seen)}</td>
             <td>${board.orders ? board.orders.order_number : 'N/A'}</td>
             <td>${board.firmware_version || 'N/A'}</td>
-            <td>${board.hardware_revision || 'N/A'}</td>
-            <td>${board.manufactured_date ? new Date(board.manufactured_date).toLocaleDateString() : 'N/A'}</td>
             <td>
               <button class="btn-secondary" onclick="editBoard('${board.id}')">Edit</button>
             </td>
           </tr>
-        `).join('')}
+        `;
+        }).join('')}
       </tbody>
     </table>
   `;
@@ -945,6 +995,394 @@ function downloadInvoice(orderId) {
 function editBoard(boardId) {
   alert('Board editing feature coming soon');
 }
+
+// ===== ANALYTICS DASHBOARD =====
+
+let analyticsCharts = {};
+
+// Load Analytics Data
+async function loadAnalytics() {
+  try {
+    // Fetch all data
+    const { data: allOrders, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (ordersError) throw ordersError;
+
+    const { data: allBoards, error: boardsError } = await supabase
+      .from('boards')
+      .select('*');
+
+    if (boardsError) throw boardsError;
+
+    // Calculate metrics
+    calculateMetrics(allOrders);
+    renderOrdersChart(allOrders);
+    renderRevenueChart(allOrders);
+    renderStatusChart(allOrders);
+    renderBoardUtilizationChart(allBoards);
+    renderTopDestinations(allOrders);
+    renderRecentActivity(allOrders);
+
+  } catch (error) {
+    console.error('Error loading analytics:', error);
+  }
+}
+
+// Calculate Summary Metrics
+function calculateMetrics(orders) {
+  const totalRevenue = orders.reduce((sum, order) => {
+    return sum + parseFloat(order.total_price || 0);
+  }, 0);
+
+  const totalOrders = orders.length;
+
+  const completedOrders = orders.filter(order =>
+    order.status === 'delivered' || order.status === 'shipped'
+  ).length;
+
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  // Update UI
+  document.getElementById('totalRevenue').textContent = '£' + totalRevenue.toFixed(2);
+  document.getElementById('totalOrders').textContent = totalOrders;
+  document.getElementById('completedOrders').textContent = completedOrders;
+  document.getElementById('avgOrderValue').textContent = '£' + avgOrderValue.toFixed(2);
+}
+
+// Render Orders Over Time Chart
+function renderOrdersChart(orders) {
+  const canvas = document.getElementById('ordersChart');
+  const ctx = canvas.getContext('2d');
+
+  // Group orders by day
+  const ordersByDay = {};
+  orders.forEach(order => {
+    const date = new Date(order.created_at).toLocaleDateString('en-GB');
+    ordersByDay[date] = (ordersByDay[date] || 0) + 1;
+  });
+
+  // Get last 30 days
+  const labels = [];
+  const data = [];
+  const today = new Date();
+
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toLocaleDateString('en-GB');
+    labels.push(dateStr);
+    data.push(ordersByDay[dateStr] || 0);
+  }
+
+  // Destroy existing chart if it exists
+  if (analyticsCharts.ordersChart) {
+    analyticsCharts.ordersChart.destroy();
+  }
+
+  analyticsCharts.ordersChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Orders',
+        data: data,
+        borderColor: '#667eea',
+        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
+        },
+        x: {
+          display: false
+        }
+      }
+    }
+  });
+}
+
+// Render Revenue Trend Chart
+function renderRevenueChart(orders) {
+  const canvas = document.getElementById('revenueChart');
+  const ctx = canvas.getContext('2d');
+
+  // Group revenue by day
+  const revenueByDay = {};
+  orders.forEach(order => {
+    const date = new Date(order.created_at).toLocaleDateString('en-GB');
+    revenueByDay[date] = (revenueByDay[date] || 0) + parseFloat(order.total_price || 0);
+  });
+
+  // Get last 30 days
+  const labels = [];
+  const data = [];
+  const today = new Date();
+
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toLocaleDateString('en-GB');
+    labels.push(dateStr);
+    data.push(revenueByDay[dateStr] || 0);
+  }
+
+  // Destroy existing chart if it exists
+  if (analyticsCharts.revenueChart) {
+    analyticsCharts.revenueChart.destroy();
+  }
+
+  analyticsCharts.revenueChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Revenue',
+        data: data,
+        backgroundColor: '#48bb78',
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+              return '£' + value;
+            }
+          }
+        },
+        x: {
+          display: false
+        }
+      }
+    }
+  });
+}
+
+// Render Status Breakdown Chart
+function renderStatusChart(orders) {
+  const canvas = document.getElementById('statusChart');
+  const ctx = canvas.getContext('2d');
+
+  // Count by status
+  const statusCounts = {
+    pending: 0,
+    paid: 0,
+    processing: 0,
+    shipped: 0,
+    delivered: 0,
+    cancelled: 0
+  };
+
+  orders.forEach(order => {
+    if (statusCounts.hasOwnProperty(order.status)) {
+      statusCounts[order.status]++;
+    }
+  });
+
+  // Destroy existing chart if it exists
+  if (analyticsCharts.statusChart) {
+    analyticsCharts.statusChart.destroy();
+  }
+
+  analyticsCharts.statusChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Pending', 'Paid', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
+      datasets: [{
+        data: Object.values(statusCounts),
+        backgroundColor: [
+          '#fbbf24',
+          '#10b981',
+          '#3b82f6',
+          '#8b5cf6',
+          '#22c55e',
+          '#ef4444'
+        ]
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          position: 'bottom'
+        }
+      }
+    }
+  });
+}
+
+// Render Board Utilization Chart
+function renderBoardUtilizationChart(boards) {
+  const canvas = document.getElementById('boardUtilizationChart');
+  const ctx = canvas.getContext('2d');
+
+  // Count by status
+  const statusCounts = {
+    in_stock: 0,
+    assigned: 0,
+    shipped: 0,
+    active: 0,
+    faulty: 0,
+    returned: 0
+  };
+
+  boards.forEach(board => {
+    if (statusCounts.hasOwnProperty(board.status)) {
+      statusCounts[board.status]++;
+    }
+  });
+
+  // Destroy existing chart if it exists
+  if (analyticsCharts.boardUtilizationChart) {
+    analyticsCharts.boardUtilizationChart.destroy();
+  }
+
+  analyticsCharts.boardUtilizationChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: ['In Stock', 'Assigned', 'Shipped', 'Active', 'Faulty', 'Returned'],
+      datasets: [{
+        data: Object.values(statusCounts),
+        backgroundColor: [
+          '#6366f1',
+          '#f59e0b',
+          '#8b5cf6',
+          '#10b981',
+          '#ef4444',
+          '#6b7280'
+        ]
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          position: 'bottom'
+        }
+      }
+    }
+  });
+}
+
+// Render Top Destinations
+function renderTopDestinations(orders) {
+  const destinationCounts = {};
+
+  orders.forEach(order => {
+    const city = order.shipping_city || 'Unknown';
+    destinationCounts[city] = (destinationCounts[city] || 0) + 1;
+  });
+
+  // Sort by count and take top 10
+  const topDestinations = Object.entries(destinationCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const container = document.getElementById('topDestinations');
+
+  if (topDestinations.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-light);">No data yet</p>';
+    return;
+  }
+
+  container.innerHTML = topDestinations.map(([city, count]) => `
+    <div class="destination-item">
+      <span class="destination-city">${city}</span>
+      <span class="destination-count">${count}</span>
+    </div>
+  `).join('');
+}
+
+// Render Recent Activity
+function renderRecentActivity(orders) {
+  const container = document.getElementById('recentActivity');
+
+  // Get last 10 orders
+  const recentOrders = [...orders]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 10);
+
+  if (recentOrders.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-light);">No activity yet</p>';
+    return;
+  }
+
+  const getIcon = (status) => {
+    switch (status) {
+      case 'pending': return '⏳';
+      case 'paid': return '💳';
+      case 'processing': return '⚙️';
+      case 'shipped': return '📦';
+      case 'delivered': return '✅';
+      case 'cancelled': return '❌';
+      default: return '📋';
+    }
+  };
+
+  const formatTime = (dateStr) => {
+    const date = new Date(dateStr);
+    const now = Date.now();
+    const diff = now - date.getTime();
+
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+    return date.toLocaleDateString('en-GB');
+  };
+
+  container.innerHTML = recentOrders.map(order => `
+    <div class="activity-item">
+      <div class="activity-icon">${getIcon(order.status)}</div>
+      <div class="activity-content">
+        <div class="activity-title">${order.order_number} - ${order.customer_name}</div>
+        <div class="activity-meta">
+          ${order.status.charAt(0).toUpperCase() + order.status.slice(1)} •
+          ${formatTime(order.created_at)} •
+          £${parseFloat(order.total_price).toFixed(2)}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Update tab switching to load analytics when clicked
+const originalSwitchTab = switchTab;
+window.switchTab = function(tabName) {
+  originalSwitchTab(tabName);
+
+  // Load analytics when analytics tab is opened
+  if (tabName === 'analytics') {
+    loadAnalytics();
+  }
+};
 
 // Initialize on page load
 init();

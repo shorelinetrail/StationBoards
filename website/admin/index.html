@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - StationBoards</title>
   <link rel="stylesheet" href="/admin/admin-styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <!-- Login Screen -->
@@ -43,6 +44,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="orders">Orders</button>
       <button class="tab" data-tab="boards">Boards</button>
+      <button class="tab" data-tab="analytics">Analytics</button>
       <button class="tab" data-tab="shipping">Shipping</button>
     </nav>
 
@@ -105,6 +107,79 @@
       </div>
     </div>
 
+    <!-- Analytics Tab -->
+    <div id="analyticsTab" class="tab-content">
+      <div class="container">
+        <div class="page-header">
+          <h2>Analytics & Insights</h2>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="stats-row">
+          <div class="stat-card stat-primary">
+            <div class="stat-icon">💷</div>
+            <div class="stat-value" id="totalRevenue">£0</div>
+            <div class="stat-label">Total Revenue</div>
+          </div>
+          <div class="stat-card stat-success">
+            <div class="stat-icon">📦</div>
+            <div class="stat-value" id="totalOrders">0</div>
+            <div class="stat-label">Total Orders</div>
+          </div>
+          <div class="stat-card stat-info">
+            <div class="stat-icon">✅</div>
+            <div class="stat-value" id="completedOrders">0</div>
+            <div class="stat-label">Completed</div>
+          </div>
+          <div class="stat-card stat-warning">
+            <div class="stat-icon">🔧</div>
+            <div class="stat-value" id="avgOrderValue">£0</div>
+            <div class="stat-label">Avg Order Value</div>
+          </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>Orders Over Time</h3>
+            <canvas id="ordersChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Revenue Trend</h3>
+            <canvas id="revenueChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Status Breakdown -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>Order Status Breakdown</h3>
+            <canvas id="statusChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Board Utilization</h3>
+            <canvas id="boardUtilizationChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Top Destinations -->
+        <div class="analytics-section">
+          <h3>Top Shipping Destinations</h3>
+          <div id="topDestinations" class="destinations-list">
+            <!-- Will be populated by JavaScript -->
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="analytics-section">
+          <h3>Recent Activity</h3>
+          <div id="recentActivity" class="activity-timeline">
+            <!-- Will be populated by JavaScript -->
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Shipping Tab -->
     <div id="shippingTab" class="tab-content">
       <div class="container">
@@ -131,36 +206,68 @@
   <div id="addBoardModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Add New Board</h2>
+        <h2>Add Boards to Inventory</h2>
         <button class="modal-close">&times;</button>
       </div>
       <div class="modal-body">
-        <form id="addBoardForm">
-          <div class="form-group">
-            <label for="newBoardId">Board ID *</label>
-            <input type="text" id="newBoardId" required placeholder="e.g., ESP32-A1B2C3D4">
+        <!-- Import Mode Tabs -->
+        <div class="import-tabs">
+          <button class="import-tab active" onclick="switchImportMode('single')">Single Board</button>
+          <button class="import-tab" onclick="switchImportMode('bulk')">Bulk Import (CSV)</button>
+        </div>
+
+        <!-- Single Board Form -->
+        <div id="singleImportMode" class="import-mode active">
+          <form id="addBoardForm">
+            <div class="form-group">
+              <label for="newBoardId">Board ID *</label>
+              <input type="text" id="newBoardId" required placeholder="e.g., ESP32-A1B2C3D4">
+            </div>
+            <div class="form-group">
+              <label for="firmwareVersion">Firmware Version</label>
+              <input type="text" id="firmwareVersion" placeholder="e.g., 2.0.0">
+            </div>
+            <div class="form-group">
+              <label for="hardwareRevision">Hardware Revision</label>
+              <input type="text" id="hardwareRevision" placeholder="e.g., v1.2">
+            </div>
+            <div class="form-group">
+              <label for="manufacturedDate">Manufactured Date</label>
+              <input type="date" id="manufacturedDate">
+            </div>
+            <div class="form-group">
+              <label for="boardNotes">Notes</label>
+              <textarea id="boardNotes" rows="3"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary modal-close">Cancel</button>
+              <button type="submit" class="btn-primary">Add Board</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Bulk CSV Import -->
+        <div id="bulkImportMode" class="import-mode">
+          <div class="csv-info">
+            <p><strong>CSV Format:</strong> board_id, firmware_version, hardware_revision, manufactured_date, notes</p>
+            <p class="help-text">Download template: <a href="#" onclick="downloadCSVTemplate(); return false;">boards_template.csv</a></p>
           </div>
+
           <div class="form-group">
-            <label for="firmwareVersion">Firmware Version</label>
-            <input type="text" id="firmwareVersion" placeholder="e.g., 2.0.0">
+            <label for="csvFile">Upload CSV File *</label>
+            <input type="file" id="csvFile" accept=".csv" onchange="handleCSVUpload(event)">
           </div>
-          <div class="form-group">
-            <label for="hardwareRevision">Hardware Revision</label>
-            <input type="text" id="hardwareRevision" placeholder="e.g., v1.2">
+
+          <div id="csvPreview" class="csv-preview" style="display: none;">
+            <h4>Preview (<span id="previewCount">0</span> boards)</h4>
+            <div id="csvPreviewTable"></div>
           </div>
-          <div class="form-group">
-            <label for="manufacturedDate">Manufactured Date</label>
-            <input type="date" id="manufacturedDate">
-          </div>
-          <div class="form-group">
-            <label for="boardNotes">Notes</label>
-            <textarea id="boardNotes" rows="3"></textarea>
-          </div>
+
           <div class="form-actions">
             <button type="button" class="btn-secondary modal-close">Cancel</button>
-            <button type="submit" class="btn-primary">Add Board</button>
+            <button type="button" class="btn-primary" id="importCSVBtn" onclick="importBoardsFromCSV()" disabled>Import Boards</button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   </div>

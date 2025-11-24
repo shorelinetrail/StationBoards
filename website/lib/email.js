@@ -74,8 +74,10 @@ async function sendOrderConfirmationEmail({
     </div>
 
     <div style="text-align: center; margin: 30px 0;">
-      <p style="margin-bottom: 15px;">Questions about your order?</p>
-      <a href="mailto:${FROM_EMAIL}" style="display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">Contact Support</a>
+      <p style="margin-bottom: 15px; color: #666;">Track your order anytime:</p>
+      <a href="${WEBSITE_URL}/track.html?order=${encodeURIComponent(orderNumber)}&email=${encodeURIComponent(customerEmail)}" style="display: inline-block; background: #667eea; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-bottom: 10px;">Track Your Order</a>
+      <p style="margin-top: 20px; margin-bottom: 15px;">Questions about your order?</p>
+      <a href="mailto:${FROM_EMAIL}" style="display: inline-block; background: white; color: #667eea; border: 2px solid #667eea; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">Contact Support</a>
     </div>
 
     <p style="color: #666; font-size: 14px; text-align: center; margin-top: 30px;">
@@ -198,8 +200,10 @@ async function sendShippingNotificationEmail({
     </div>
 
     <div style="text-align: center; margin: 30px 0;">
-      <p style="margin-bottom: 15px;">Need help?</p>
-      <a href="mailto:support@stationboards.co.uk" style="display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">Contact Support</a>
+      <p style="margin-bottom: 15px; color: #666;">Check your order status anytime:</p>
+      <a href="${WEBSITE_URL}/track.html?order=${encodeURIComponent(orderNumber)}&email=${encodeURIComponent(customerEmail)}" style="display: inline-block; background: #667eea; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-bottom: 10px;">View Order Status</a>
+      <p style="margin-top: 20px; margin-bottom: 15px;">Need help?</p>
+      <a href="mailto:support@stationboards.co.uk" style="display: inline-block; background: white; color: #667eea; border: 2px solid #667eea; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">Contact Support</a>
     </div>
 
     <p style="color: #666; font-size: 14px; text-align: center; margin-top: 30px;">
