@@ -134,6 +134,15 @@ function switchTab(tabName) {
     loadOrders();
   } else if (tabName === 'boards') {
     loadBoards();
+  } else if (tabName === 'shipping') {
+    if (typeof loadShipping === 'function') {
+      loadShipping();
+      testRoyalMailConnection();
+    }
+  } else if (tabName === 'analytics') {
+    if (typeof loadAnalytics === 'function') {
+      loadAnalytics();
+    }
   }
 }
 
