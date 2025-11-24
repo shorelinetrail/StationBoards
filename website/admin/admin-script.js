@@ -1386,3 +1386,238 @@ window.switchTab = function(tabName) {
 
 // Initialize on page load
 init();
+
+// ===== BULK BOARD IMPORT =====
+
+let csvData = [];
+
+// Switch between single and bulk import modes
+function switchImportMode(mode) {
+  // Update tab buttons
+  document.querySelectorAll('.import-tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  event.target.classList.add('active');
+
+  // Update content panels
+  document.querySelectorAll('.import-mode').forEach(panel => {
+    panel.classList.remove('active');
+  });
+
+  if (mode === 'single') {
+    document.getElementById('singleImportMode').classList.add('active');
+  } else {
+    document.getElementById('bulkImportMode').classList.add('active');
+  }
+}
+
+// Download CSV template
+function downloadCSVTemplate() {
+  const template = 'board_id,firmware_version,hardware_revision,manufactured_date,notes\n' +
+                   'ESP32-EXAMPLE001,1.0.0,v1.0,2025-01-24,Example board 1\n' +
+                   'ESP32-EXAMPLE002,1.0.0,v1.0,2025-01-24,Example board 2\n' +
+                   'ESP32-EXAMPLE003,1.0.0,v1.0,2025-01-24,Example board 3';
+
+  const blob = new Blob([template], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'boards_template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Handle CSV file upload
+function handleCSVUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    parseCSV(text);
+  };
+  reader.readAsText(file);
+}
+
+// Parse CSV data
+function parseCSV(text) {
+  const lines = text.split('\n').filter(line => line.trim());
+  
+  if (lines.length < 2) {
+    alert('CSV file is empty or invalid');
+    return;
+  }
+
+  // Parse header
+  const header = lines[0].split(',').map(h => h.trim());
+  
+  // Validate header
+  const requiredColumns = ['board_id'];
+  const missingColumns = requiredColumns.filter(col => !header.includes(col));
+  
+  if (missingColumns.length > 0) {
+    alert('CSV missing required columns: ' + missingColumns.join(', '));
+    return;
+  }
+
+  // Parse rows
+  csvData = [];
+  const errors = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(',').map(v => v.trim());
+    
+    if (values.length === 0 || values[0] === '') continue;
+
+    const row = {};
+    let hasError = false;
+    let errorMsg = '';
+
+    header.forEach((col, index) => {
+      row[col] = values[index] || null;
+    });
+
+    // Validate board_id
+    if (!row.board_id || row.board_id.length < 3) {
+      hasError = true;
+      errorMsg = 'Invalid board_id';
+    }
+
+    // Check for duplicates in CSV
+    if (csvData.some(r => r.board_id === row.board_id)) {
+      hasError = true;
+      errorMsg = 'Duplicate board_id in CSV';
+    }
+
+    row.error = hasError;
+    row.errorMsg = errorMsg;
+    row.lineNumber = i + 1;
+
+    csvData.push(row);
+  }
+
+  displayCSVPreview();
+}
+
+// Display CSV preview
+function displayCSVPreview() {
+  const preview = document.getElementById('csvPreview');
+  const previewTable = document.getElementById('csvPreviewTable');
+  const previewCount = document.getElementById('previewCount');
+  const importBtn = document.getElementById('importCSVBtn');
+
+  if (csvData.length === 0) {
+    preview.style.display = 'none';
+    return;
+  }
+
+  preview.style.display = 'block';
+  previewCount.textContent = csvData.filter(r => !r.error).length;
+
+  const validCount = csvData.filter(r => !r.error).length;
+  const errorCount = csvData.filter(r => r.error).length;
+
+  let html = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Board ID</th>
+          <th>Firmware</th>
+          <th>Hardware</th>
+          <th>Manufactured</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${csvData.map(row => `
+          <tr class="${row.error ? 'error' : ''}">
+            <td>${row.lineNumber}</td>
+            <td>${row.board_id || ''}</td>
+            <td>${row.firmware_version || 'N/A'}</td>
+            <td>${row.hardware_revision || 'N/A'}</td>
+            <td>${row.manufactured_date || 'N/A'}</td>
+            <td>${row.error ? '❌ ' + row.errorMsg : '✓ Valid'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  if (errorCount > 0) {
+    html = `<p style="color: var(--danger); margin-bottom: 1rem;">⚠️ ${errorCount} row(s) have errors and will be skipped</p>` + html;
+  }
+
+  previewTable.innerHTML = html;
+
+  // Enable/disable import button
+  importBtn.disabled = validCount === 0;
+}
+
+// Import boards from CSV
+async function importBoardsFromCSV() {
+  const validBoards = csvData.filter(r => !r.error);
+  
+  if (validBoards.length === 0) {
+    alert('No valid boards to import');
+    return;
+  }
+
+  const importBtn = document.getElementById('importCSVBtn');
+  importBtn.disabled = true;
+  importBtn.textContent = 'Importing...';
+
+  try {
+    // Insert boards in batches to avoid timeout
+    const batchSize = 10;
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < validBoards.length; i += batchSize) {
+      const batch = validBoards.slice(i, i + batchSize);
+      
+      const boardsToInsert = batch.map(row => ({
+        board_id: row.board_id,
+        firmware_version: row.firmware_version || null,
+        hardware_revision: row.hardware_revision || null,
+        manufactured_date: row.manufactured_date || null,
+        notes: row.notes || null,
+        status: 'in_stock'
+      }));
+
+      const { data, error } = await supabase
+        .from('boards')
+        .insert(boardsToInsert);
+
+      if (error) {
+        console.error('Batch import error:', error);
+        failCount += batch.length;
+      } else {
+        successCount += batch.length;
+      }
+
+      // Update progress
+      importBtn.textContent = `Importing... ${i + batch.length}/${validBoards.length}`;
+    }
+
+    // Show results
+    alert(`Import complete!\n✓ ${successCount} boards imported\n${failCount > 0 ? '❌ ' + failCount + ' failed' : ''}`);
+
+    // Close modal and refresh
+    hideModal('addBoardModal');
+    loadBoards();
+
+    // Reset form
+    document.getElementById('csvFile').value = '';
+    csvData = [];
+    document.getElementById('csvPreview').style.display = 'none';
+
+  } catch (error) {
+    console.error('Import error:', error);
+    alert('Import failed: ' + error.message);
+  } finally {
+    importBtn.disabled = false;
+    importBtn.textContent = 'Import Boards';
+  }
+}
