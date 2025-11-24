@@ -325,3 +325,155 @@ function showDemoDepartures() {
 // Show demo departures on load and refresh every 30 seconds to update times
 showDemoDepartures();
 setInterval(showDemoDepartures, 30000);
+
+// ============= Payment Error Handling =============
+
+// Check for payment-related URL parameters (from PayPal/Stripe redirects)
+function checkPaymentStatus() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const error = urlParams.get('error');
+  const message = urlParams.get('message');
+  const orderNumber = urlParams.get('order');
+  const paymentCancelled = urlParams.get('payment_cancelled');
+
+  if (paymentCancelled) {
+    showPaymentMessage(
+      '⚠️ Payment Cancelled',
+      `Your PayPal payment for order ${paymentCancelled} was cancelled. You can try again from the checkout page.`,
+      'warning'
+    );
+    return;
+  }
+
+  if (error === 'payment_failed') {
+    showPaymentMessage(
+      '❌ Payment Failed',
+      message ? `Payment failed: ${message}` : 'Your payment could not be processed. Please try again or use a different payment method.',
+      'error'
+    );
+  } else if (error === 'payment_processing') {
+    showPaymentMessage(
+      '⚠️ Payment Processing Issue',
+      `There was an issue processing your payment${orderNumber ? ` for order ${orderNumber}` : ''}. ${message || 'Please contact support.'}`,
+      'warning'
+    );
+  } else if (error === 'missing_parameters') {
+    showPaymentMessage(
+      '❌ Invalid Payment Link',
+      'This payment link is invalid or incomplete. Please start a new checkout.',
+      'error'
+    );
+  }
+}
+
+// Display payment message banner
+function showPaymentMessage(title, message, type = 'info') {
+  // Create message banner
+  const banner = document.createElement('div');
+  banner.className = `payment-message payment-message-${type}`;
+  banner.innerHTML = `
+    <div class="payment-message-content">
+      <div class="payment-message-title">${title}</div>
+      <div class="payment-message-text">${message}</div>
+      <button onclick="this.parentElement.parentElement.remove()" class="payment-message-close">✕</button>
+    </div>
+  `;
+
+  // Add styles if not already added
+  if (!document.getElementById('payment-message-styles')) {
+    const style = document.createElement('style');
+    style.id = 'payment-message-styles';
+    style.textContent = `
+      .payment-message {
+        position: fixed;
+        top: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 600px;
+        width: 90%;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        z-index: 1000;
+        animation: slideDown 0.4s ease;
+      }
+
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+
+      .payment-message-error {
+        background: #fee;
+        border-left: 4px solid #e53e3e;
+      }
+
+      .payment-message-warning {
+        background: #ffc;
+        border-left: 4px solid #dd6b20;
+      }
+
+      .payment-message-info {
+        background: #e6f7ff;
+        border-left: 4px solid #3182ce;
+      }
+
+      .payment-message-content {
+        position: relative;
+        padding-right: 2rem;
+      }
+
+      .payment-message-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #1a202c;
+      }
+
+      .payment-message-text {
+        color: #4a5568;
+        line-height: 1.6;
+      }
+
+      .payment-message-close {
+        position: absolute;
+        top: 0;
+        right: 0;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #718096;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        line-height: 1;
+      }
+
+      .payment-message-close:hover {
+        color: #1a202c;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Insert banner at top of page
+  document.body.insertBefore(banner, document.body.firstChild);
+
+  // Auto-dismiss after 10 seconds
+  setTimeout(() => {
+    if (banner.parentElement) {
+      banner.style.animation = 'slideDown 0.3s ease reverse';
+      setTimeout(() => banner.remove(), 300);
+    }
+  }, 10000);
+}
+
+// Check for payment status on page load
+checkPaymentStatus();
