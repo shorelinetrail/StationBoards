@@ -43,6 +43,12 @@ if (orderForm) {
   orderForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    // Disable submit button to prevent double submission
+    const submitBtn = orderForm.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
     // Get form data
     const formData = new FormData(orderForm);
     const data = {
@@ -52,15 +58,13 @@ if (orderForm) {
       address: formData.get('address'),
       city: formData.get('city'),
       postcode: formData.get('postcode'),
-      quantity: formData.get('quantity'),
-      notes: formData.get('notes'),
-      timestamp: new Date().toISOString(),
-      total: totalEl.textContent
+      quantity: parseInt(formData.get('quantity')),
+      notes: formData.get('notes')
     };
 
     try {
-      // Send order to backend (you'll need to implement this endpoint)
-      const response = await fetch('/api/orders', {
+      // Send order to API
+      const response = await fetch('/api/submit-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -68,22 +72,38 @@ if (orderForm) {
         body: JSON.stringify(data)
       });
 
+      const result = await response.json();
+
       if (response.ok) {
         // Show success message
         orderForm.style.display = 'none';
         orderSuccess.style.display = 'block';
 
-        // Send email notification (implement on backend)
-        console.log('Order submitted:', data);
+        // Update success message with order number
+        const successMessage = orderSuccess.querySelector('p');
+        if (result.order && result.order.orderNumber) {
+          successMessage.innerHTML = `Thank you for your order! Your order number is <strong>${result.order.orderNumber}</strong>. We've sent a confirmation email to ${data.email} with payment instructions.`;
+        }
+
+        console.log('Order submitted successfully:', result);
       } else {
-        throw new Error('Order submission failed');
+        throw new Error(result.error || 'Order submission failed');
       }
     } catch (error) {
       console.error('Error submitting order:', error);
 
+      // Show error message
+      alert(`Failed to submit order: ${error.message}\n\nPlease try again or contact us at orders@stationboards.co.uk`);
+
+      // Re-enable submit button
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+
       // Fallback: open email client with order details
-      const subject = encodeURIComponent('StationBoard Order Request');
-      const body = encodeURIComponent(`
+      const shouldUseFallback = confirm('Would you like to send your order via email instead?');
+      if (shouldUseFallback) {
+        const subject = encodeURIComponent('StationBoard Order Request');
+        const body = encodeURIComponent(`
 Name: ${data.name}
 Email: ${data.email}
 Phone: ${data.phone}
@@ -93,17 +113,14 @@ ${data.address}
 ${data.city}, ${data.postcode}
 
 Quantity: ${data.quantity}
-Total: ${data.total}
+Total: ${totalEl.textContent}
 
 Additional Notes:
 ${data.notes || 'None'}
-      `);
+        `);
 
-      window.location.href = `mailto:orders@stationboards.co.uk?subject=${subject}&body=${body}`;
-
-      // Show success message anyway
-      orderForm.style.display = 'none';
-      orderSuccess.style.display = 'block';
+        window.location.href = `mailto:orders@stationboards.co.uk?subject=${subject}&body=${body}`;
+      }
     }
   });
 }

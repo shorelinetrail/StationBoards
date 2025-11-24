@@ -1,0 +1,17 @@
+{
+  "name": "stationboards-website",
+  "version": "1.0.0",
+  "description": "StationBoards sales website and order management",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build needed for static site'",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.3",
+    "resend": "^3.2.0"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  }
+}
