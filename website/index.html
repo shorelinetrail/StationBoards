@@ -14,7 +14,7 @@
     <div class="container">
       <div class="nav-brand">
         <span class="logo">🚉</span>
-        <span class="brand-name">StationBoards</span>
+        <span class="brand-name">StationBoards.co.uk</span>
       </div>
       <div class="nav-links">
         <a href="#features">Features</a>
@@ -58,34 +58,12 @@
       </div>
       <div class="hero-image">
         <div class="board-preview">
-          <div class="board-screen">
-            <div class="board-header">London Paddington</div>
-            <div class="board-services">
-              <div class="service-row">
-                <span class="time">14:35</span>
-                <span class="destination">Reading</span>
-                <span class="platform">Platform 8</span>
-                <span class="status status-ontime">On time</span>
-              </div>
-              <div class="service-row">
-                <span class="time">14:42</span>
-                <span class="destination">Oxford</span>
-                <span class="platform">Platform 3</span>
-                <span class="status status-ontime">On time</span>
-              </div>
-              <div class="service-row">
-                <span class="time">14:50</span>
-                <span class="destination">Bristol Temple Meads</span>
-                <span class="platform">Platform 6</span>
-                <span class="status status-delay">Delayed 5 mins</span>
-              </div>
-              <div class="service-row">
-                <span class="time">15:00</span>
-                <span class="destination">Cardiff Central</span>
-                <span class="platform">Platform 10</span>
-                <span class="status status-ontime">On time</span>
-              </div>
+          <div class="board-screen oled-display">
+            <div class="oled-header" id="liveStationName">London Kings Cross</div>
+            <div class="oled-services" id="liveServices">
+              <div class="oled-loading">Loading live departures...</div>
             </div>
+            <div class="oled-clock" id="liveClock">00:00:00</div>
           </div>
         </div>
       </div>
@@ -112,9 +90,9 @@
         </div>
 
         <div class="feature-card">
-          <div class="feature-icon">📊</div>
-          <h3>Cloud Monitoring</h3>
-          <p>Monitor your board remotely and update settings from anywhere via our web dashboard</p>
+          <div class="feature-icon">🎯</div>
+          <h3>Always Accurate</h3>
+          <p>Direct connection to National Rail and TFL APIs ensures you always see the most up-to-date departure information</p>
         </div>
 
         <div class="feature-card">
@@ -224,7 +202,7 @@
           <li>✓ USB-C power cable</li>
           <li>✓ Pre-configured firmware</li>
           <li>✓ Web configuration interface</li>
-          <li>✓ Cloud monitoring dashboard</li>
+          <li>✓ Live National Rail & TFL data</li>
           <li>✓ Lifetime firmware updates</li>
           <li>✓ Email support</li>
         </ul>
@@ -335,7 +313,7 @@
 
         <div class="faq-item">
           <h3>Does it require a subscription?</h3>
-          <p>No subscriptions! One-time purchase includes lifetime access to firmware updates and cloud monitoring.</p>
+          <p>No subscriptions! One-time purchase includes lifetime access to firmware updates and live data feeds.</p>
         </div>
 
         <div class="faq-item">
