@@ -286,7 +286,8 @@ body {
 }
 
 .oled-service {
-  padding-bottom: 0.25rem;
+  padding-bottom: 0.1rem;
+  margin-bottom: 0.1rem;
 }
 
 .oled-service-line {
@@ -299,22 +300,30 @@ body {
 }
 
 .oled-calling {
-  margin-top: 0.25rem;
+  margin-top: 0.1rem;
   color: #ffd700;
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   white-space: nowrap;
   overflow: hidden;
   position: relative;
+  display: flex;
 }
 
 .oled-calling-label {
-  display: inline;
+  flex-shrink: 0;
   margin-right: 0.5rem;
+}
+
+.oled-calling-scroll-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
 }
 
 .oled-calling-scroll {
   display: inline-block;
   animation: scroll-left 20s linear infinite;
+  padding-right: 2rem;
 }
 
 @keyframes scroll-left {

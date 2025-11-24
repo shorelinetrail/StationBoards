@@ -268,7 +268,9 @@ function showDemoDepartures() {
       </div>
       <div class="oled-calling">
         <span class="oled-calling-label">Calling at:</span>
-        <span class="oled-calling-scroll">${callingText1}</span>
+        <div class="oled-calling-scroll-container">
+          <span class="oled-calling-scroll">${callingText1}</span>
+        </div>
       </div>
     </div>
     <div class="oled-service">
