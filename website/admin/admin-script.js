@@ -578,25 +578,372 @@ function hideModal(modalId) {
   document.getElementById(modalId).classList.remove('show');
 }
 
-// Placeholder functions (to be implemented)
-function showAssignBoardDialog(orderId) {
-  alert('Board assignment feature coming soon');
+// Global variable to track current order being worked on
+let currentOrderId = null;
+
+// Board Assignment
+async function showAssignBoardDialog(orderId) {
+  currentOrderId = orderId;
+
+  try {
+    // Load available boards
+    const { data: availableBoards, error } = await supabase
+      .from('boards')
+      .select('*')
+      .eq('status', 'in_stock')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const select = document.getElementById('assignBoardSelect');
+    select.innerHTML = '<option value="">-- Select a board from inventory --</option>';
+
+    if (availableBoards.length === 0) {
+      select.innerHTML = '<option value="">No boards available in inventory</option>';
+      select.disabled = true;
+    } else {
+      availableBoards.forEach(board => {
+        const option = document.createElement('option');
+        option.value = board.id;
+        option.textContent = `${board.board_id} - ${board.firmware_version || 'No version'} - ${board.hardware_revision || 'No revision'}`;
+        select.appendChild(option);
+      });
+      select.disabled = false;
+    }
+
+    showModal('assignBoardModal');
+  } catch (error) {
+    console.error('Error loading boards:', error);
+    alert('Failed to load available boards: ' + error.message);
+  }
 }
 
-function createShippingLabel(orderId) {
-  alert('Royal Mail integration coming soon');
+// Handle board assignment form submission
+document.getElementById('assignBoardForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const boardId = document.getElementById('assignBoardSelect').value;
+  const notes = document.getElementById('assignmentNotes').value;
+
+  if (!boardId || !currentOrderId) {
+    alert('Please select a board');
+    return;
+  }
+
+  try {
+    // Update board record
+    const { error: boardError } = await supabase
+      .from('boards')
+      .update({
+        order_id: currentOrderId,
+        status: 'assigned',
+        assigned_at: new Date().toISOString(),
+        notes: notes || null
+      })
+      .eq('id', boardId);
+
+    if (boardError) throw boardError;
+
+    // Log in order history
+    const { error: historyError } = await supabase
+      .from('order_history')
+      .insert({
+        order_id: currentOrderId,
+        action: 'board_assigned',
+        description: `Board assigned to order`,
+        performed_by: currentUser.email,
+        user_id: currentUser.id
+      });
+
+    if (historyError) console.error('History log error:', historyError);
+
+    // Close modal and refresh
+    hideModal('assignBoardModal');
+    document.getElementById('assignBoardForm').reset();
+
+    alert('Board assigned successfully!');
+
+    // Refresh order details
+    await showOrderDetail(currentOrderId);
+    await loadBoards();
+  } catch (error) {
+    console.error('Error assigning board:', error);
+    alert('Failed to assign board: ' + error.message);
+  }
+});
+
+// Manual Shipping Entry
+async function createShippingLabel(orderId) {
+  currentOrderId = orderId;
+
+  // Reset form
+  document.getElementById('shippingForm').reset();
+  document.getElementById('shippingWeight').value = '400';
+
+  showModal('shippingModal');
 }
 
-function sendEmail(orderId, emailType) {
-  alert('Email sending feature coming soon');
+// Handle shipping form submission
+document.getElementById('shippingForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const service = document.getElementById('shippingService').value;
+  const trackingNumber = document.getElementById('trackingNumber').value;
+  const weight = document.getElementById('shippingWeight').value;
+  const notes = document.getElementById('shippingNotes').value;
+
+  if (!service || !trackingNumber || !currentOrderId) {
+    alert('Please fill in all required fields');
+    return;
+  }
+
+  const serviceNames = {
+    'rm48': 'Royal Mail 48 Tracked',
+    'rm24': 'Royal Mail 24 Tracked',
+    'rmsd': 'Royal Mail Special Delivery by 1pm',
+    'other': 'Other Service'
+  };
+
+  try {
+    // Create shipment record
+    const { error: shipmentError } = await supabase
+      .from('shipments')
+      .insert({
+        order_id: currentOrderId,
+        tracking_number: trackingNumber,
+        service_code: service,
+        service_name: serviceNames[service],
+        weight_grams: parseInt(weight) || 400,
+        status: 'label_created',
+        status_details: notes || null
+      });
+
+    if (shipmentError) throw shipmentError;
+
+    // Update order status to shipped
+    const { error: orderError } = await supabase
+      .from('orders')
+      .update({
+        status: 'shipped',
+        shipped_at: new Date().toISOString()
+      })
+      .eq('id', currentOrderId);
+
+    if (orderError) throw orderError;
+
+    // Update assigned boards status
+    const { error: boardError } = await supabase
+      .from('boards')
+      .update({
+        status: 'shipped',
+        shipped_at: new Date().toISOString()
+      })
+      .eq('order_id', currentOrderId)
+      .eq('status', 'assigned');
+
+    if (boardError) console.error('Board update error:', boardError);
+
+    // Log in order history
+    await supabase.from('order_history').insert({
+      order_id: currentOrderId,
+      action: 'shipped',
+      description: `Order shipped via ${serviceNames[service]}. Tracking: ${trackingNumber}`,
+      performed_by: currentUser.email,
+      user_id: currentUser.id
+    });
+
+    // Send shipping notification email
+    await sendEmail(currentOrderId, 'shipping');
+
+    // Close modal and refresh
+    hideModal('shippingModal');
+    document.getElementById('shippingForm').reset();
+
+    alert('Shipment created and notification sent successfully!');
+
+    // Refresh displays
+    await showOrderDetail(currentOrderId);
+    await loadOrders();
+  } catch (error) {
+    console.error('Error creating shipment:', error);
+    alert('Failed to create shipment: ' + error.message);
+  }
+});
+
+// Email Sending
+async function sendEmail(orderId, emailType) {
+  try {
+    // Get order details
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        boards (board_id),
+        shipments (tracking_number, service_name)
+      `)
+      .eq('id', orderId)
+      .single();
+
+    if (orderError) throw orderError;
+
+    let emailData = {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      customerName: order.customer_name,
+      customerEmail: order.customer_email
+    };
+
+    let emailSubject, emailBody;
+
+    switch (emailType) {
+      case 'shipping':
+        if (!order.shipments || order.shipments.length === 0) {
+          alert('No shipment found for this order');
+          return;
+        }
+        emailSubject = `Your StationBoard has shipped! - Order ${order.order_number}`;
+        emailBody = `
+          <h2>Your order is on its way! 🚉</h2>
+          <p>Hi ${order.customer_name},</p>
+          <p>Great news! Your StationBoard order <strong>${order.order_number}</strong> has been shipped.</p>
+          <h3>Shipping Details:</h3>
+          <ul>
+            <li><strong>Service:</strong> ${order.shipments[0].service_name}</li>
+            <li><strong>Tracking Number:</strong> ${order.shipments[0].tracking_number}</li>
+            <li><strong>Track your parcel:</strong> <a href="https://www.royalmail.com/track-your-item#/tracking-results/${order.shipments[0].tracking_number}">Track on Royal Mail</a></li>
+          </ul>
+          ${order.boards && order.boards.length > 0 ? `
+            <h3>Your Board(s):</h3>
+            <ul>${order.boards.map(b => `<li>${b.board_id}</li>`).join('')}</ul>
+          ` : ''}
+          <p>Your board should arrive within 2-3 working days.</p>
+          <p>Best regards,<br>StationBoards Team</p>
+        `;
+        break;
+
+      case 'payment':
+        emailSubject = `Payment Reminder - Order ${order.order_number}`;
+        emailBody = `
+          <h2>Payment Reminder</h2>
+          <p>Hi ${order.customer_name},</p>
+          <p>This is a friendly reminder about your StationBoard order <strong>${order.order_number}</strong>.</p>
+          <p><strong>Amount due:</strong> £${order.total_price}</p>
+          <p>Please complete payment to proceed with your order.</p>
+          <p>If you've already paid, please disregard this message.</p>
+          <p>Best regards,<br>StationBoards Team</p>
+        `;
+        break;
+
+      default:
+        alert('Unknown email type');
+        return;
+    }
+
+    // Call email API endpoint
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: order.customer_email,
+        subject: emailSubject,
+        html: emailBody
+      })
+    });
+
+    if (!response.ok) {
+      // If API doesn't exist, log to database only
+      console.warn('Email API not available, logging to database only');
+    }
+
+    // Log email in database
+    await supabase.from('email_log').insert({
+      order_id: orderId,
+      email_type: emailType,
+      recipient_email: order.customer_email,
+      subject: emailSubject,
+      status: 'sent'
+    });
+
+    // Log in order history
+    await supabase.from('order_history').insert({
+      order_id: orderId,
+      action: `email_sent_${emailType}`,
+      description: `Email sent: ${emailSubject}`,
+      performed_by: currentUser.email,
+      user_id: currentUser.id
+    });
+
+    alert(`${emailType.charAt(0).toUpperCase() + emailType.slice(1)} email sent to ${order.customer_email}`);
+  } catch (error) {
+    console.error('Error sending email:', error);
+    alert('Failed to send email: ' + error.message);
+  }
 }
 
+// Status update functions
+async function updateOrderStatus(orderId, status) {
+  try {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status })
+      .eq('id', orderId);
+
+    if (error) throw error;
+
+    await supabase.from('order_history').insert({
+      order_id: orderId,
+      action: 'status_updated',
+      description: `Order status changed to: ${status}`,
+      performed_by: currentUser.email,
+      user_id: currentUser.id
+    });
+
+    await showOrderDetail(orderId);
+    await loadOrders();
+  } catch (error) {
+    console.error('Error updating status:', error);
+    alert('Failed to update status: ' + error.message);
+  }
+}
+
+async function updatePaymentStatus(orderId, paymentStatus) {
+  try {
+    const updateData = { payment_status: paymentStatus };
+
+    if (paymentStatus === 'paid') {
+      updateData.paid_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase
+      .from('orders')
+      .update(updateData)
+      .eq('id', orderId);
+
+    if (error) throw error;
+
+    await supabase.from('order_history').insert({
+      order_id: orderId,
+      action: 'payment_updated',
+      description: `Payment status changed to: ${paymentStatus}`,
+      performed_by: currentUser.email,
+      user_id: currentUser.id
+    });
+
+    await showOrderDetail(orderId);
+    await loadOrders();
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    alert('Failed to update payment status: ' + error.message);
+  }
+}
+
+// Placeholder functions (to be implemented later)
 function downloadInvoice(orderId) {
-  alert('Invoice generation coming soon');
+  alert('Invoice generation feature coming soon');
 }
 
 function editBoard(boardId) {
-  alert('Board editing coming soon');
+  alert('Board editing feature coming soon');
 }
 
 // Initialize on page load

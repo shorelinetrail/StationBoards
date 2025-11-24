@@ -165,6 +165,76 @@
     </div>
   </div>
 
+  <!-- Assign Board Modal -->
+  <div id="assignBoardModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Assign Board to Order</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="assignBoardForm">
+          <div class="form-group">
+            <label for="assignBoardSelect">Select Board *</label>
+            <select id="assignBoardSelect" required>
+              <option value="">-- Select a board from inventory --</option>
+            </select>
+            <small>Only showing boards with status 'in_stock'</small>
+          </div>
+          <div class="form-group">
+            <label for="assignmentNotes">Notes (optional)</label>
+            <textarea id="assignmentNotes" rows="2" placeholder="Any notes about this assignment..."></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary modal-close">Cancel</button>
+            <button type="submit" class="btn-primary">Assign Board</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Shipping Modal -->
+  <div id="shippingModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Create Shipment</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="shippingForm">
+          <div class="form-group">
+            <label for="shippingService">Shipping Service *</label>
+            <select id="shippingService" required>
+              <option value="">-- Select service --</option>
+              <option value="rm48">Royal Mail 48 Tracked</option>
+              <option value="rm24">Royal Mail 24 Tracked</option>
+              <option value="rmsd">Royal Mail Special Delivery by 1pm</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="trackingNumber">Tracking Number *</label>
+            <input type="text" id="trackingNumber" required placeholder="e.g., AB123456789GB">
+            <small>Enter tracking number from Royal Mail</small>
+          </div>
+          <div class="form-group">
+            <label for="shippingWeight">Weight (grams)</label>
+            <input type="number" id="shippingWeight" placeholder="400" value="400">
+          </div>
+          <div class="form-group">
+            <label for="shippingNotes">Notes (optional)</label>
+            <textarea id="shippingNotes" rows="2" placeholder="Any shipping notes..."></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary modal-close">Cancel</button>
+            <button type="submit" class="btn-primary">Create Shipment</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/admin/admin-script.js"></script>
