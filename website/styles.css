@@ -284,41 +284,17 @@ body {
 }
 
 .oled-service {
-  border-bottom: 1px solid #333;
-  padding-bottom: 0.75rem;
-}
-
-.oled-service-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding-bottom: 0.5rem;
   margin-bottom: 0.5rem;
 }
 
-.oled-label {
+.oled-service-line {
   color: #ffd700;
-  font-size: 0.75rem;
-  font-weight: bold;
-}
-
-.oled-time {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #fff;
-}
-
-.oled-destination {
-  font-size: 1.1rem;
-  color: #fff;
+  font-size: 1rem;
+  font-weight: normal;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.oled-etd {
-  font-size: 1rem;
-  color: #ffd700;
-  font-weight: bold;
+  line-height: 1.5;
 }
 
 .oled-calling {

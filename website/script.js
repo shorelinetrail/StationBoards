@@ -244,32 +244,19 @@ function showDemoDepartures() {
   const etd1 = mins1 <= 1 ? 'On time' : mins1 <= 5 ? `${mins1} min` : 'On time';
   const etd2 = mins2 <= 20 ? 'On time' : `${Math.floor(mins2 / 60)}h ${mins2 % 60}m`;
 
+  // Format as single line: "1st  19:47  Newcastle         On time"
+  const line1 = `1st  ${std1}  ${dest1.name.padEnd(20, ' ')} ${etd1}`;
+  const line2 = `2nd  ${std2}  ${dest2.name.padEnd(20, ' ')} ${etd2}`;
+
   const html = `
     <div class="oled-service">
-      <div class="oled-service-header">
-        <div>
-          <div class="oled-label">1st</div>
-          <div class="oled-time">${std1}</div>
-        </div>
-        <div class="oled-etd">${etd1}</div>
-      </div>
-      <div class="oled-destination">${dest1.name}</div>
+      <div class="oled-service-line">${line1}</div>
       <div class="oled-calling">
         <span class="oled-calling-text">Calling at: ${dest1.calling.join(', ')}</span>
       </div>
     </div>
     <div class="oled-service">
-      <div class="oled-service-header">
-        <div>
-          <div class="oled-label">2nd</div>
-          <div class="oled-time">${std2}</div>
-        </div>
-        <div class="oled-etd">${etd2}</div>
-      </div>
-      <div class="oled-destination">${dest2.name}</div>
-      <div class="oled-calling">
-        <span class="oled-calling-text">Calling at: ${dest2.calling.join(', ')}</span>
-      </div>
+      <div class="oled-service-line">${line2}</div>
     </div>
   `;
 
