@@ -45,6 +45,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Check if PayPal credentials are configured
+  if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+    console.error('PayPal credentials not configured');
+    return res.status(500).json({
+      success: false,
+      error: 'PayPal payment is not configured. Please contact support or use card payment.',
+      details: 'Missing PayPal API credentials'
+    });
+  }
+
   const {
     order_id,
     order_number,
@@ -58,7 +68,8 @@ export default async function handler(req, res) {
   if (!order_id || !order_number || !customer_email || !total_price) {
     return res.status(400).json({
       success: false,
-      error: 'Missing required fields'
+      error: 'Missing required fields',
+      required: ['order_id', 'order_number', 'customer_email', 'total_price']
     });
   }
 
@@ -118,11 +129,18 @@ export default async function handler(req, res) {
     const orderData = await response.json();
 
     if (!response.ok) {
-      throw new Error(orderData.message || 'PayPal order creation failed');
+      console.error('PayPal API error:', orderData);
+      const errorMessage = orderData.details?.[0]?.description || orderData.message || 'PayPal order creation failed';
+      throw new Error(errorMessage);
     }
 
     // Find approval URL
-    const approvalUrl = orderData.links.find(link => link.rel === 'approve')?.href;
+    const approvalUrl = orderData.links?.find(link => link.rel === 'approve')?.href;
+
+    if (!approvalUrl) {
+      console.error('No approval URL in PayPal response:', orderData);
+      throw new Error('PayPal did not return an approval URL');
+    }
 
     return res.status(200).json({
       success: true,
@@ -132,10 +150,11 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('PayPal order creation error:', error);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({
       success: false,
-      error: 'Failed to create PayPal order',
-      message: error.message
+      error: error.message || 'Failed to create PayPal order',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
