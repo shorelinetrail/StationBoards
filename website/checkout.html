@@ -487,13 +487,13 @@
                      (address2 ? '\n' + address2 : '');
 
       return {
-        customer_name: document.getElementById('customerName').value,
-        customer_email: document.getElementById('customerEmail').value,
-        customer_phone: document.getElementById('customerPhone').value || null,
-        shipping_address: address,
-        shipping_city: document.getElementById('shippingCity').value,
-        shipping_postcode: document.getElementById('shippingPostcode').value,
-        shipping_country: document.getElementById('shippingCountry').value,
+        name: document.getElementById('customerName').value,
+        email: document.getElementById('customerEmail').value,
+        phone: document.getElementById('customerPhone').value || null,
+        address: address,
+        city: document.getElementById('shippingCity').value,
+        postcode: document.getElementById('shippingPostcode').value,
+        country: document.getElementById('shippingCountry').value,
         quantity: quantity,
         total_price: PRICE_PER_UNIT * quantity,
         notes: document.getElementById('orderNotes').value || null
@@ -530,9 +530,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             order_id: orderData.order.id,
-            order_number: orderData.order.order_number,
-            customer_email: formData.customer_email,
-            customer_name: formData.customer_name,
+            order_number: orderData.order.orderNumber,
+            customer_email: formData.email,
+            customer_name: formData.name,
             quantity: formData.quantity,
             total_price: formData.total_price
           })
@@ -588,9 +588,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             order_id: orderData.order.id,
-            order_number: orderData.order.order_number,
-            customer_email: formData.customer_email,
-            customer_name: formData.customer_name,
+            order_number: orderData.order.orderNumber,
+            customer_email: formData.email,
+            customer_name: formData.name,
             quantity: formData.quantity,
             total_price: formData.total_price
           })
