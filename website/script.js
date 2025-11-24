@@ -170,7 +170,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Live board preview with National Rail API
-async function fetchLiveDepartures() {
+async function fetchLiveServices() {
   const stationCode = 'KGX'; // Kings Cross
   const liveServices = document.getElementById('liveServices');
 
@@ -179,14 +179,14 @@ async function fetchLiveDepartures() {
     const response = await fetch(`https://huxley2.azurewebsites.net/departures/${stationCode}/4`);
 
     if (!response.ok) {
-      throw new Error('Failed to fetch departures');
+      throw new Error('Failed to fetch train services');
     }
 
     const data = await response.json();
     const services = data.trainServices || [];
 
     if (services.length === 0) {
-      liveServices.innerHTML = '<div class="loading-spinner"><p>No departures available</p></div>';
+      liveServices.innerHTML = '<div class="loading-spinner"><p>No services available</p></div>';
       return;
     }
 
@@ -194,7 +194,6 @@ async function fetchLiveDepartures() {
     liveServices.innerHTML = services.slice(0, 4).map(service => {
       const time = service.std || '--:--';
       const destination = service.destination?.[0]?.locationName || 'Unknown';
-      const platform = service.platform ? `Platform ${service.platform}` : 'Platform TBC';
 
       // Determine status
       let statusClass = 'status-ontime';
@@ -209,23 +208,22 @@ async function fetchLiveDepartures() {
       }
 
       return `
-        <div class="service-row">
+        <div class="service-row service-row-no-platform">
           <span class="time">${time}</span>
           <span class="destination">${destination}</span>
-          <span class="platform">${platform}</span>
           <span class="status ${statusClass}">${statusText}</span>
         </div>
       `;
     }).join('');
 
-    console.log(`✓ Loaded ${services.length} live departures from ${stationCode}`);
+    console.log(`✓ Loaded ${services.length} live services from ${stationCode}`);
 
   } catch (error) {
-    console.error('Error fetching live departures:', error);
+    console.error('Error fetching live services:', error);
     liveServices.innerHTML = `
       <div class="loading-spinner">
         <p>Unable to load live data</p>
-        <p style="font-size: 0.8rem; opacity: 0.7;">Showing example departures</p>
+        <p style="font-size: 0.8rem; opacity: 0.7;">Showing example services</p>
       </div>
     `;
 
@@ -265,18 +263,18 @@ async function fetchLiveDepartures() {
 const cancelledStyle = document.createElement('style');
 cancelledStyle.textContent = `
   .status-cancelled {
-    background: #f8d7da;
-    color: #721c24;
+    color: #ff4444;
+    border-color: #ff4444;
   }
 `;
 document.head.appendChild(cancelledStyle);
 
 // Fetch live data on page load
 document.addEventListener('DOMContentLoaded', () => {
-  fetchLiveDepartures();
+  fetchLiveServices();
 
   // Refresh every 60 seconds
-  setInterval(fetchLiveDepartures, 60000);
+  setInterval(fetchLiveServices, 60000);
 });
 
 // Log page view (add analytics tracking here)
