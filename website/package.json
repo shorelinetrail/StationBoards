@@ -4,7 +4,6 @@
   "description": "StationBoards sales website and order management",
   "scripts": {
     "dev": "vercel dev",
-    "build": "echo 'No build needed for static site'",
     "deploy": "vercel --prod"
   },
   "dependencies": {
