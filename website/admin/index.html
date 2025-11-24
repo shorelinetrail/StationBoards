@@ -406,6 +406,77 @@
     </div>
   </div>
 
+  <!-- Edit Board Modal -->
+  <div id="editBoardModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edit Board</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="editBoardForm">
+          <input type="hidden" id="editBoardDbId">
+
+          <div class="form-group">
+            <label for="editBoardId">Board ID *</label>
+            <input type="text" id="editBoardId" required placeholder="e.g., ESP32-A1B2C3D4">
+          </div>
+
+          <div class="form-group">
+            <label for="editBoardStatus">Status *</label>
+            <select id="editBoardStatus" required>
+              <option value="in_stock">In Stock</option>
+              <option value="assigned">Assigned</option>
+              <option value="shipped">Shipped</option>
+              <option value="active">Active</option>
+              <option value="faulty">Faulty</option>
+              <option value="returned">Returned</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="editFirmwareVersion">Firmware Version</label>
+            <input type="text" id="editFirmwareVersion" placeholder="e.g., 2.0.0">
+          </div>
+
+          <div class="form-group">
+            <label for="editHardwareRevision">Hardware Revision</label>
+            <input type="text" id="editHardwareRevision" placeholder="e.g., v1.2">
+          </div>
+
+          <div class="form-group">
+            <label for="editManufacturedDate">Manufactured Date</label>
+            <input type="date" id="editManufacturedDate">
+          </div>
+
+          <div class="form-group">
+            <label for="editBoardNotes">Notes</label>
+            <textarea id="editBoardNotes" rows="3"></textarea>
+          </div>
+
+          <div class="monitoring-info" style="background: #f7fafc; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+            <h4 style="margin-bottom: 0.5rem;">Monitoring Status</h4>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; font-size: 0.9rem;">
+              <strong>Last Seen:</strong>
+              <span id="editLastSeen">Never</span>
+
+              <strong>Last IP:</strong>
+              <span id="editLastIp">Unknown</span>
+
+              <strong>Activated At:</strong>
+              <span id="editActivatedAt">Not activated</span>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-secondary modal-close">Cancel</button>
+            <button type="submit" class="btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/admin/admin-script.js"></script>

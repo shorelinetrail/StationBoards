@@ -1001,9 +1001,107 @@ function downloadInvoice(orderId) {
   alert('Invoice generation feature coming soon');
 }
 
-function editBoard(boardId) {
-  alert('Board editing feature coming soon');
+// Edit Board
+async function editBoard(boardDbId) {
+  try {
+    // Load board details
+    const { data: board, error } = await supabase
+      .from('boards')
+      .select('*')
+      .eq('id', boardDbId)
+      .single();
+
+    if (error) throw error;
+
+    // Populate form fields
+    document.getElementById('editBoardDbId').value = board.id;
+    document.getElementById('editBoardId').value = board.board_id;
+    document.getElementById('editBoardStatus').value = board.status;
+    document.getElementById('editFirmwareVersion').value = board.firmware_version || '';
+    document.getElementById('editHardwareRevision').value = board.hardware_revision || '';
+    document.getElementById('editManufacturedDate').value = board.manufactured_date || '';
+    document.getElementById('editBoardNotes').value = board.notes || '';
+
+    // Format and display monitoring info
+    const formatDateTime = (dateStr) => {
+      if (!dateStr) return 'Never';
+      const date = new Date(dateStr);
+      return date.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    const formatLastSeen = (lastSeen) => {
+      if (!lastSeen) return 'Never';
+      const date = new Date(lastSeen);
+      const now = Date.now();
+      const diff = now - date.getTime();
+
+      if (diff < 60000) return 'Just now';
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+      return date.toLocaleString('en-GB');
+    };
+
+    document.getElementById('editLastSeen').textContent = formatLastSeen(board.last_seen);
+    document.getElementById('editLastIp').textContent = board.last_ip || 'Unknown';
+    document.getElementById('editActivatedAt').textContent = formatDateTime(board.activated_at);
+
+    // Color code the last seen based on status
+    const lastSeenEl = document.getElementById('editLastSeen');
+    if (board.last_seen) {
+      const diff = Date.now() - new Date(board.last_seen).getTime();
+      if (diff < 5 * 60 * 1000) {
+        lastSeenEl.style.color = '#10b981'; // Green - online
+        lastSeenEl.innerHTML = `<strong>${formatLastSeen(board.last_seen)}</strong> <span style="color: #10b981;">● Online</span>`;
+      } else if (diff < 60 * 60 * 1000) {
+        lastSeenEl.style.color = '#f59e0b'; // Orange - recent
+      } else {
+        lastSeenEl.style.color = '#6b7280'; // Gray - offline
+      }
+    }
+
+    showModal('editBoardModal');
+  } catch (error) {
+    console.error('Error loading board details:', error);
+    alert('Failed to load board details: ' + error.message);
+  }
 }
+
+// Handle edit board form submission
+document.getElementById('editBoardForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const boardDbId = document.getElementById('editBoardDbId').value;
+  const boardData = {
+    board_id: document.getElementById('editBoardId').value,
+    status: document.getElementById('editBoardStatus').value,
+    firmware_version: document.getElementById('editFirmwareVersion').value || null,
+    hardware_revision: document.getElementById('editHardwareRevision').value || null,
+    manufactured_date: document.getElementById('editManufacturedDate').value || null,
+    notes: document.getElementById('editBoardNotes').value || null
+  };
+
+  try {
+    const { error } = await supabase
+      .from('boards')
+      .update(boardData)
+      .eq('id', boardDbId);
+
+    if (error) throw error;
+
+    alert('Board updated successfully');
+    hideModal('editBoardModal');
+    loadBoards();
+  } catch (error) {
+    console.error('Error updating board:', error);
+    alert('Failed to update board: ' + error.message);
+  }
+});
 
 // ===== ANALYTICS DASHBOARD =====
 
