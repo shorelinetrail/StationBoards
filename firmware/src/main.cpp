@@ -9,6 +9,15 @@
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>         // ← FIXED: Added missing include
 #include <WebSocketsServer.h>
+
+// Override WebSocket TCP timeout to prevent long hangs when monitoring server is unavailable
+// Default is 5000ms, but we want faster failure detection to avoid blocking the device
+// This timeout affects: initial connection attempt, reconnection attempts, and handshake timeout
+// IMPORTANT: Keep this low to ensure the display never hangs even when server is down
+#ifndef WEBSOCKETS_TCP_TIMEOUT
+#define WEBSOCKETS_TCP_TIMEOUT (2000)  // 2 seconds - fast failure for better responsiveness
+#endif
+
 #include <WebSocketsClient.h>
 #include <HTTPUpdate.h>
 #include "config.h"
@@ -218,6 +227,7 @@ void setupOTA();
 void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void sendMonitorHeartbeat();
 void sendMonitorLog(const String& level, const String& message);
+void monitoringTask(void* parameter);  // FreeRTOS task for monitoring
 
 // Helper macro for easy logging
 #define LOG_TO_MONITOR(level, msg) sendMonitorLog(level, msg)
@@ -238,8 +248,8 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       {
         Serial.println("✅ Connected to monitoring server");
         monitoringState.connected = true;
-        
-        // Register device
+
+        // Register device with full config
         String registerMsg = "{";
         registerMsg += "\"type\":\"register\",";
         registerMsg += "\"deviceId\":\"" + config.deviceId + "\",";
@@ -249,12 +259,22 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         registerMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
         registerMsg += "\"stationName\":\"" + String(displayState.stationName) + "\",";
         registerMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
+        registerMsg += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
+        registerMsg += "\"showStationName\":" + String(config.showStationName ? "true" : "false") + ",";
+        registerMsg += "\"extraServices\":" + String(config.extraServices) + ",";
+        registerMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
+        registerMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
+        registerMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
+        // TFL-specific filters
+        registerMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
+        registerMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\",";
+        // Runtime status
         registerMsg += "\"rssi\":" + String(WiFi.RSSI()) + ",";
         registerMsg += "\"uptime\":" + String(millis() / 1000) + ",";
         registerMsg += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
         registerMsg += "\"services\":" + String(displayState.serviceCount);
         registerMsg += "}";
-        
+
         monitorClient.sendTXT(registerMsg);
         LOG_TO_MONITOR("info", "Connected to monitoring server");
       }
@@ -296,6 +316,45 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               Serial.println("⚙️ Remote config update");
               LOG_TO_MONITOR("info", "Remote config update received");
 
+              // Track if service type changed (need to reinit service provider)
+              bool serviceTypeChanged = false;
+              int oldServiceType = config.serviceType;
+
+              // Process service type
+              if (doc.containsKey("serviceType")) {
+                String serviceTypeStr = doc["serviceType"].as<String>();
+                serviceTypeStr.trim();
+                Serial.println("📡 Service type from dashboard: " + serviceTypeStr);
+
+                if (serviceTypeStr == "National Rail") {
+                  config.serviceType = Config::SERVICE_NATIONAL_RAIL;
+                } else if (serviceTypeStr == "TFL") {
+                  config.serviceType = Config::SERVICE_TFL_UNDERGROUND;
+                }
+
+                if (config.serviceType != oldServiceType) {
+                  serviceTypeChanged = true;
+                  Serial.println("🔄 Service type changed: " + String(oldServiceType) + " → " + String(config.serviceType));
+                }
+              }
+
+              // Process TFL filters
+              if (doc.containsKey("tflLineFilter")) {
+                String lineFilter = doc["tflLineFilter"].as<String>();
+                lineFilter.trim();
+                strncpy(config.tflLineFilter, lineFilter.c_str(), sizeof(config.tflLineFilter) - 1);
+                config.tflLineFilter[sizeof(config.tflLineFilter) - 1] = '\0';
+                Serial.println("🚇 TFL Line filter: " + String(config.tflLineFilter));
+              }
+
+              if (doc.containsKey("tflPlatformFilter")) {
+                String platformFilter = doc["tflPlatformFilter"].as<String>();
+                platformFilter.trim();
+                strncpy(config.tflPlatformFilter, platformFilter.c_str(), sizeof(config.tflPlatformFilter) - 1);
+                config.tflPlatformFilter[sizeof(config.tflPlatformFilter) - 1] = '\0';
+                Serial.println("🚉 TFL Platform filter: " + String(config.tflPlatformFilter));
+              }
+
               if (doc.containsKey("stationCode")) {
                 String station = doc["stationCode"].as<String>();
                 station.toUpperCase();
@@ -319,9 +378,23 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               if (doc.containsKey("rotationSpeed")) {
                 config.rotationSpeed = doc["rotationSpeed"];
               }
-              
+
               config.save();
-              LOG_TO_MONITOR("info", "Config updated and saved - Station: " + String(config.stationCode));
+
+              String serviceTypeName = (config.serviceType == Config::SERVICE_NATIONAL_RAIL) ? "National Rail" : "TFL Underground";
+              LOG_TO_MONITOR("info", "Config updated - Service: " + serviceTypeName + ", Station: " + String(config.stationCode));
+
+              // Reinitialize service provider if service type changed
+              if (serviceTypeChanged) {
+                Serial.println("🔄 Reinitializing service provider...");
+                LOG_TO_MONITOR("info", "Switching to " + serviceTypeName);
+
+                if (config.serviceType == Config::SERVICE_NATIONAL_RAIL) {
+                  serviceProvider = &nationalRailProvider;
+                } else {
+                  serviceProvider = &tflUndergroundProvider;
+                }
+              }
 
               // Reset alternating service
               if (config.useCallingAt) {
@@ -331,7 +404,7 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               } else {
                 displayState.currentAlternatingService = 2;
               }
-              
+
               // Clear data and force refresh
               displayState.serviceCount = 0;
               fetchStateData.lastSuccess = 0;
@@ -431,13 +504,16 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               configMsg += "\"type\":\"configResponse\",";
               configMsg += "\"deviceId\":\"" + config.deviceId + "\",";
               configMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
+              configMsg += "\"stationName\":\"" + String(displayState.stationName) + "\",";
               configMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
               configMsg += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
               configMsg += "\"showStationName\":" + String(config.showStationName ? "true" : "false") + ",";
               configMsg += "\"extraServices\":" + String(config.extraServices) + ",";
               configMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
               configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
-              configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed);
+              configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
+              configMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
+              configMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\"";
               configMsg += "}";
 
               monitorClient.sendTXT(configMsg);
@@ -491,17 +567,49 @@ void sendMonitorHeartbeat() {
 
 // Send log message to monitoring server
 void sendMonitorLog(const String& level, const String& message) {
-  if (!monitoringState.connected || !monitoringState.logsEnabled) return;
+  if (!monitoringState.connected) return;
+
+  // Get Unix timestamp in milliseconds (if NTP synced, otherwise use millis)
+  time_t now = time(nullptr);
+  unsigned long timestamp = (now > 0) ? (now * 1000UL) : millis();
 
   String logMsg = "{";
   logMsg += "\"type\":\"log\",";
   logMsg += "\"deviceId\":\"" + config.deviceId + "\",";
   logMsg += "\"level\":\"" + level + "\",";
   logMsg += "\"message\":\"" + message + "\",";
-  logMsg += "\"timestamp\":" + String(millis());
+  logMsg += "\"timestamp\":" + String(timestamp);
   logMsg += "}";
 
   monitorClient.sendTXT(logMsg);
+}
+
+// FreeRTOS task for monitoring - runs on separate core to never block display
+// This task handles monitorClient.loop() and heartbeats independently
+// CRITICAL: This ensures the display NEVER hangs, even when monitoring blocks
+void monitoringTask(void* parameter) {
+  Serial.println("✅ Monitoring task started on core " + String(xPortGetCoreID()));
+
+  unsigned long lastHeartbeat = 0;
+
+  while (true) {
+    if (monitoringState.enabled) {
+      unsigned long currentTime = millis();
+
+      // Call monitorClient.loop() - can block up to 2s, but won't affect display
+      monitorClient.loop();
+
+      // Send heartbeat every 30 seconds
+      if (monitoringState.connected && currentTime - lastHeartbeat >= Timing::MONITOR_HEARTBEAT_INTERVAL) {
+        sendMonitorHeartbeat();
+        lastHeartbeat = currentTime;
+      }
+    }
+
+    // Use FreeRTOS delay to yield to other tasks
+    // Check every 100ms for responsiveness, but loop() inside will handle its own timing
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
 }
 
 // ============ END MONITORING Functions ============
@@ -997,12 +1105,14 @@ bool initializeWiFi() {
 
   WiFi.begin(config.wifiSSID, config.wifiPassword);
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 100) {
+  int maxAttempts = 100;  // Maximum WiFi connection attempts (30 seconds)
+  while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
     delay(300);
     Serial.print(".");
     attempts++;
     if (attempts % 4 == 0) {
-      int progress = (attempts * 100) / 30;
+      // Fix: Cap progress at 100% (was going to 300%+ due to wrong divisor)
+      int progress = min(100, (attempts * 100) / maxAttempts);
       displayProgress("Connecting to WiFi...", 2, 5, progress);
     }
   }
@@ -1468,8 +1578,8 @@ void updateDisplay() {
       int indexA = displayState.currentAlternatingService;
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      String labelA = getServiceLabel(indexA, serviceOffset);
-      String labelB = getServiceLabel(indexB, serviceOffset);
+      String labelA = getServiceLabel(indexA);
+      String labelB = getServiceLabel(indexB);
 
       displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
                                 labelA.c_str(), labelB.c_str(), config.yPosAlt,
@@ -1487,7 +1597,7 @@ void updateDisplay() {
       if (serviceIdx >= displayState.serviceCount) break;
 
       int yPos = (i == 0) ? config.yPos1st : config.yPos2nd;
-      String label = getServiceLabel(i, serviceOffset);
+      String label = getServiceLabel(serviceIdx);
 
       displayServiceLine(displayState.services[serviceIdx], label.c_str(), yPos, u8g2);
     }
@@ -1501,8 +1611,8 @@ void updateDisplay() {
       int indexA = displayState.currentAlternatingService;
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
-      String labelA = getServiceLabel(indexA, serviceOffset);
-      String labelB = getServiceLabel(indexB, serviceOffset);
+      String labelA = getServiceLabel(indexA);
+      String labelB = getServiceLabel(indexB);
 
       displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
                                 labelA.c_str(), labelB.c_str(), config.yPosAlt,
@@ -1759,10 +1869,10 @@ void setupWebServer() {
       String lineFilter = server.arg("tflLineFilter");
       lineFilter.trim();
 
-      // VALIDATE: TFL stations MUST have a line filter to prevent out-of-memory errors
+      // VALIDATE: TFL stations MUST have a line filter
       if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND && lineFilter.length() == 0) {
         Serial.println("  ❌ TFL line filter is required");
-        server.send(400, "text/plain", "Line filter is REQUIRED for TFL stations to reduce memory usage. Please select a specific tube line.");
+        server.send(400, "text/plain", "Line filter is required for TFL stations. Please select a specific tube line.");
         return;
       }
 
@@ -1786,11 +1896,20 @@ void setupWebServer() {
     // Handle TFL Platform Filter
     if (server.hasArg("tflPlatformFilter")) {
       String platformFilter = server.arg("tflPlatformFilter");
+      platformFilter.trim();
+
+      // VALIDATE: TFL stations MUST have a platform filter
+      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND && platformFilter.length() == 0) {
+        Serial.println("  ❌ TFL platform filter is required");
+        server.send(400, "text/plain", "Platform filter is required for TFL stations. Please select a specific platform.");
+        return;
+      }
+
       safeStrCopy(config.tflPlatformFilter, platformFilter, sizeof(config.tflPlatformFilter));
       if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
         tflUndergroundProvider.setPlatformFilter(platformFilter);
       }
-      Serial.printf("  🚇 TFL platform filter: %s\n", platformFilter.length() > 0 ? platformFilter.c_str() : "All Platforms");
+      Serial.printf("  🚇 TFL platform filter: %s\n", platformFilter.c_str());
     }
 
     // Validate SSID
@@ -1889,8 +2008,29 @@ void setupWebServer() {
       displayState.currentAlternatingService = 2;  // Standard mode, station shown: start from service[2]
     }
     displayState.callingAtScrollOffset = 0;
-    
+
     config.save();
+
+    // Notify monitoring server of config update
+    if (monitoringState.connected) {
+      String configMsg = "{";
+      configMsg += "\"type\":\"configUpdate\",";
+      configMsg += "\"deviceId\":\"" + config.deviceId + "\",";
+      configMsg += "\"stationCode\":\"" + String(config.stationCode) + "\",";
+      configMsg += "\"stationName\":\"" + String(displayState.stationName) + "\",";
+      configMsg += "\"serviceType\":\"" + String(config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? "TFL" : "National Rail") + "\",";
+      configMsg += "\"useCallingAt\":" + String(config.useCallingAt ? "true" : "false") + ",";
+      configMsg += "\"showStationName\":" + String(config.showStationName ? "true" : "false") + ",";
+      configMsg += "\"extraServices\":" + String(config.extraServices) + ",";
+      configMsg += "\"refreshInterval\":" + String(config.refreshInterval) + ",";
+      configMsg += "\"scrollSpeed\":" + String(config.scrollSpeed) + ",";
+      configMsg += "\"rotationSpeed\":" + String(config.rotationSpeed) + ",";
+      configMsg += "\"tflLineFilter\":\"" + String(config.tflLineFilter) + "\",";
+      configMsg += "\"tflPlatformFilter\":\"" + String(config.tflPlatformFilter) + "\"";
+      configMsg += "}";
+      monitorClient.sendTXT(configMsg);
+      Serial.println("📡 Config update sent to monitoring server");
+    }
 
     bool stationChanged = (oldStation != String(config.stationCode));
     bool lineFilterChanged = (oldLineFilter != String(config.tflLineFilter)) && (config.serviceType == Config::SERVICE_TFL_UNDERGROUND);
@@ -2087,10 +2227,10 @@ void setup() {
   // Initialize WiFi
   displayProgress("Connecting to WiFi...", 3, 5, 40);
   if (!initializeWiFi()) {
-    Serial.println("❌ WiFi connection failed - Starting AP mode");
-    startAccessPoint();
-    displayAPScreen();
-    return;
+    Serial.println("⚠️  WiFi connection failed during setup");
+    Serial.println("⏭️  Continuing anyway - will retry in main loop");
+    // Don't immediately fall back to AP mode - WiFi might be temporarily down
+    // The main loop will retry connection, and user can configure via serial if needed
   }
   
   // Initialize time sync
@@ -2121,7 +2261,7 @@ void setup() {
   Serial.println("🌐 WebSocket ready on port 81");
   Serial.println("📊 Free heap: " + String(ESP.getFreeHeap()) + " bytes");
   
-  // Connect to monitoring server
+  // Connect to monitoring server and start monitoring task
   if (monitoringState.enabled && !systemFlags.apMode) {
     Serial.println("🔌 Connecting to monitoring server...");
     Serial.println("   Host: " + monitoringState.serverHost + ":" + String(monitoringState.serverPort));
@@ -2135,9 +2275,26 @@ void setup() {
 
     monitorClient.onEvent(monitorWebSocketEvent);
     monitorClient.setReconnectInterval(5000);
+
+    // Enable automatic WebSocket ping/pong to keep connection alive
+    // Send pings frequently to prevent server timeout disconnections
+    monitorClient.enableHeartbeat(5000, 3000, 2);  // ping every 5s, timeout 3s, 2 retries
+
+    // Start monitoring task on core 0 (opposite from main loop on core 1)
+    // This ensures monitoring NEVER blocks the display, even if it hangs for seconds
+    Serial.println("🚀 Starting monitoring task on separate core...");
+    xTaskCreatePinnedToCore(
+      monitoringTask,      // Task function
+      "MonitoringTask",    // Task name
+      10240,               // Stack size (bytes) - 10KB for SSL WebSocket operations
+      NULL,                // Parameters
+      1,                   // Priority (1 = low, same as loop)
+      NULL,                // Task handle
+      0                    // Core 0 (main loop runs on core 1)
+    );
     delay(500);
   }
-  
+
   // Initial data fetch will happen automatically in loop
 }
 
@@ -2181,7 +2338,9 @@ void loop() {
         Serial.println("❌ WiFi disconnected");
         // Keep displaying previous data even when WiFi is down - no status changes
         fetchStateData.lastAttempt = currentTime;
-        if (!initializeWiFi()) startAccessPoint();
+        // Try to reconnect to WiFi but don't fall back to AP mode
+        // WiFi service might be temporarily down - keep retrying
+        initializeWiFi();
       }
     }
   }
@@ -2207,29 +2366,11 @@ void loop() {
       lastClockUpdate = currentTime;
     }
   }
-  
-  // Handle monitoring server connection
-  if (monitoringState.enabled) {
-    // Throttle monitoring loop to prevent blocking on reconnection attempts
-    static unsigned long lastMonitorLoop = 0;
-    
-    // Skip monitoring loop for 2 seconds after disconnect to prevent immediate 
-    // reconnection blocking the display
-    bool recentlyDisconnected = (currentTime - monitoringState.lastDisconnect < 2000);
-    
-    // Only call loop() every 500ms to reduce blocking impact, and not right after disconnect
-    if (!recentlyDisconnected && currentTime - lastMonitorLoop > 500) {
-      monitorClient.loop();
-      lastMonitorLoop = currentTime;
-    }
-    
-    // Send heartbeat to monitoring server (only if connected)
-    if (monitoringState.connected && currentTime - monitoringState.lastHeartbeat >= Timing::MONITOR_HEARTBEAT_INTERVAL) {
-      sendMonitorHeartbeat();
-      monitoringState.lastHeartbeat = currentTime;
-    }
-  }
-  
+
+  // NOTE: Monitoring now runs on separate FreeRTOS task (monitoringTask on core 0)
+  // This ensures the display NEVER hangs, even when monitoring blocks for up to 2 seconds
+  // See monitoringTask() function and setup() for task initialization
+
   // Broadcast metrics periodically
   if (currentTime - wsClients.lastMetricsBroadcast >= Timing::METRICS_BROADCAST_INTERVAL) {
     broadcastMetrics();

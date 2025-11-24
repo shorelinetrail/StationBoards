@@ -58,6 +58,8 @@ db.serialize(() => {
   db.run(`ALTER TABLE devices ADD COLUMN scroll_speed INTEGER DEFAULT 50`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN show_station_name INTEGER DEFAULT 1`, () => {});
   db.run(`ALTER TABLE devices ADD COLUMN service_type TEXT DEFAULT 'National Rail'`, () => {});
+  db.run(`ALTER TABLE devices ADD COLUMN tfl_line_filter TEXT DEFAULT ''`, () => {});
+  db.run(`ALTER TABLE devices ADD COLUMN tfl_platform_filter TEXT DEFAULT ''`, () => {});
   
   // Data migration: Fix rotation_speed values
   // 1. Fix values in seconds (< 1000) → convert to milliseconds
@@ -177,30 +179,31 @@ const wsClients = new Map(); // deviceId -> WebSocket
 
 wss.on('connection', (ws, req) => {
   console.log('📱 New WebSocket connection from:', req.socket.remoteAddress);
-  
+
   let deviceId = null;
   let heartbeatInterval = null;
 
   ws.on('message', (data) => {
     try {
       const message = JSON.parse(data.toString());
-      console.log('📨 Received from device:', message.type);
+      console.log('📨 Received from device:', message.type, message.deviceId || '');
 
       switch (message.type) {
         case 'register':
           handleDeviceRegister(ws, message);
           deviceId = message.deviceId;
-          
+
           // Store WebSocket connection
           wsClients.set(deviceId, ws);
-          
+          console.log(`✓ Device registered in wsClients: ${deviceId} (total: ${wsClients.size})`);
+
           // Send acknowledgment
           ws.send(JSON.stringify({
             type: 'registered',
             success: true,
             message: 'Device registered successfully'
           }));
-          
+
           // Notify web dashboard
           io.emit('deviceUpdate', {
             deviceId: deviceId,
@@ -210,7 +213,14 @@ wss.on('connection', (ws, req) => {
 
         case 'heartbeat':
           handleDeviceHeartbeat(message);
-          
+
+          // If deviceId not set yet, set it from heartbeat (handles reconnections)
+          if (!deviceId && message.deviceId) {
+            deviceId = message.deviceId;
+            wsClients.set(deviceId, ws);
+            console.log(`✓ Device tracked via heartbeat: ${deviceId} (total: ${wsClients.size})`);
+          }
+
           // Echo heartbeat acknowledgment
           ws.send(JSON.stringify({
             type: 'heartbeat_ack',
@@ -247,13 +257,33 @@ wss.on('connection', (ws, req) => {
             deviceId: message.deviceId,
             config: {
               station_code: message.stationCode,
+              station_name: message.stationName,
               service_type: message.serviceType,
               use_calling_at: message.useCallingAt,
               show_station_name: message.showStationName,
               extra_services: message.extraServices,
-              refresh_interval: message.refreshInterval,
-              scroll_speed: message.scrollSpeed,
-              rotation_speed: message.rotationSpeed
+              tfl_line_filter: message.tflLineFilter,
+              tfl_platform_filter: message.tflPlatformFilter
+            }
+          });
+          break;
+
+        case 'configUpdate':
+          console.log('🔄 Config update from device:', message.deviceId);
+          handleDeviceConfigUpdate(message);
+
+          // Broadcast config update to dashboard
+          io.emit('configUpdate', {
+            deviceId: message.deviceId,
+            config: {
+              station_code: message.stationCode,
+              station_name: message.stationName,
+              service_type: message.serviceType,
+              use_calling_at: message.useCallingAt,
+              show_station_name: message.showStationName,
+              extra_services: message.extraServices,
+              tfl_line_filter: message.tflLineFilter,
+              tfl_platform_filter: message.tflPlatformFilter
             }
           });
           break;
@@ -303,15 +333,11 @@ function handleDeviceRegister(ws, data) {
     INSERT OR REPLACE INTO devices
     (id, name, ip, firmware_version, station_code, station_name, service_type, rssi, uptime,
      free_heap, services, last_seen, status, first_seen, use_calling_at,
-     extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name)
+     extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name,
+     tfl_line_filter, tfl_platform_filter)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online',
             COALESCE((SELECT first_seen FROM devices WHERE id = ?), ?),
-            COALESCE((SELECT use_calling_at FROM devices WHERE id = ?), 1),
-            COALESCE((SELECT extra_services FROM devices WHERE id = ?), 0),
-            COALESCE((SELECT rotation_speed FROM devices WHERE id = ?), 5000),
-            COALESCE((SELECT refresh_interval FROM devices WHERE id = ?), 60),
-            COALESCE((SELECT scroll_speed FROM devices WHERE id = ?), 50),
-            COALESCE((SELECT show_station_name FROM devices WHERE id = ?), 1))
+            ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const now = Date.now();
@@ -330,12 +356,14 @@ function handleDeviceRegister(ws, data) {
     data.services,
     now,
     data.deviceId, now,
-    data.deviceId,
-    data.deviceId,
-    data.deviceId,
-    data.deviceId,
-    data.deviceId,
-    data.deviceId
+    data.useCallingAt !== undefined ? (data.useCallingAt ? 1 : 0) : 1,
+    data.extraServices || 0,
+    data.rotationSpeed || 5000,
+    data.refreshInterval || 60,
+    data.scrollSpeed || 50,
+    data.showStationName !== undefined ? (data.showStationName ? 1 : 0) : 1,
+    data.tflLineFilter || '',
+    data.tflPlatformFilter || ''
   );
 
   stmt.finalize();
@@ -396,6 +424,39 @@ function handleDeviceStatus(data) {
 
 function handleDeviceLog(data) {
   logEvent(data.deviceId, 'log', data.message);
+}
+
+function handleDeviceConfigUpdate(data) {
+  db.run(
+    `UPDATE devices
+     SET station_code = ?, station_name = ?, service_type = ?,
+         use_calling_at = ?, show_station_name = ?, extra_services = ?,
+         refresh_interval = ?, scroll_speed = ?, rotation_speed = ?,
+         tfl_line_filter = ?, tfl_platform_filter = ?
+     WHERE id = ?`,
+    [
+      data.stationCode,
+      data.stationName,
+      data.serviceType,
+      data.useCallingAt ? 1 : 0,
+      data.showStationName ? 1 : 0,
+      data.extraServices || 0,
+      data.refreshInterval || 60,
+      data.scrollSpeed || 50,
+      data.rotationSpeed || 5000,
+      data.tflLineFilter || '',
+      data.tflPlatformFilter || '',
+      data.deviceId
+    ],
+    (err) => {
+      if (err) {
+        console.error('Error updating device config:', err);
+      } else {
+        console.log('✅ Device config updated in database:', data.deviceId);
+        logEvent(data.deviceId, 'config_change', `Config updated: ${data.stationCode} - ${data.serviceType}`);
+      }
+    }
+  );
 }
 
 function updateDeviceStatus(deviceId, status) {
@@ -596,6 +657,7 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
               firmware_version: device.firmware_version,
               station_code: device.station_code,
               station_name: device.station_name,
+              service_type: device.service_type,
               rssi: device.rssi,
               uptime: device.uptime,
               free_heap: device.free_heap,
@@ -605,24 +667,13 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
             },
             config: {
               station_code: device.station_code,
-              refresh_interval: device.refresh_interval,
+              station_name: device.station_name,
+              service_type: device.service_type,
               use_calling_at: device.use_calling_at === 1,
               show_station_name: device.show_station_name === 1,
               extra_services: device.extra_services,
-              scroll_speed: device.scroll_speed || 50,
-              // Convert rotation_speed from milliseconds to seconds
-              // Handle edge cases: NULL, 0, or values already in seconds
-              rotation_speed: (() => {
-                const rs = device.rotation_speed;
-                // NULL or 0 → use default 5 seconds
-                if (!rs || rs === 0) return 5;
-                // Value already in seconds (< 100) → use as-is
-                if (rs < 100) return rs;
-                // Value in milliseconds (>= 1000) → convert to seconds
-                if (rs >= 1000) return rs / 1000;
-                // Ambiguous range (100-999) → assume seconds, use as-is
-                return rs;
-              })()
+              tfl_line_filter: device.tfl_line_filter || '',
+              tfl_platform_filter: device.tfl_platform_filter || ''
             },
             logs: formattedLogs
           });
@@ -632,37 +683,37 @@ app.get('/api/devices/:id', requireAuth, (req, res) => {
   });
 });
 
-// Update device configuration
+// Update device configuration (full config)
 app.post('/api/devices/:id/config', requireAuth, (req, res) => {
-  const { stationCode, useCallingAt, extraServices, rotationSpeed, refreshInterval, scrollSpeed, showStationName } = req.body;
-  
-  // Validate rotation speed is in expected range (5-60 seconds)
-  const rotationSpeedSeconds = parseInt(rotationSpeed);
-  if (isNaN(rotationSpeedSeconds) || rotationSpeedSeconds < 5 || rotationSpeedSeconds > 60) {
-    return res.status(400).json({ error: 'Rotation speed must be between 5 and 60 seconds' });
-  }
-  
-  // Convert to milliseconds for storage and device
-  const rotationSpeedMs = rotationSpeedSeconds * 1000;
-  
-  console.log(`💾 Config update for ${req.params.id}: rotation_speed ${rotationSpeedSeconds}s (${rotationSpeedMs}ms)`);
-  
+  const { serviceType, stationCode, useCallingAt, extraServices, showStationName, tflLineFilter, tflPlatformFilter } = req.body;
+
+  console.log(`💾 Config update for ${req.params.id}`);
+
   // First, get the current values to see what actually changed
-  db.get('SELECT station_code, use_calling_at, extra_services, rotation_speed, refresh_interval, scroll_speed, show_station_name FROM devices WHERE id = ?', 
-    [req.params.id], 
+  db.get('SELECT station_code, service_type, use_calling_at, extra_services, show_station_name, tfl_line_filter, tfl_platform_filter FROM devices WHERE id = ?',
+    [req.params.id],
     (err, oldConfig) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
-      
-      // Now update the database
+
+      // Update all configuration settings
       db.run(
-        `UPDATE devices 
-         SET station_code = ?, use_calling_at = ?, extra_services = ?, 
-             rotation_speed = ?, refresh_interval = ?, scroll_speed = ?, show_station_name = ?
+        `UPDATE devices
+         SET station_code = ?, service_type = ?, use_calling_at = ?, extra_services = ?, show_station_name = ?,
+             tfl_line_filter = ?, tfl_platform_filter = ?
          WHERE id = ?`,
-        [stationCode, useCallingAt ? 1 : 0, extraServices, rotationSpeedMs, refreshInterval, scrollSpeed, showStationName ? 1 : 0, req.params.id],
+        [
+          stationCode || '',
+          serviceType || 'National Rail',
+          useCallingAt ? 1 : 0,
+          extraServices || 0,
+          showStationName ? 1 : 0,
+          tflLineFilter || '',
+          tflPlatformFilter || '',
+          req.params.id
+        ],
         (err) => {
           if (err) {
             res.status(500).json({ error: err.message });
@@ -673,21 +724,24 @@ app.post('/api/devices/:id/config', requireAuth, (req, res) => {
               ws.send(JSON.stringify({
                 type: 'command',
                 command: 'updateConfig',
+                serviceType,
                 stationCode,
                 useCallingAt,
                 extraServices,
-                rotationSpeed: rotationSpeedMs, // Send in milliseconds
-                refreshInterval,
-                scrollSpeed,
-                showStationName
+                showStationName,
+                tflLineFilter,
+                tflPlatformFilter
               }));
             }
-            
+
             // Compare old vs new and log only what changed
             const changes = [];
             if (oldConfig) {
               if (oldConfig.station_code !== stationCode) {
                 changes.push(`station: ${oldConfig.station_code || 'none'} → ${stationCode}`);
+              }
+              if (oldConfig.service_type !== serviceType) {
+                changes.push(`service: ${oldConfig.service_type || 'National Rail'} → ${serviceType}`);
               }
               if ((oldConfig.use_calling_at === 1) !== useCallingAt) {
                 changes.push(`calling_at: ${oldConfig.use_calling_at ? 'on' : 'off'} → ${useCallingAt ? 'on' : 'off'}`);
@@ -695,40 +749,36 @@ app.post('/api/devices/:id/config', requireAuth, (req, res) => {
               if (oldConfig.extra_services !== extraServices) {
                 changes.push(`extra_services: ${oldConfig.extra_services} → ${extraServices}`);
               }
-              if (oldConfig.rotation_speed !== rotationSpeedMs) {
-                const oldSec = oldConfig.rotation_speed ? oldConfig.rotation_speed / 1000 : 0;
-                changes.push(`rotation: ${oldSec}s → ${rotationSpeedSeconds}s`);
-              }
-              if (oldConfig.refresh_interval !== refreshInterval) {
-                changes.push(`refresh: ${oldConfig.refresh_interval}s → ${refreshInterval}s`);
-              }
-              if (oldConfig.scroll_speed !== scrollSpeed) {
-                changes.push(`scroll_speed: ${oldConfig.scroll_speed}ms → ${scrollSpeed}ms`);
-              }
               if ((oldConfig.show_station_name === 1) !== showStationName) {
                 changes.push(`show_name: ${oldConfig.show_station_name ? 'on' : 'off'} → ${showStationName ? 'on' : 'off'}`);
               }
+              if (oldConfig.tfl_line_filter !== tflLineFilter) {
+                changes.push(`tfl_line: ${oldConfig.tfl_line_filter || 'none'} → ${tflLineFilter || 'none'}`);
+              }
+              if (oldConfig.tfl_platform_filter !== tflPlatformFilter) {
+                changes.push(`tfl_platform: ${oldConfig.tfl_platform_filter || 'none'} → ${tflPlatformFilter || 'none'}`);
+              }
             }
-            
-            const logMessage = changes.length > 0 
+
+            const logMessage = changes.length > 0
               ? `Configuration changed: ${changes.join(', ')}`
               : 'Configuration saved (no changes)';
-            
+
             logEvent(req.params.id, 'config_change', logMessage);
             console.log(`✓ ${logMessage} for ${req.params.id}`);
-            
-            // Broadcast update to all web clients (keeping milliseconds for consistency with DB)
+
+            // Broadcast update to all web clients
             io.emit('deviceUpdate', {
               deviceId: req.params.id,
               station_code: stationCode,
+              service_type: serviceType,
               use_calling_at: useCallingAt ? 1 : 0,
               extra_services: extraServices,
-              rotation_speed: rotationSpeedMs, // Store in milliseconds
-              refresh_interval: refreshInterval,
-              scroll_speed: scrollSpeed,
-              show_station_name: showStationName ? 1 : 0
+              show_station_name: showStationName ? 1 : 0,
+              tfl_line_filter: tflLineFilter || '',
+              tfl_platform_filter: tflPlatformFilter || ''
             });
-            
+
             res.json({ success: true });
           }
         }
@@ -775,7 +825,13 @@ app.post('/api/devices/:id/restart', requireAuth, (req, res) => {
 
 // Request config from device
 app.post('/api/devices/:id/getConfig', requireAuth, (req, res) => {
-  const ws = wsClients.get(req.params.id);
+  const deviceId = req.params.id;
+  const ws = wsClients.get(deviceId);
+
+  console.log(`📖 Config request for device: ${deviceId}`);
+  console.log(`   Tracked devices: [${Array.from(wsClients.keys()).join(', ')}]`);
+  console.log(`   WebSocket exists: ${!!ws}`);
+  console.log(`   WebSocket state: ${ws ? ws.readyState : 'N/A'} (1 = OPEN)`);
 
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
@@ -783,9 +839,10 @@ app.post('/api/devices/:id/getConfig', requireAuth, (req, res) => {
       command: 'getConfig'
     }));
 
-    console.log(`📖 Config request sent to device: ${req.params.id}`);
+    console.log(`   ✓ Config request sent to device`);
     res.json({ success: true, message: 'Config request sent' });
   } else {
+    console.log(`   ❌ Device not connected or WebSocket not OPEN`);
     res.status(503).json({ success: false, message: 'Device not connected' });
   }
 });

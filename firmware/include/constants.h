@@ -13,7 +13,7 @@ namespace Display {
   const int CLIP_WINDOW_END = 255;
 
   // Default Y positions (configurable via web interface)
-  const int DEFAULT_Y_TOP = 12;    // When station name hidden
+  const int DEFAULT_Y_TOP = 14;    // When station name hidden
   const int DEFAULT_Y_1ST = 26;    // First service line
   const int DEFAULT_Y_2ND = 38;    // Second service line
   const int DEFAULT_Y_ALT = 50;    // Alternating services line
@@ -94,10 +94,10 @@ namespace Timing {
   // Display refresh rates
   const unsigned long DISPLAY_UPDATE_INTERVAL = 200;      // milliseconds
   const unsigned long METRICS_BROADCAST_INTERVAL = 10000; // 10 seconds
-  const unsigned long SNAPSHOT_BROADCAST_INTERVAL = 2000; // 2 seconds
+  const unsigned long SNAPSHOT_BROADCAST_INTERVAL = 1000; // 1 second - web live display refresh
   const unsigned long AP_DISPLAY_UPDATE = 30000;          // 30 seconds
   const unsigned long MONITOR_HEARTBEAT_INTERVAL = 30000; // 30 seconds
-  const unsigned long MONITOR_LOOP_THROTTLE = 500;        // milliseconds
+  // MONITOR_LOOP_THROTTLE removed - monitoring now runs on separate FreeRTOS task
   const unsigned long MONITOR_DISCONNECT_DELAY = 2000;    // milliseconds
 
   // Animation timing

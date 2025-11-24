@@ -33,10 +33,10 @@ public:
   int extraServices = 0;  // Number of extra services on bottom line (0-4)
   int refreshInterval = 60;  // Seconds between API calls
   int scrollSpeed = 50;  // Milliseconds for scrolling text
-  int rotationSpeed = 15;  // Seconds between service rotations
+  int rotationSpeed = 10;  // Seconds between service rotations
   
   // Display Positions
-  int yPosTop = 12;  // Y position for top service when station name is hidden
+  int yPosTop = 14;  // Y position for top service when station name is hidden
   int yPos1st = 26;
   int yPos2nd = 38;
   int yPosAlt = 50;
@@ -142,17 +142,23 @@ public:
     if (extraServices > 4) extraServices = 4;
     refreshInterval = doc["refreshInterval"] | 60;
     scrollSpeed = doc["scrollSpeed"] | 50;
-    rotationSpeed = doc["rotationSpeed"] | 15;
-    
+    rotationSpeed = doc["rotationSpeed"] | 10;
+
     // Load Positions
-    yPosTop = doc["yPosTop"] | 12;
+    yPosTop = doc["yPosTop"] | 14;
     yPos1st = doc["yPos1st"] | 26;
     yPos2nd = doc["yPos2nd"] | 38;
     yPosAlt = doc["yPosAlt"] | 50;
     
     // Load Vertical Spacing
     lineSpacing = doc["lineSpacing"] | 14;
-    
+
+    // Migrate old config values to new defaults (one-time migration)
+    if (yPosTop == 12) {
+      yPosTop = 14;  // Update from old default to new default
+      Serial.println("  ⬆️  Migrated yPosTop: 12 → 14");
+    }
+
     // Load Device Info
     if (doc.containsKey("deviceId")) {
       deviceId = doc["deviceId"].as<String>();

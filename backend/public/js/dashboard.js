@@ -547,23 +547,36 @@ function populateDeviceModal(data) {
   // Config tab
   if (config) {
     document.getElementById('configDeviceId').value = device.id;
+    document.getElementById('configServiceType').value = config.service_type || 'National Rail';
     document.getElementById('configStationCode').value = config.station_code || '';
-    document.getElementById('configRefreshInterval').value = config.refresh_interval || 60;
     document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
     document.getElementById('configShowStationName').value = config.show_station_name ? '1' : '0';
-    document.getElementById('configExtraServices').value = config.extra_services || 1;
-    document.getElementById('configScrollSpeed').value = config.scroll_speed || 50;
-    document.getElementById('configRotationSpeed').value = config.rotation_speed || 15;
+    document.getElementById('configExtraServices').value = config.extra_services || 0;
 
     // Apply service-type specific UI adjustments
-    const isTFL = device.service_type === 'TFL';
+    const isTFL = config.service_type === 'TFL';
 
-    // Station Code help text
-    const stationCodeHelp = document.getElementById('stationCodeHelp');
+    console.log('Populating config - Service type:', config.service_type, 'isTFL:', isTFL);
+
+    // Update station label based on service type
+    document.getElementById('configStationLabel').textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+
+    // Show/hide TFL filter fields
+    const lineFilterGroup = document.getElementById('configTflLineFilterGroup');
+    const platformFilterGroup = document.getElementById('configTflPlatformFilterGroup');
+
+    if (lineFilterGroup) lineFilterGroup.style.display = isTFL ? 'block' : 'none';
+    if (platformFilterGroup) platformFilterGroup.style.display = isTFL ? 'block' : 'none';
+
     if (isTFL) {
-      stationCodeHelp.textContent = 'TFL NaPTAN ID (e.g., 940GZZLUKSX for King\'s Cross)';
-    } else {
-      stationCodeHelp.textContent = 'National Rail CRS code (e.g., PAD for Paddington)';
+      // Fetch TFL lines and platforms from API if we have a station code
+      if (config.station_code) {
+        populateTflLines(config.station_code, config.tfl_line_filter || '', config.tfl_platform_filter || '');
+      } else {
+        // No station code, just set the values if they exist
+        document.getElementById('configTflLineFilter').value = config.tfl_line_filter || '';
+        document.getElementById('configTflPlatformFilter').value = config.tfl_platform_filter || '';
+      }
     }
 
     // Disable "Calling At" mode for TFL services (not supported)
@@ -619,67 +632,34 @@ async function saveDeviceConfig(event) {
     return;
   }
 
-  // Clear previous validation errors
-  ['configStationCode', 'configRefreshInterval', 'configScrollSpeed', 'configRotationSpeed'].forEach(clearValidationError);
-
-  // Get values
+  // Get all configuration values
+  const serviceType = document.getElementById('configServiceType').value;
   const stationCode = document.getElementById('configStationCode').value.trim().toUpperCase();
-  const refreshInterval = document.getElementById('configRefreshInterval').value;
-  const scrollSpeed = document.getElementById('configScrollSpeed').value;
-  const rotationSpeed = document.getElementById('configRotationSpeed').value;
+  const isTFL = serviceType === 'TFL';
 
-  // Validate station code
-  const stationCodeValidation = validateStationCode(stationCode);
-  if (!stationCodeValidation.valid) {
-    showValidationError('configStationCode', stationCodeValidation.error);
-    return;
-  }
-
-  // Validate refresh interval
-  const refreshValidation = validateRange(
-    refreshInterval,
-    CONFIG.VALIDATION.REFRESH_INTERVAL_MIN,
-    CONFIG.VALIDATION.REFRESH_INTERVAL_MAX,
-    'Refresh interval'
-  );
-  if (!refreshValidation.valid) {
-    showValidationError('configRefreshInterval', refreshValidation.error);
-    return;
-  }
-
-  // Validate scroll speed
-  const scrollValidation = validateRange(
-    scrollSpeed,
-    CONFIG.VALIDATION.SCROLL_SPEED_MIN,
-    CONFIG.VALIDATION.SCROLL_SPEED_MAX,
-    'Scroll speed'
-  );
-  if (!scrollValidation.valid) {
-    showValidationError('configScrollSpeed', scrollValidation.error);
-    return;
-  }
-
-  // Validate rotation speed
-  const rotationValidation = validateRange(
-    rotationSpeed,
-    CONFIG.VALIDATION.ROTATION_SPEED_MIN,
-    CONFIG.VALIDATION.ROTATION_SPEED_MAX,
-    'Rotation speed'
-  );
-  if (!rotationValidation.valid) {
-    showValidationError('configRotationSpeed', rotationValidation.error);
-    return;
-  }
-
+  // Build config object
   const config = {
+    serviceType: serviceType,
     stationCode: stationCode,
-    refreshInterval: refreshValidation.value,
     useCallingAt: document.getElementById('configUseCallingAt').value === '1',
     showStationName: document.getElementById('configShowStationName').value === '1',
-    extraServices: parseInt(document.getElementById('configExtraServices').value),
-    scrollSpeed: scrollValidation.value,
-    rotationSpeed: rotationValidation.value
+    extraServices: parseInt(document.getElementById('configExtraServices').value)
   };
+
+  // Add TFL filters if applicable
+  if (isTFL) {
+    config.tflLineFilter = document.getElementById('configTflLineFilter').value;
+    config.tflPlatformFilter = document.getElementById('configTflPlatformFilter').value;
+  } else {
+    config.tflLineFilter = '';
+    config.tflPlatformFilter = '';
+  }
+
+  // Validate station code
+  if (!stationCode) {
+    showToast('Station code is required', 'warning');
+    return;
+  }
 
   try {
     AppState.activeRequests.add('saveConfig');
@@ -740,14 +720,186 @@ async function syncConfigFromDevice() {
 }
 
 /**
+ * Common TFL station codes for reference
+ */
+const TFL_EXAMPLES = {
+  '940GZZLUPAC': 'Piccadilly Circus',
+  '940GZZLULVT': 'Liverpool Street',
+  '940GZZLUKSX': 'Kings Cross St Pancras',
+  '940GZZLUWSM': 'Westminster',
+  '940GZZLUBND': 'Bond Street',
+  '940GZZLUOXC': 'Oxford Circus'
+};
+
+/**
+ * Fetch available tube lines and platforms from TFL API for a station
+ */
+async function fetchTflStationLines(stationId) {
+  console.log('fetchTflStationLines called with:', stationId);
+
+  // Use Arrivals endpoint to get lines that actually have services at this station
+  const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}/Arrivals`;
+
+  console.log('Fetching arrivals from TFL API:', apiUrl);
+
+  try {
+    const response = await fetch(apiUrl);
+    console.log('Response status:', response.status);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        const examples = Object.entries(TFL_EXAMPLES).slice(0, 3).map(([code, name]) => `${code} (${name})`).join(', ');
+        throw new Error(`Station '${stationId}' not found. Use a TFL NaPTAN code like: ${examples}`);
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const arrivals = await response.json();
+    console.log(`Received ${arrivals.length} arrivals`);
+
+    if (arrivals.length === 0) {
+      console.warn('No arrivals found for station:', stationId);
+      throw new Error(`No tube services found for '${stationId}'. The station may not be served by Underground lines.`);
+    }
+
+    // Extract unique lines and platforms from arrivals
+    const linesByIdMap = new Map();
+    const platformsByLine = new Map();
+
+    arrivals.forEach(arrival => {
+      const lineId = arrival.lineId;
+      const lineName = arrival.lineName;
+      const platform = arrival.platformName;
+
+      if (lineId && lineName) {
+        linesByIdMap.set(lineId, lineName);
+
+        if (platform) {
+          if (!platformsByLine.has(lineId)) {
+            platformsByLine.set(lineId, new Set());
+          }
+          platformsByLine.get(lineId).add(platform);
+        }
+      }
+    });
+
+    // Convert to array format
+    const tubeLines = Array.from(linesByIdMap.entries()).map(([id, name]) => ({
+      id: id,
+      name: name,
+      platforms: Array.from(platformsByLine.get(id) || []).sort()
+    }));
+
+    // Sort alphabetically by name
+    tubeLines.sort((a, b) => a.name.localeCompare(b.name));
+
+    console.log('Station has', tubeLines.length, 'tube lines with active services:', tubeLines.map(l => `${l.name} (${l.platforms.length} platforms)`));
+    return tubeLines;
+
+  } catch (error) {
+    console.error('Error fetching TFL station lines:', error);
+    showToast('Failed to fetch tube lines: ' + error.message, 'danger');
+    return [];
+  }
+}
+
+/**
+ * Populate line dropdown with lines from TFL API
+ */
+async function populateTflLines(stationId, currentLine = '', currentPlatform = '') {
+  const lineSelect = document.getElementById('configTflLineFilter');
+  const platformSelect = document.getElementById('configTflPlatformFilter');
+
+  if (!lineSelect || !platformSelect) return;
+
+  // Show loading state
+  lineSelect.innerHTML = '<option value="">Loading lines...</option>';
+  lineSelect.disabled = true;
+  platformSelect.innerHTML = '<option value="">Loading platforms...</option>';
+  platformSelect.disabled = true;
+
+  try {
+    const lines = await fetchTflStationLines(stationId);
+
+    if (lines.length === 0) {
+      // No lines found - reset to default state
+      lineSelect.innerHTML = '<option value="">-- No lines found --</option>';
+      lineSelect.disabled = false;
+      platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
+      platformSelect.disabled = false;
+      showToast('No tube lines found for this station', 'warning');
+      return;
+    }
+
+    // Populate line dropdown
+    lineSelect.innerHTML = '<option value="">-- Select Line --</option>';
+    lines.forEach(line => {
+      const option = document.createElement('option');
+      option.value = line.id;
+      option.textContent = line.name;
+      option.dataset.platforms = JSON.stringify(line.platforms);
+      if (currentLine === line.id) {
+        option.selected = true;
+      }
+      lineSelect.appendChild(option);
+    });
+    lineSelect.disabled = false;
+
+    // If a line was selected, populate its platforms
+    if (currentLine) {
+      const selectedLine = lines.find(l => l.id === currentLine);
+      if (selectedLine) {
+        populatePlatformOptionsFromData(selectedLine.platforms, currentPlatform);
+      }
+    } else {
+      platformSelect.innerHTML = '<option value="">-- Select Line First --</option>';
+      platformSelect.disabled = false;
+    }
+
+    console.log('Populated', lines.length, 'lines for station', stationId);
+
+  } catch (error) {
+    console.error('Error populating TFL lines:', error);
+    lineSelect.innerHTML = '<option value="">-- Error loading lines --</option>';
+    lineSelect.disabled = false;
+    platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
+    platformSelect.disabled = false;
+  }
+}
+
+/**
+ * Populate platform options from API data
+ */
+function populatePlatformOptionsFromData(platforms, currentPlatform = '') {
+  const platformSelect = document.getElementById('configTflPlatformFilter');
+  if (!platformSelect) return;
+
+  platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
+
+  platforms.forEach(platform => {
+    const option = document.createElement('option');
+    option.value = platform;
+    option.textContent = platform;
+    if (currentPlatform === platform) {
+      option.selected = true;
+    }
+    platformSelect.appendChild(option);
+  });
+
+  platformSelect.disabled = false;
+
+  console.log('Populated', platforms.length, 'platforms');
+}
+
+/**
  * Update config form with values from device
  */
 function updateConfigForm(config) {
+  if (config.service_type) {
+    document.getElementById('configServiceType').value = config.service_type;
+  }
   if (config.station_code) {
     document.getElementById('configStationCode').value = config.station_code;
-  }
-  if (config.refresh_interval !== undefined) {
-    document.getElementById('configRefreshInterval').value = config.refresh_interval;
   }
   if (config.use_calling_at !== undefined) {
     document.getElementById('configUseCallingAt').value = config.use_calling_at ? '1' : '0';
@@ -758,11 +910,26 @@ function updateConfigForm(config) {
   if (config.extra_services !== undefined) {
     document.getElementById('configExtraServices').value = config.extra_services;
   }
-  if (config.scroll_speed !== undefined) {
-    document.getElementById('configScrollSpeed').value = config.scroll_speed;
+
+  // Handle TFL filters
+  const isTFL = config.service_type === 'TFL';
+
+  // Update station label
+  const stationLabel = document.getElementById('configStationLabel');
+  if (stationLabel) {
+    stationLabel.textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
   }
-  if (config.rotation_speed !== undefined) {
-    document.getElementById('configRotationSpeed').value = config.rotation_speed;
+
+  // Show/hide TFL filter groups
+  const lineFilterGroup = document.getElementById('configTflLineFilterGroup');
+  const platformFilterGroup = document.getElementById('configTflPlatformFilterGroup');
+
+  if (lineFilterGroup) lineFilterGroup.style.display = isTFL ? 'block' : 'none';
+  if (platformFilterGroup) platformFilterGroup.style.display = isTFL ? 'block' : 'none';
+
+  if (isTFL && config.station_code) {
+    // Fetch TFL lines and platforms from API
+    populateTflLines(config.station_code, config.tfl_line_filter || '', config.tfl_platform_filter || '');
   }
 }
 
@@ -1036,6 +1203,102 @@ function setupEventListeners() {
   const startOtaButton = document.querySelector('[data-action="start-ota"]');
   if (startOtaButton) {
     startOtaButton.addEventListener('click', startOTA);
+  }
+
+  // Service type change handler
+  const serviceTypeSelect = document.getElementById('configServiceType');
+  if (serviceTypeSelect) {
+    serviceTypeSelect.addEventListener('change', (e) => {
+      const isTFL = e.target.value === 'TFL';
+
+      console.log('Service type changed to:', e.target.value, 'isTFL:', isTFL);
+
+      // Update station label
+      const stationLabel = document.getElementById('configStationLabel');
+      if (stationLabel) {
+        stationLabel.textContent = isTFL ? 'Station NaPTAN Code' : 'Station Code (CRS)';
+      }
+
+      // Show/hide TFL filter groups
+      const lineFilterGroup = document.getElementById('configTflLineFilterGroup');
+      const platformFilterGroup = document.getElementById('configTflPlatformFilterGroup');
+
+      if (lineFilterGroup) {
+        lineFilterGroup.style.display = isTFL ? 'block' : 'none';
+        console.log('Line filter group display:', lineFilterGroup.style.display);
+      }
+      if (platformFilterGroup) {
+        platformFilterGroup.style.display = isTFL ? 'block' : 'none';
+        console.log('Platform filter group display:', platformFilterGroup.style.display);
+      }
+
+      // Disable calling at mode for TFL
+      const callingAtSelect = document.getElementById('configUseCallingAt');
+      if (callingAtSelect) {
+        if (isTFL) {
+          callingAtSelect.disabled = true;
+          callingAtSelect.value = '0';
+        } else {
+          callingAtSelect.disabled = false;
+        }
+      }
+
+      // Fetch TFL lines when switching to TFL (if we have a station code)
+      if (isTFL) {
+        const stationCode = document.getElementById('configStationCode').value.trim();
+        if (stationCode.length >= 3) {
+          console.log('Fetching TFL lines for station:', stationCode);
+          populateTflLines(stationCode);
+        }
+      } else {
+        // Clear TFL filters when switching to National Rail
+        const lineFilter = document.getElementById('configTflLineFilter');
+        const platformFilter = document.getElementById('configTflPlatformFilter');
+        if (lineFilter) lineFilter.value = '';
+        if (platformFilter) platformFilter.value = '';
+      }
+    });
+  }
+
+  // Station code change handler - fetch TFL lines when station changes
+  const stationCodeInput = document.getElementById('configStationCode');
+  if (stationCodeInput) {
+    let stationCodeTimeout = null;
+    stationCodeInput.addEventListener('input', (e) => {
+      const serviceType = document.getElementById('configServiceType').value;
+      const stationCode = e.target.value.trim();
+
+      // Only fetch TFL lines if service type is TFL and we have a station code
+      if (serviceType === 'TFL' && stationCode.length >= 3) {
+        // Debounce the API call
+        clearTimeout(stationCodeTimeout);
+        stationCodeTimeout = setTimeout(() => {
+          console.log('Station code changed, fetching TFL lines for:', stationCode);
+          populateTflLines(stationCode);
+        }, 500); // Wait 500ms after user stops typing
+      }
+    });
+  }
+
+  // TFL Line filter change handler - populate platforms from dataset
+  const tflLineFilter = document.getElementById('configTflLineFilter');
+  if (tflLineFilter) {
+    tflLineFilter.addEventListener('change', (e) => {
+      const selectedOption = e.target.selectedOptions[0];
+      console.log('TFL line changed to:', e.target.value);
+
+      if (selectedOption && selectedOption.dataset.platforms) {
+        // Parse platforms from the data attribute
+        const platforms = JSON.parse(selectedOption.dataset.platforms);
+        populatePlatformOptionsFromData(platforms);
+      } else {
+        // Clear platforms if no line selected
+        const platformSelect = document.getElementById('configTflPlatformFilter');
+        if (platformSelect) {
+          platformSelect.innerHTML = '<option value="">-- Select Platform --</option>';
+        }
+      }
+    });
   }
 }
 

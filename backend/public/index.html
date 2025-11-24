@@ -145,59 +145,87 @@
             <div class="tab-pane fade" id="configTab">
               <form id="configForm">
                 <input type="hidden" id="configDeviceId">
-                
-                <div class="row">
-                  <div class="col-md-6">
-                    <h6>Station Settings</h6>
-                    <div class="mb-3" id="stationCodeWrapper">
-                      <label class="form-label">Station Code</label>
-                      <input type="text" class="form-control" id="configStationCode" maxlength="15">
-                      <small class="text-muted" id="stationCodeHelp"></small>
-                    </div>
-                    <div class="mb-3">
-                      <label class="form-label">Refresh Interval (seconds)</label>
-                      <input type="number" class="form-control" id="configRefreshInterval" min="30" max="300">
-                    </div>
-                  </div>
-                  
-                  <div class="col-md-6">
-                    <h6>Display Settings</h6>
-                    <div class="mb-3">
-                      <label class="form-label">Display Mode</label>
-                      <select class="form-select" id="configUseCallingAt">
-                        <option value="0">Standard</option>
-                        <option value="1">Calling At</option>
-                      </select>
-                    </div>
-                    <div class="mb-3">
-                      <label class="form-label">Show Station Name</label>
-                      <select class="form-select" id="configShowStationName">
-                        <option value="1">Yes</option>
-                        <option value="0">No</option>
-                      </select>
-                    </div>
-                    <div class="mb-3">
-                      <label class="form-label">Extra Services</label>
-                      <select class="form-select" id="configExtraServices">
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
 
                 <div class="row">
                   <div class="col-md-6">
+                    <h6>🚉 Station Configuration</h6>
+
                     <div class="mb-3">
-                      <label class="form-label">Scroll Speed (ms)</label>
-                      <input type="number" class="form-control" id="configScrollSpeed" min="10" max="200">
+                      <label class="form-label">Transport Service</label>
+                      <select class="form-select" id="configServiceType">
+                        <option value="National Rail">National Rail</option>
+                        <option value="TFL">TFL Underground</option>
+                      </select>
+                      <small class="text-muted">Select which transport service to display</small>
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label">
+                        <span id="configStationLabel">Station Code (CRS)</span>
+                      </label>
+                      <input type="text" class="form-control" id="configStationCode" placeholder="e.g. PAD, VIC, WAT" maxlength="10">
+                      <small class="text-muted">Enter station code or NaPTAN for TFL</small>
+                    </div>
+
+                    <div class="mb-3" id="configTflLineFilterGroup" style="display: none;">
+                      <label class="form-label">TFL Line</label>
+                      <select class="form-select" id="configTflLineFilter">
+                        <option value="">-- Select Line --</option>
+                        <option value="bakerloo">Bakerloo</option>
+                        <option value="central">Central</option>
+                        <option value="circle">Circle</option>
+                        <option value="district">District</option>
+                        <option value="hammersmith-city">Hammersmith & City</option>
+                        <option value="jubilee">Jubilee</option>
+                        <option value="metropolitan">Metropolitan</option>
+                        <option value="northern">Northern</option>
+                        <option value="piccadilly">Piccadilly</option>
+                        <option value="victoria">Victoria</option>
+                        <option value="waterloo-city">Waterloo & City</option>
+                      </select>
+                      <small class="text-muted">Filter by specific line</small>
+                    </div>
+
+                    <div class="mb-3" id="configTflPlatformFilterGroup" style="display: none;">
+                      <label class="form-label">TFL Platform</label>
+                      <select class="form-select" id="configTflPlatformFilter">
+                        <option value="">-- Select Platform --</option>
+                      </select>
+                      <small class="text-muted">Filter by platform/direction</small>
                     </div>
                   </div>
+
                   <div class="col-md-6">
+                    <h6>Display Options</h6>
+
                     <div class="mb-3">
-                      <label class="form-label">Rotation Speed (seconds)</label>
-                      <input type="number" class="form-control" id="configRotationSpeed" min="5" max="60">
+                      <label class="form-label">Display Mode</label>
+                      <select class="form-select" id="configUseCallingAt">
+                        <option value="0">Standard View</option>
+                        <option value="1">Calling At Mode (show all intermediate stops)</option>
+                      </select>
+                      <small class="text-muted">Calling At mode displays all intermediate station stops</small>
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label">Show Station Name at Top</label>
+                      <select class="form-select" id="configShowStationName">
+                        <option value="1">Show Station Name</option>
+                        <option value="0">Hide Station Name (frees space for one more departure)</option>
+                      </select>
+                      <small class="text-muted">Hiding frees up the top line for an additional departure</small>
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label">Rotating Bottom Line Services</label>
+                      <select class="form-select" id="configExtraServices">
+                        <option value="0">No rotation (fixed last service)</option>
+                        <option value="1">Rotate 1 extra service</option>
+                        <option value="2">Rotate 2 extra services</option>
+                        <option value="3">Rotate 3 extra services</option>
+                        <option value="4">Rotate 4 extra services</option>
+                      </select>
+                      <small class="text-muted">Bottom line cycles through additional departures</small>
                     </div>
                   </div>
                 </div>
@@ -209,6 +237,10 @@
                   <button type="button" class="btn btn-outline-secondary" onclick="syncConfigFromDevice()">
                     <i class="bi bi-arrow-clockwise"></i> Sync from Device
                   </button>
+                </div>
+                <div class="alert alert-info mt-3">
+                  <i class="bi bi-info-circle"></i>
+                  <strong>Note:</strong> Changes will be sent to the device and applied automatically.
                 </div>
               </form>
             </div>

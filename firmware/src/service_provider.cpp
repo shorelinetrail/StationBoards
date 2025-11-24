@@ -80,10 +80,41 @@ bool NationalRailProvider::parseResponse(const String& response,
   // Check for SOAP fault
   if (response.indexOf("soap:Fault") != -1) {
     Serial.println("❌ SOAP Fault detected");
-    String faultMsg = extractTagValue(response, "faultstring", "");
-    if (faultMsg.length() > 0) {
-      Serial.println("   Message: " + faultMsg);
+
+    // Extract fault details - support both SOAP 1.1 and SOAP 1.2 formats
+    // SOAP 1.1: <faultcode> and <faultstring>
+    // SOAP 1.2: <soap:Code><soap:Value> and <soap:Reason><soap:Text>
+    String faultCode = extractTagValue(response, "faultcode", "");
+    String faultString = extractTagValue(response, "faultstring", "");
+
+    // Try with soap prefix if no namespace version failed
+    if (faultCode.length() == 0) faultCode = extractTagValue(response, "faultcode", "soap");
+    if (faultString.length() == 0) faultString = extractTagValue(response, "faultstring", "soap");
+
+    // SOAP 1.2 format
+    if (faultCode.length() == 0) faultCode = extractTagValue(response, "Value", "soap");
+    if (faultString.length() == 0) faultString = extractTagValue(response, "Text", "soap");
+
+    if (faultCode.length() > 0) {
+      Serial.println("   Code: " + faultCode);
     }
+    if (faultString.length() > 0) {
+      Serial.println("   Message: " + faultString);
+    }
+
+    // If we couldn't extract structured fault info, show raw fault section
+    if (faultCode.length() == 0 && faultString.length() == 0) {
+      int faultStart = response.indexOf("soap:Fault");
+      if (faultStart != -1) {
+        int faultEnd = response.indexOf("</soap:Fault>", faultStart);
+        if (faultEnd != -1) {
+          faultEnd += 13; // Include closing tag
+          String faultSection = response.substring(faultStart, faultEnd);
+          Serial.println("   Raw fault (first 500 chars): " + faultSection.substring(0, min(500, (int)faultSection.length())));
+        }
+      }
+    }
+
     return false;
   }
 

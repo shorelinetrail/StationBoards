@@ -240,13 +240,11 @@ inline void displayClock() {
 }
 
 /**
- * Gets the service label based on index and offset
- * e.g., getServiceLabel(2, 0) = "3rd ", getServiceLabel(2, 1) = "4th "
+ * Gets the service label based on the service index in the array
+ * e.g., getServiceLabel(0) = "1st ", getServiceLabel(2) = "3rd "
  */
-inline String getServiceLabel(int index, int offset) {
-  int displayNum = index + 1;
-
-  if (offset == 1) displayNum++;  // Adjust for hidden station name
+inline String getServiceLabel(int serviceIndex) {
+  int displayNum = serviceIndex + 1;
 
   switch (displayNum) {
     case 1: return "1st ";

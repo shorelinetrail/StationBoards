@@ -1056,7 +1056,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
                 <button type="button" class="preset-btn" data-station="SRA" data-name="Stansted Airport" aria-label="Select Stansted Airport station">Stansted</button>
                 <button type="button" class="preset-btn" data-station="LTN" data-name="Luton Airport Parkway" aria-label="Select Luton Airport station">Luton</button>
                 <button type="button" class="preset-btn" data-station="HWV" data-name="Heathrow Terminals 2 & 3" aria-label="Select Heathrow terminals station">Heathrow</button>
-                <button type="button" class="preset-btn" data-station="BHX" data-name="Birmingham International" aria-label="Select Birmingham Airport station">Birmingham Arpt</button>
+                <button type="button" class="preset-btn" data-station="BHI" data-name="Birmingham International" aria-label="Select Birmingham Airport station">Birmingham Arpt</button>
                 <button type="button" class="preset-btn" data-station="MIA" data-name="Manchester Airport" aria-label="Select Manchester Airport station">Manchester Arpt</button>
               </div>
 
@@ -1094,13 +1094,13 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         <div class="form-group" id="tflLineFilterGroup" style="display:none;">
           <label for="tflLineFilter">
-            Filter by Tube Line <span style="color:red;">*</span>
-            <span class="info-tooltip" title="Select which tube line to display (required for TFL stations)" aria-label="Information: Filter by tube line">?</span>
+            Select Tube Line
+            <span class="info-tooltip" title="Select which tube line to display (required for TFL stations)" aria-label="Information: Select tube line">?</span>
           </label>
           <select id="tflLineFilter" name="tflLineFilter" required aria-describedby="tflline-help">
-            <option value="">-- Select Line --</option>
+            <option value="" disabled selected>-- Select Line --</option>
           </select>
-          <span class="help-text" id="tflline-help">Line filter is REQUIRED for TFL stations to reduce memory usage</span>
+          <span class="help-text" id="tflline-help">Select a line to filter arrivals</span>
         </div>
 
         <div class="form-group" id="tflPlatformFilterGroup" style="display:none;">
@@ -1108,10 +1108,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             Filter by Platform
             <span class="info-tooltip" title="Show only arrivals for selected platform" aria-label="Information: Filter by platform">?</span>
           </label>
-          <select id="tflPlatformFilter" name="tflPlatformFilter" aria-describedby="tflplatform-help">
-            <option value="">-- All Platforms --</option>
+          <select id="tflPlatformFilter" name="tflPlatformFilter" required aria-describedby="tflplatform-help">
+            <option value="" disabled selected>-- Select Platform --</option>
           </select>
-          <span class="help-text" id="tflplatform-help">Optional: Select a platform to narrow down results</span>
+          <span class="help-text" id="tflplatform-help">Select a platform to filter arrivals</span>
         </div>
 
         <div class="button-group">
@@ -1124,31 +1124,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       <div class="card">
         <h2>Display Options</h2>
         <p style="margin-top: 0; margin-bottom: 20px; color: #666; font-size: 14px;">These settings apply automatically when changed</p>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="interval">
-              Refresh Interval (seconds)
-              <span class="info-tooltip" title="How often to fetch new departure data" aria-label="Information: How often to fetch new departure data">?</span>
-            </label>
-            <input type="number" id="interval" name="interval" value="{INTERVAL}" min="30" max="600" required aria-describedby="interval-help">
-            <span class="help-text" id="interval-help">Recommended: 60-120 seconds</span>
-          </div>
-
-          <div class="form-group">
-            <label for="scrollspeed">
-              Scroll Speed
-              <span class="info-tooltip" title="Controls how fast text scrolls across the display" aria-label="Information: Controls how fast text scrolls across the display">?</span>
-            </label>
-            <select id="scrollspeed" name="scrollspeed" aria-describedby="scrollspeed-help">
-              <option value="10"{SCROLL_SEL_10}>10ms (fastest)</option>
-              <option value="25"{SCROLL_SEL_25}>25ms (fast)</option>
-              <option value="50"{SCROLL_SEL_50}>50ms (moderate)</option>
-              <option value="100"{SCROLL_SEL_100}>100ms (smooth)</option>
-            </select>
-            <span class="help-text" id="scrollspeed-help">Delay between scroll steps - lower is faster, higher is smoother</span>
-          </div>
-        </div>
 
         <div class="form-group">
           <label for="mode">Display Mode</label>
@@ -1177,16 +1152,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             <option value="3"{EXTRA_SEL_3}>Rotate 3 extra services</option>
             <option value="4"{EXTRA_SEL_4}>Rotate 4 extra services</option>
           </select>
-          <span class="help-text" id="extra-help">The bottom line of the display automatically cycles through additional departures at the rotation speed below</span>
-        </div>
-
-        <div class="form-group">
-          <label for="rotationspeed">
-            Bottom Line Rotation Speed (seconds)
-            <span class="info-tooltip" title="How long each service is displayed before rotating to the next" aria-label="Information: How long each service is displayed">?</span>
-          </label>
-          <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" required aria-describedby="rotationspeed-help">
-          <span class="help-text" id="rotationspeed-help">Recommended: 12-18 seconds. How often the bottom line alternates between services</span>
+          <span class="help-text" id="extra-help">The bottom line of the display automatically cycles through additional departures</span>
         </div>
       </div>
 
@@ -1218,10 +1184,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       <div class="tab-content" id="tab-1" role="tabpanel" aria-labelledby="tab-btn-1">
         <form method="POST" action="/save" id="networkForm">
           <input type="hidden" name="station" id="station-hidden" value="{STATION}">
-          <input type="hidden" name="interval" id="interval-hidden" value="{INTERVAL}">
           <input type="hidden" name="mode" id="mode-hidden" value="">
           <input type="hidden" name="extra" id="extra-hidden" value="">
-          <input type="hidden" name="scrollspeed" id="scrollspeed-hidden" value="{SCROLL}">
 
           <div class="card">
             <h2>📡 WiFi Configuration</h2>
@@ -1549,7 +1513,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       input.value = name;
       console.log('Set input.value to:', input.value, 'stored code:', code);
       document.getElementById("stationAutocomplete").classList.remove("show");
-      showToast(`Selected: ${escapeHtml(name)}. Click "Apply Station Settings" to apply.`, "info");
 
       input.classList.add("success");
       input.classList.remove("error");
@@ -1570,7 +1533,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1') {
         document.getElementById('tflLineFilter').value = '';
-        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
+        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">-- Select Platform --</option>';
         document.getElementById('tflPlatformFilter').value = '';
         console.log('Cleared line and platform filters for new station (not yet applied)');
 
@@ -1751,16 +1714,27 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       document.getElementById("lastUpdate").textContent = now.toLocaleTimeString();
 
       const useCallingAt = document.getElementById("mode").value === "1";
+      const showStationName = document.getElementById("showstation").value === "1";
       const showExtraService = document.getElementById("extra").value === "1";
 
       let html = '<div style="font-size: 14px; line-height: 1.8;">';
 
-      html += '<div style="text-align: center; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 16px;">';
-      html += escapeHtml(data.stationName || "Unknown Station");
-      html += '</div>';
+      // Only show station name if enabled
+      if (showStationName) {
+        html += '<div style="text-align: center; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 16px;">';
+        html += escapeHtml(data.stationName || "Unknown Station");
+        html += '</div>';
+      }
 
       if (data.serviceCount > 0 && data.services && data.services.length > 0) {
-        if (data.services[0]) {
+        // If station name hidden, show first service at top
+        if (!showStationName && data.services[0]) {
+          html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #111; border-radius: 4px;">';
+          html += `<span><strong>1st</strong> ${escapeHtml(data.services[0].std)} ${escapeHtml(data.services[0].destination)}</span>`;
+          html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(data.services[0].etd))}</span>`;
+          html += '</div>';
+        } else if (data.services[0]) {
+          // Station name visible, show first service normally
           html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #111; border-radius: 4px;">';
           html += `<span><strong>1st</strong> ${escapeHtml(data.services[0].std)} ${escapeHtml(data.services[0].destination)}</span>`;
           html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(data.services[0].etd))}</span>`;
@@ -1773,18 +1747,34 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           html += '</div>';
         }
 
-        if (!useCallingAt && data.services[1]) {
-          html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #111; border-radius: 4px;">';
-          html += `<span><strong>2nd</strong> ${escapeHtml(data.services[1].std)} ${escapeHtml(data.services[1].destination)}</span>`;
-          html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(data.services[1].etd))}</span>`;
-          html += '</div>';
+        // Show second service (if not in calling at mode)
+        if (!useCallingAt) {
+          // Adjust index based on whether station name is shown
+          const secondIdx = showStationName ? 1 : (useCallingAt ? 1 : 2);
+          if (data.services[secondIdx]) {
+            const label = showStationName ? "2nd" : (useCallingAt ? "2nd" : "3rd");
+            html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #111; border-radius: 4px;">';
+            html += `<span><strong>${label}</strong> ${escapeHtml(data.services[secondIdx].std)} ${escapeHtml(data.services[secondIdx].destination)}</span>`;
+            html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(data.services[secondIdx].etd))}</span>`;
+            html += '</div>';
+          }
         }
 
-        const startIdx = useCallingAt ? 1 : 2;
-        const maxIdx = useCallingAt ? (showExtraService ? 4 : 3) : (showExtraService ? 6 : 4);
+        // Calculate alternating service indices based on mode and station name visibility
+        const serviceOffset = showStationName ? 0 : 1;
+        const startIdx = useCallingAt ? (1 + serviceOffset) : (2 + serviceOffset);
+        const maxIdx = useCallingAt ?
+          (showExtraService ? (4 + serviceOffset) : (3 + serviceOffset)) :
+          (showExtraService ? (6 + serviceOffset) : (4 + serviceOffset));
 
         if (data.services.length > startIdx) {
-          const currentIdx = data.alternatingService || startIdx;
+          // Fix: Ensure alternatingService index is within the available services array
+          let currentIdx = data.alternatingService || startIdx;
+          // Clamp to available services to prevent bottom line from disappearing
+          if (currentIdx >= data.services.length) {
+            currentIdx = startIdx;
+          }
+
           if (data.services[currentIdx]) {
             const service = data.services[currentIdx];
             const labels = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
@@ -1794,11 +1784,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
             html += `<span><strong>${labels[currentIdx]}</strong> ${escapeHtml(service.std)} ${escapeHtml(service.destination)}</span>`;
             html += `<span style="color: #ffa500; font-weight: bold;">${escapeHtml(formatETD(service.etd))}</span>`;
             html += '</div>';
-
-            const numRotating = Math.min(data.services.length - startIdx, maxIdx - startIdx);
-            if (numRotating > 1) {
-              html += `<div style="margin-top: 5px; font-size: 10px; color: #888; font-style: italic;">↻ Rotates with ${numRotating - 1} more</div>`;
-            }
             html += '</div>';
           }
         }
@@ -1938,7 +1923,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     const selectNetwork = (ssid) => {
       document.getElementById("ssid2").value = ssid;
       document.getElementById("password2").focus();
-      showToast(`Selected: ${ssid}`, "info");
     };
 
     // ==================== Station Presets ====================
@@ -1952,7 +1936,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       // Store the code in a data attribute and show the name in the input
       input.dataset.stationCode = code;
       input.value = name || code; // Fallback to code if name not provided
-      showToast(`Station set to: ${name || code}. Click "Apply Station Settings" to apply.`, "info");
       input.blur();
 
       // Highlight the selected preset button
@@ -1968,7 +1951,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const serviceType = document.getElementById('serviceType').value;
       if (serviceType === '1') {
         document.getElementById('tflLineFilter').value = '';
-        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">All Platforms</option>';
+        document.getElementById('tflPlatformFilter').innerHTML = '<option value="">-- Select Platform --</option>';
         document.getElementById('tflPlatformFilter').value = '';
         console.log('Cleared line and platform filters for new station (not yet applied)');
 
@@ -2011,18 +1994,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         }
       });
 
-      const intervalInput = document.getElementById("interval");
-      intervalInput.addEventListener("input", (e) => {
-        const val = parseInt(e.target.value);
-        if (val >= 30 && val <= 600) {
-          e.target.classList.add("success");
-          e.target.classList.remove("error");
-        } else {
-          e.target.classList.add("error");
-          e.target.classList.remove("success");
-        }
-      });
-
       // Update preview when display settings change
       ["mode", "extra"].forEach(id => {
         document.getElementById(id).addEventListener("change", () => {
@@ -2045,10 +2016,8 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         // Copy current settings to hidden fields
         document.getElementById("station-hidden").value = document.getElementById("station").value;
-        document.getElementById("interval-hidden").value = document.getElementById("interval").value;
         document.getElementById("mode-hidden").value = document.getElementById("mode").value;
         document.getElementById("extra-hidden").value = document.getElementById("extra").value;
-        document.getElementById("scrollspeed-hidden").value = document.getElementById("scrollspeed").value;
 
         const btn = document.getElementById("saveBtn");
         btn.disabled = true;
@@ -2102,12 +2071,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       formData.append('tflPlatformFilter', document.getElementById('tflPlatformFilter').value);
       formData.append('station', stationValue);
       console.log('autoApplySettings: Sending station=', stationValue, 'tflLineFilter=', document.getElementById('tflLineFilter').value, 'tflPlatformFilter=', document.getElementById('tflPlatformFilter').value);
-      formData.append('interval', document.getElementById('interval').value);
       formData.append('mode', document.getElementById('mode').value);
       formData.append('showstation', document.getElementById('showstation').value);
       formData.append('extra', document.getElementById('extra').value);
-      formData.append('scrollspeed', document.getElementById('scrollspeed').value);
-      formData.append('rotationspeed', document.getElementById('rotationspeed').value);
 
       const ytopField = document.getElementById('ytop');
       if (ytopField) formData.append('ytop', ytopField.value);
@@ -2117,8 +2083,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       if (y2Field) formData.append('y2', y2Field.value);
       const y3Field = document.getElementById('y3');
       if (y3Field) formData.append('y3', y3Field.value);
-
-      showToast("Applying changes...", "info");
 
       fetch("/apply", {
         method: "POST",
@@ -2132,8 +2096,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         return response;
       })
       .then(() => {
-        showToast("Settings updated!", "success");
-
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({command: "getState"}));
         }
@@ -2226,9 +2188,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         if (lines.length === 0) {
           // No lines found - reset to default state
-          lineFilter.innerHTML = '<option value="">All Lines</option>';
+          lineFilter.innerHTML = '<option value="">-- Select Line --</option>';
           lineFilter.disabled = false;
-          platformFilter.innerHTML = '<option value="">All Platforms</option>';
+          platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
           platformFilter.disabled = false;
           showToast('No tube lines found for this station', 'warning');
           return;
@@ -2238,25 +2200,21 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         window.tflLinesData = lines;
 
         // Populate the line filter dropdown
-        lineFilter.innerHTML = '<option value="">All Lines</option>' +
+        lineFilter.innerHTML = '<option value="">-- Select Line --</option>' +
           lines.map(line => `<option value="${escapeHtml(line.id)}">${escapeHtml(line.name)}</option>`).join('');
         lineFilter.disabled = false;
 
         // Reset platform filter and re-enable
-        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
         platformFilter.disabled = false;
 
         // Don't auto-select any line - let the user choose
         lineFilter.value = '';
-
-        // Show toast with available lines
-        const lineNames = lines.map(l => l.name).join(', ');
-        showToast(`Available lines: ${lineNames}`, 'info');
       } catch (error) {
         // Error handling - reset to default state
-        lineFilter.innerHTML = '<option value="">All Lines</option>';
+        lineFilter.innerHTML = '<option value="">-- Select Line --</option>';
         lineFilter.disabled = false;
-        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
         platformFilter.disabled = false;
       }
     };
@@ -2396,7 +2354,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const platformFilter = document.getElementById('tflPlatformFilter');
 
       // Clear platform filter first
-      platformFilter.innerHTML = '<option value="">All Platforms</option>';
+      platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
       platformFilter.value = '';
 
       // If no line selected or no lines data, return
@@ -2413,7 +2371,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Populate platform dropdown
-      platformFilter.innerHTML = '<option value="">All Platforms</option>' +
+      platformFilter.innerHTML = '<option value="">-- Select Platform --</option>' +
         selectedLine.platforms.map(platform =>
           `<option value="${escapeHtml(platform)}">${escapeHtml(platform)}</option>`
         ).join('');
@@ -2439,22 +2397,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           } else {
             showToast("Not connected to device", "error");
           }
-        });
-      }
-
-      // Setup auto-apply for scroll speed dropdown
-      const scrollspeedSelect = document.getElementById('scrollspeed');
-      if (scrollspeedSelect) {
-        scrollspeedSelect.addEventListener('change', () => {
-          autoApplySettings();
-        });
-      }
-
-      // Setup auto-apply for rotation speed input
-      const rotationspeedInput = document.getElementById('rotationspeed');
-      if (rotationspeedInput) {
-        rotationspeedInput.addEventListener('input', () => {
-          autoApplySettings();
         });
       }
 
@@ -2501,6 +2443,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         nationalRailPresets.style.display = isUnderground ? "none" : "grid";
         tflPresets.style.display = isUnderground ? "grid" : "none";
 
+        // Clear TFL filters when switching to National Rail
+        if (!isUnderground) {
+          document.getElementById('tflLineFilter').value = '';
+          document.getElementById('tflPlatformFilter').value = '';
+        }
+
         // Disable "Calling At Mode" for TFL (option value="1")
         const callingAtOption = modeSelect.querySelector('option[value="1"]');
         if (callingAtOption) {
@@ -2544,7 +2492,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Auto-apply for display options only (station settings require Apply button)
-      const autoApplyFields = ["interval", "mode", "showstation", "extra", "rotationspeed", "scrollspeed", "ytop", "y1", "y2", "y3"];
+      const autoApplyFields = ["mode", "showstation", "extra", "ytop", "y1", "y2", "y3"];
       autoApplyFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
@@ -2566,7 +2514,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           } else {
             // Clear platform filter if no line selected
             const platformFilter = document.getElementById('tflPlatformFilter');
-            platformFilter.innerHTML = '<option value="">All Platforms</option>';
+            platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
             platformFilter.value = '';
           }
           // Note: Don't auto-apply - wait for user to click Apply button
@@ -2582,6 +2530,23 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           if (stationInput && stationInput.value.length < 3) {
             showToast("Station code must be at least 3 characters", "error");
             return;
+          }
+
+          // Validate TFL filters if TFL station type is selected
+          const serviceTypeSelect = document.getElementById('serviceType');
+          if (serviceTypeSelect && serviceTypeSelect.value === 'tfl') {
+            const lineFilter = document.getElementById('tflLineFilter');
+            const platformFilter = document.getElementById('tflPlatformFilter');
+
+            if (!lineFilter || !lineFilter.value || lineFilter.value === '') {
+              showToast("Please select a tube line", "error");
+              return;
+            }
+
+            if (!platformFilter || !platformFilter.value || platformFilter.value === '') {
+              showToast("Please select a platform", "error");
+              return;
+            }
           }
 
           autoApplySettings();
