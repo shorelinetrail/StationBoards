@@ -1038,14 +1038,13 @@ body {
   }
 }
 
-/* iPad and tablet optimization */
-@media (min-width: 769px) and (max-width: 1024px) {
+/* iPad and large tablet optimization (above mobile breakpoint) */
+@media (min-width: 969px) and (max-width: 1024px) {
   .container {
     max-width: 900px;
   }
 
   .hero .container {
-    grid-template-columns: 1fr 1fr;
     gap: 2rem;
   }
 
