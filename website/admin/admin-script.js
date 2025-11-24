@@ -236,7 +236,7 @@ async function showOrderDetail(orderId) {
         *,
         boards (*),
         shipments (*),
-        order_history (*, user:user_id(email)),
+        order_history (*),
         email_log (*)
       `)
       .eq('id', orderId)
