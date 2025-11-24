@@ -244,19 +244,38 @@ function showDemoDepartures() {
   const etd1 = mins1 <= 1 ? 'On time' : mins1 <= 5 ? `${mins1} min` : 'On time';
   const etd2 = mins2 <= 20 ? 'On time' : `${Math.floor(mins2 / 60)}h ${mins2 % 60}m`;
 
-  // Format as single line: "1st  19:47  Newcastle         On time"
-  const line1 = `1st  ${std1}  ${dest1.name.padEnd(20, ' ')} ${etd1}`;
-  const line2 = `2nd  ${std2}  ${dest2.name.padEnd(20, ' ')} ${etd2}`;
+  // Generate calling point times (approximately 10-15 minutes between stops)
+  function generateCallingTimes(departureTime, stationCount) {
+    const times = [];
+    let currentTime = new Date(departureTime.getTime());
+    for (let i = 0; i < stationCount; i++) {
+      currentTime = new Date(currentTime.getTime() + (10 + Math.random() * 5) * 60000);
+      const hh = String(currentTime.getHours()).padStart(2, '0');
+      const mm = String(currentTime.getMinutes()).padStart(2, '0');
+      times.push(`${hh}:${mm}`);
+    }
+    return times;
+  }
+
+  const callingTimes1 = generateCallingTimes(time1, dest1.calling.length);
+  const callingText1 = dest1.calling.map((station, i) => `${station} (${callingTimes1[i]})`).join(', ');
 
   const html = `
     <div class="oled-service">
-      <div class="oled-service-line">${line1}</div>
+      <div class="oled-service-line">
+        <span>1st  ${std1}  ${dest1.name}</span>
+        <span>${etd1}</span>
+      </div>
       <div class="oled-calling">
-        <span class="oled-calling-text">Calling at: ${dest1.calling.join(', ')}</span>
+        <span class="oled-calling-label">Calling at:</span>
+        <span class="oled-calling-scroll">${callingText1}</span>
       </div>
     </div>
     <div class="oled-service">
-      <div class="oled-service-line">${line2}</div>
+      <div class="oled-service-line">
+        <span>2nd  ${std2}  ${dest2.name}</span>
+        <span>${etd2}</span>
+      </div>
     </div>
   `;
 
