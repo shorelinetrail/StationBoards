@@ -1047,18 +1047,20 @@ String generateDeviceId() {
 }
 
 bool checkFirstBoot() {
+  bool isFirstBoot = false;
+
   if (!SPIFFS.exists("/config.json")) {
-    Serial.println("🆕 First boot detected");
-    return true;
+    Serial.println("🆕 First boot detected - no config");
+    isFirstBoot = true;
   }
-  
+
   if (SPIFFS.exists("/firstboot.flag")) {
     Serial.println("🆕 First boot flag found");
     SPIFFS.remove("/firstboot.flag");
-    return true;
+    isFirstBoot = true;
   }
-  
-  return false;
+
+  return isFirstBoot;
 }
 
 // Note: formatETD is now defined in helpers.h
