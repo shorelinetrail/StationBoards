@@ -1571,15 +1571,8 @@ void updateDisplay() {
     int startIndex = getAlternatingStartIndex(config.useCallingAt, config.showStationName);
     int maxIndex = getAlternatingMaxIndex(config.useCallingAt, config.extraServices, config.showStationName);
 
-    if (displayState.serviceCount >= minServices) {
+    if (displayState.serviceCount >= 2 + serviceOffset) {
       int indexA = displayState.currentAlternatingService;
-
-      // Safety check: ensure indexA is in valid range
-      if (indexA < startIndex || indexA > maxIndex || indexA >= displayState.serviceCount) {
-        indexA = startIndex;
-        displayState.currentAlternatingService = startIndex;
-      }
-
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
       String labelA = getServiceLabel(indexA);
@@ -1611,15 +1604,8 @@ void updateDisplay() {
     int startIndex = getAlternatingStartIndex(config.useCallingAt, config.showStationName);
     int maxIndex = getAlternatingMaxIndex(config.useCallingAt, config.extraServices, config.showStationName);
 
-    if (displayState.serviceCount >= minServices) {
+    if (displayState.serviceCount >= 3 + serviceOffset) {
       int indexA = displayState.currentAlternatingService;
-
-      // Safety check: ensure indexA is in valid range
-      if (indexA < startIndex || indexA > maxIndex || indexA >= displayState.serviceCount) {
-        indexA = startIndex;
-        displayState.currentAlternatingService = startIndex;
-      }
-
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
       String labelA = getServiceLabel(indexA);
