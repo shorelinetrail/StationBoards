@@ -396,13 +396,11 @@ void monitorWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
                 }
               }
 
-              // Reset alternating service
+              // Reset alternating service based on display mode
               if (config.useCallingAt) {
-                displayState.currentAlternatingService = 1;
-              } else if (!config.showStationName) {
-                displayState.currentAlternatingService = 3;
+                displayState.currentAlternatingService = config.showStationName ? 1 : 2;
               } else {
-                displayState.currentAlternatingService = 2;
+                displayState.currentAlternatingService = config.showStationName ? 2 : 3;
               }
 
               // Clear data and force refresh
@@ -1501,8 +1499,7 @@ void handleAlternatingService(unsigned long currentTime) {
 
       // Move to next service
       displayState.currentAlternatingService++;
-      int maxIndex = (config.useCallingAt ? config.extraServices + 1 : config.extraServices + 2) + serviceOffset;
-      if (displayState.currentAlternatingService > maxIndex) {
+      if (displayState.currentAlternatingService > maxServiceIndex) {
         displayState.currentAlternatingService = startIndex;
       }
 
@@ -1576,6 +1573,13 @@ void updateDisplay() {
 
     if (displayState.serviceCount >= minServices) {
       int indexA = displayState.currentAlternatingService;
+
+      // Safety check: ensure indexA is in valid range
+      if (indexA < startIndex || indexA > maxIndex || indexA >= displayState.serviceCount) {
+        indexA = startIndex;
+        displayState.currentAlternatingService = startIndex;
+      }
+
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
       String labelA = getServiceLabel(indexA);
@@ -1609,6 +1613,13 @@ void updateDisplay() {
 
     if (displayState.serviceCount >= minServices) {
       int indexA = displayState.currentAlternatingService;
+
+      // Safety check: ensure indexA is in valid range
+      if (indexA < startIndex || indexA > maxIndex || indexA >= displayState.serviceCount) {
+        indexA = startIndex;
+        displayState.currentAlternatingService = startIndex;
+      }
+
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
       String labelA = getServiceLabel(indexA);
