@@ -1154,6 +1154,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           </select>
           <span class="help-text" id="extra-help">The bottom line of the display automatically cycles through additional departures</span>
         </div>
+
+        <div class="form-group">
+          <label for="rotationspeed">Rotation Speed (seconds)</label>
+          <input type="number" id="rotationspeed" name="rotationspeed" value="{ROTATION}" min="5" max="60" step="1" aria-describedby="rotation-help">
+          <span class="help-text" id="rotation-help">How long each service is displayed before rotating to the next (5-60 seconds)</span>
+        </div>
       </div>
 
       <!-- Live Display Preview -->
@@ -2075,6 +2081,9 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       formData.append('showstation', document.getElementById('showstation').value);
       formData.append('extra', document.getElementById('extra').value);
 
+      const rotationspeedField = document.getElementById('rotationspeed');
+      if (rotationspeedField) formData.append('rotationspeed', rotationspeedField.value);
+
       const ytopField = document.getElementById('ytop');
       if (ytopField) formData.append('ytop', ytopField.value);
       const y1Field = document.getElementById('y1');
@@ -2492,7 +2501,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       }
 
       // Auto-apply for display options only (station settings require Apply button)
-      const autoApplyFields = ["mode", "showstation", "extra", "ytop", "y1", "y2", "y3"];
+      const autoApplyFields = ["mode", "showstation", "extra", "rotationspeed", "ytop", "y1", "y2", "y3"];
       autoApplyFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {

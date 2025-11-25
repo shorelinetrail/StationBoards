@@ -144,6 +144,12 @@ public:
     scrollSpeed = doc["scrollSpeed"] | 50;
     rotationSpeed = doc["rotationSpeed"] | 10;
 
+    // Validate rotation speed (fix corrupt values)
+    if (rotationSpeed < 5 || rotationSpeed > 60) {
+      Serial.printf("  ⚠️  Invalid rotationSpeed (%d), resetting to 10\n", rotationSpeed);
+      rotationSpeed = 10;
+    }
+
     // Load Positions
     yPosTop = doc["yPosTop"] | 14;
     yPos1st = doc["yPos1st"] | 26;
