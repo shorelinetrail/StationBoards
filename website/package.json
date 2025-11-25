@@ -1,0 +1,13 @@
+{
+  "name": "stationboards-website",
+  "version": "1.0.0",
+  "description": "StationBoards e-commerce website",
+  "private": true,
+  "dependencies": {
+    "resend": "^3.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
