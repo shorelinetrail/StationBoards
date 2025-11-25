@@ -1538,11 +1538,12 @@ void handleAlternatingService(unsigned long currentTime) {
       // Move to next service
       int oldIndex = displayState.currentAlternatingService;
       displayState.currentAlternatingService++;
-      if (displayState.currentAlternatingService > maxServiceIndex) {
+      int maxIndex = (config.useCallingAt ? config.extraServices + 1 : config.extraServices + 2) + serviceOffset;
+      if (displayState.currentAlternatingService > maxIndex) {
         displayState.currentAlternatingService = startIndex;
       }
       Serial.printf("✅ ANIMATION COMPLETE: Index %d -> %d (max: %d, start: %d)\n",
-                    oldIndex, displayState.currentAlternatingService, maxServiceIndex, startIndex);
+                    oldIndex, displayState.currentAlternatingService, maxIndex, startIndex);
 
       displayState.animationOffset = 0;
       displayState.markDirty();
