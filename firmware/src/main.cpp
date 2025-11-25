@@ -1515,9 +1515,16 @@ void handleAlternatingService(unsigned long currentTime) {
   if (currentTime - displayState.lastRotation >= rotationInterval &&
       displayState.serviceCount >= minServicesForAlt &&
       !displayState.isAnimating) {
-    Serial.printf("🎬 STARTING ANIMATION: %d -> %d\n",
-                  displayState.currentAlternatingService,
-                  (displayState.currentAlternatingService + 1 > maxServiceIndex) ? startIndex : displayState.currentAlternatingService + 1);
+    int oldIndex = displayState.currentAlternatingService;
+
+    // Move to next service BEFORE starting animation
+    displayState.currentAlternatingService++;
+    int maxIndex = (config.useCallingAt ? config.extraServices + 1 : config.extraServices + 2) + serviceOffset;
+    if (displayState.currentAlternatingService > maxIndex) {
+      displayState.currentAlternatingService = startIndex;
+    }
+
+    Serial.printf("🎬 STARTING ANIMATION: %d -> %d\n", oldIndex, displayState.currentAlternatingService);
     displayState.isAnimating = true;
     displayState.animationOffset = 0;
     displayState.animationStartTime = currentTime;
@@ -1531,22 +1538,11 @@ void handleAlternatingService(unsigned long currentTime) {
 
     // Calculate progress (0.0 to 1.0) based on animation duration
     if (elapsed >= Timing::SERVICE_ANIMATION_DURATION) {
-      // Animation complete
+      // Animation complete - just stop animating, service index was already updated at start
       displayState.isAnimating = false;
-      displayState.animationOffset = maxOffset;  // Ensure we end exactly at maxOffset
-
-      // Move to next service
-      int oldIndex = displayState.currentAlternatingService;
-      displayState.currentAlternatingService++;
-      int maxIndex = (config.useCallingAt ? config.extraServices + 1 : config.extraServices + 2) + serviceOffset;
-      if (displayState.currentAlternatingService > maxIndex) {
-        displayState.currentAlternatingService = startIndex;
-      }
-      Serial.printf("✅ ANIMATION COMPLETE: Index %d -> %d (max: %d, start: %d)\n",
-                    oldIndex, displayState.currentAlternatingService, maxIndex, startIndex);
-
       displayState.animationOffset = 0;
       displayState.markDirty();
+      Serial.printf("✅ ANIMATION COMPLETE: Now showing service %d\n", displayState.currentAlternatingService);
     } else {
       // Animation in progress - apply smooth easing
       float progress = (float)elapsed / (float)Timing::SERVICE_ANIMATION_DURATION;
