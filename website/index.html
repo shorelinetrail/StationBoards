@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="StationBoards - Live departure boards for your home or office. Real-time National Rail and London Underground arrivals on a beautiful OLED display.">
-  <meta name="keywords" content="departure board, train board, OLED display, railway station board, TFL, National Rail">
-  <title>StationBoards - Live Departure Boards for Your Home</title>
+  <meta name="description" content="StationBoards - Live train boards for your home or office. Real-time National Rail and London Underground services on a beautiful OLED display.">
+  <meta name="keywords" content="train board, station board, OLED display, railway station board, TFL, National Rail">
+  <title>StationBoards - Live Train Boards for Your Home</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -34,7 +34,7 @@
     <div class="container">
       <div class="hero-content">
         <h1>Your Station, Your Home</h1>
-        <p class="hero-subtitle">Live departure boards with real-time National Rail and London Underground arrivals on a beautiful OLED display</p>
+        <p class="hero-subtitle">Live train boards with real-time National Rail and London Underground services on a beautiful OLED display</p>
         <div class="hero-cta">
           <a href="/checkout.html" class="btn-primary btn-large">Order Now - £89</a>
           <a href="#features" class="btn-secondary btn-large">Learn More</a>
@@ -62,10 +62,13 @@
       </div>
       <div class="hero-image">
         <div class="board-preview">
-          <div class="board-screen oled-display">
-            <div class="oled-header" id="liveStationName">London Kings Cross</div>
-            <div class="oled-services" id="liveServices">
-              <div class="oled-loading">Loading live departures...</div>
+          <div class="board-screen">
+            <div class="board-header" id="liveStationName">London Kings Cross</div>
+            <div class="board-services" id="liveServices">
+              <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>Loading live services...</p>
+              </div>
             </div>
             <div class="oled-clock" id="liveClock">00:00:00</div>
           </div>
@@ -78,13 +81,13 @@
   <section id="features" class="features">
     <div class="container">
       <h2 class="section-title">Everything You Need</h2>
-      <p class="section-subtitle">A complete live departure board for your home or office</p>
+      <p class="section-subtitle">A complete live train board for your home or office</p>
 
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon">🚂</div>
           <h3>National Rail & TFL</h3>
-          <p>Real-time departures from over 2,500 National Rail stations and all London Underground lines</p>
+          <p>Real-time services from over 2,500 National Rail stations and all London Underground lines</p>
         </div>
 
         <div class="feature-card">
@@ -94,21 +97,15 @@
         </div>
 
         <div class="feature-card">
-          <div class="feature-icon">🎯</div>
-          <h3>Always Accurate</h3>
-          <p>Direct connection to National Rail and TFL APIs ensures you always see the most up-to-date departure information</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">🌙</div>
+          <div class="feature-icon">💎</div>
           <h3>OLED Display</h3>
-          <p>Crisp 3.12" OLED screen (256×64) with high contrast. Perfect readability in any lighting condition</p>
+          <p>Crisp, high-contrast OLED display with vibrant colors and deep blacks. Perfect visibility in any lighting condition</p>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon">⚡</div>
           <h3>Auto Updates</h3>
-          <p>Refreshes automatically every minute with the latest departure information. Over-the-air firmware updates</p>
+          <p>Refreshes automatically every minute with the latest train information. Over-the-air firmware updates</p>
         </div>
 
         <div class="feature-card">
@@ -147,8 +144,8 @@
 
         <div class="step">
           <div class="step-number">4</div>
-          <h3>Enjoy Live Departures</h3>
-          <p>Your board automatically updates with real-time departure information. Change stations anytime from the web dashboard</p>
+          <h3>Enjoy Live Services</h3>
+          <p>Your board automatically updates with real-time train information. Change stations anytime through the web interface</p>
         </div>
       </div>
     </div>
@@ -162,11 +159,11 @@
       <div class="specs-grid">
         <div class="spec-item">
           <div class="spec-label">Display</div>
-          <div class="spec-value">3.12" OLED (256×64)</div>
+          <div class="spec-value">OLED High-Contrast Display</div>
         </div>
         <div class="spec-item">
           <div class="spec-label">Processor</div>
-          <div class="spec-value">ESP32 Dual-Core</div>
+          <div class="spec-value">Dual-Core WiFi SoC</div>
         </div>
         <div class="spec-item">
           <div class="spec-label">Connectivity</div>
@@ -201,12 +198,11 @@
         </div>
         <h3>StationBoard</h3>
         <ul class="pricing-features">
-          <li>✓ 3.12" OLED display (256×64)</li>
-          <li>✓ ESP32 board with WiFi</li>
+          <li>✓ OLED high-contrast display</li>
+          <li>✓ WiFi-enabled smart board</li>
           <li>✓ USB-C power cable</li>
           <li>✓ Pre-configured firmware</li>
           <li>✓ Web configuration interface</li>
-          <li>✓ Live National Rail & TFL data</li>
           <li>✓ Lifetime firmware updates</li>
           <li>✓ Email support</li>
         </ul>
@@ -229,12 +225,12 @@
 
         <div class="faq-item">
           <h3>Does it require a subscription?</h3>
-          <p>No subscriptions! One-time purchase includes lifetime access to firmware updates and live data feeds.</p>
+          <p>No subscriptions! One-time purchase includes lifetime access to firmware updates.</p>
         </div>
 
         <div class="faq-item">
           <h3>How is the data updated?</h3>
-          <p>The board connects to your WiFi and automatically fetches live departure data from National Rail and TFL APIs every minute.</p>
+          <p>The board connects to your WiFi and automatically fetches live train data from National Rail and TFL APIs every minute.</p>
         </div>
 
         <div class="faq-item">
@@ -244,7 +240,7 @@
 
         <div class="faq-item">
           <h3>What's the power consumption?</h3>
-          <p>OLED displays are power-efficient with selective pixel illumination. The board uses <1W on average and can run from a USB power bank.</p>
+          <p>The OLED display is power-efficient. The board uses less than 5W on average and can be powered via USB-C from any standard adapter or power bank.</p>
         </div>
 
         <div class="faq-item">
@@ -262,7 +258,7 @@
         <div class="footer-brand">
           <span class="logo">🚉</span>
           <span class="brand-name">StationBoards</span>
-          <p>Live departure boards for your home</p>
+          <p>Live train boards for your home</p>
         </div>
 
         <div class="footer-links">

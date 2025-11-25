@@ -211,6 +211,114 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// Live board preview with National Rail API
+async function fetchLiveServices() {
+  const stationCode = 'KGX'; // Kings Cross
+  const liveServices = document.getElementById('liveServices');
+
+  try {
+    // Fetch from National Rail API
+    const response = await fetch(`https://huxley2.azurewebsites.net/departures/${stationCode}/4`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch train services');
+    }
+
+    const data = await response.json();
+    const services = data.trainServices || [];
+
+    if (services.length === 0) {
+      liveServices.innerHTML = '<div class="loading-spinner"><p>No services available</p></div>';
+      return;
+    }
+
+    // Display services
+    liveServices.innerHTML = services.slice(0, 4).map(service => {
+      const time = service.std || '--:--';
+      const destination = service.destination?.[0]?.locationName || 'Unknown';
+
+      // Determine status
+      let statusClass = 'status-ontime';
+      let statusText = 'On time';
+
+      if (service.isCancelled) {
+        statusClass = 'status-cancelled';
+        statusText = 'Cancelled';
+      } else if (service.etd && service.etd !== 'On time') {
+        statusClass = 'status-delay';
+        statusText = service.etd;
+      }
+
+      return `
+        <div class="service-row service-row-no-platform">
+          <span class="time">${time}</span>
+          <span class="destination">${destination}</span>
+          <span class="status ${statusClass}">${statusText}</span>
+        </div>
+      `;
+    }).join('');
+
+    console.log(`✓ Loaded ${services.length} live services from ${stationCode}`);
+
+  } catch (error) {
+    console.error('Error fetching live services:', error);
+    liveServices.innerHTML = `
+      <div class="loading-spinner">
+        <p>Unable to load live data</p>
+        <p style="font-size: 0.8rem; opacity: 0.7;">Showing example services</p>
+      </div>
+    `;
+
+    // Fallback to static example
+    setTimeout(() => {
+      liveServices.innerHTML = `
+        <div class="service-row">
+          <span class="time">14:35</span>
+          <span class="destination">Edinburgh</span>
+          <span class="platform">Platform 0</span>
+          <span class="status status-ontime">On time</span>
+        </div>
+        <div class="service-row">
+          <span class="time">14:42</span>
+          <span class="destination">Cambridge</span>
+          <span class="platform">Platform 2</span>
+          <span class="status status-ontime">On time</span>
+        </div>
+        <div class="service-row">
+          <span class="time">14:50</span>
+          <span class="destination">Leeds</span>
+          <span class="platform">Platform 7</span>
+          <span class="status status-delay">Delayed 5 mins</span>
+        </div>
+        <div class="service-row">
+          <span class="time">15:00</span>
+          <span class="destination">Peterborough</span>
+          <span class="platform">Platform 4</span>
+          <span class="status status-ontime">On time</span>
+        </div>
+      `;
+    }, 2000);
+  }
+}
+
+// Add cancelled status style dynamically
+const cancelledStyle = document.createElement('style');
+cancelledStyle.textContent = `
+  .status-cancelled {
+    color: #ff4444;
+    border-color: #ff4444;
+  }
+`;
+document.head.appendChild(cancelledStyle);
+
+// Fetch live data on page load
+document.addEventListener('DOMContentLoaded', () => {
+  fetchLiveServices();
+
+  // Refresh every 60 seconds
+  setInterval(fetchLiveServices, 60000);
+});
+
 // Log page view (add analytics tracking here)
 console.log('StationBoards website loaded');
 console.log('Ready to take orders! 🚉');
