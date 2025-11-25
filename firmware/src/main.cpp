@@ -1465,12 +1465,12 @@ void handleAlternatingService(unsigned long currentTime) {
   if (config.useCallingAt) {
     // Calling At mode: need at least 2 services on bottom line to rotate
     minServicesForAlt = config.extraServices + 2 + serviceOffset;
-    maxServiceIndex = config.extraServices + serviceOffset;
+    maxServiceIndex = config.extraServices + 1 + serviceOffset;
     startIndex = 1 + serviceOffset;
   } else {
     // Standard mode: need at least 2 services on bottom line to rotate
     minServicesForAlt = config.extraServices + 3 + serviceOffset;
-    maxServiceIndex = config.extraServices + 1 + serviceOffset;
+    maxServiceIndex = config.extraServices + 2 + serviceOffset;
     startIndex = 2 + serviceOffset;
   }
 
