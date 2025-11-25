@@ -1476,10 +1476,44 @@ void handleAlternatingService(unsigned long currentTime) {
 
   unsigned long rotationInterval = config.rotationSpeed * 1000UL;  // Use config setting
 
+  // DEBUG: Print rotation state every 5 seconds
+  static unsigned long lastDebug = 0;
+  if (currentTime - lastDebug > 5000) {
+    Serial.println("\n=== ROTATION DEBUG ===");
+    Serial.printf("Mode: %s | StationName: %s\n",
+                  config.useCallingAt ? "CallingAt" : "Standard",
+                  config.showStationName ? "Shown" : "Hidden");
+    Serial.printf("Services: %d | ExtraServices: %d | Offset: %d\n",
+                  displayState.serviceCount, config.extraServices, serviceOffset);
+    Serial.printf("MinServices: %d | StartIdx: %d | MaxIdx: %d\n",
+                  minServicesForAlt, startIndex, maxServiceIndex);
+    Serial.printf("CurrentIdx: %d | Animating: %s\n",
+                  displayState.currentAlternatingService, displayState.isAnimating ? "YES" : "NO");
+    Serial.printf("TimeSinceRotation: %lums | Interval: %lums\n",
+                  currentTime - displayState.lastRotation, rotationInterval);
+
+    // Check animation conditions
+    if (displayState.serviceCount < minServicesForAlt) {
+      Serial.printf("❌ NOT ROTATING: Need %d services, have %d\n", minServicesForAlt, displayState.serviceCount);
+    } else if (currentTime - displayState.lastRotation < rotationInterval) {
+      Serial.printf("⏳ WAITING: %lums until next rotation\n",
+                    rotationInterval - (currentTime - displayState.lastRotation));
+    } else if (displayState.isAnimating) {
+      Serial.println("🎬 ANIMATING NOW");
+    } else {
+      Serial.println("✅ READY TO ROTATE");
+    }
+    Serial.println("===================\n");
+    lastDebug = currentTime;
+  }
+
   // Start new animation if it's time
   if (currentTime - displayState.lastRotation >= rotationInterval &&
       displayState.serviceCount >= minServicesForAlt &&
       !displayState.isAnimating) {
+    Serial.printf("🎬 STARTING ANIMATION: %d -> %d\n",
+                  displayState.currentAlternatingService,
+                  (displayState.currentAlternatingService + 1 > maxServiceIndex) ? startIndex : displayState.currentAlternatingService + 1);
     displayState.isAnimating = true;
     displayState.animationOffset = 0;
     displayState.animationStartTime = currentTime;
@@ -1498,10 +1532,13 @@ void handleAlternatingService(unsigned long currentTime) {
       displayState.animationOffset = maxOffset;  // Ensure we end exactly at maxOffset
 
       // Move to next service
+      int oldIndex = displayState.currentAlternatingService;
       displayState.currentAlternatingService++;
       if (displayState.currentAlternatingService > maxServiceIndex) {
         displayState.currentAlternatingService = startIndex;
       }
+      Serial.printf("✅ ANIMATION COMPLETE: Index %d -> %d (max: %d, start: %d)\n",
+                    oldIndex, displayState.currentAlternatingService, maxServiceIndex, startIndex);
 
       displayState.animationOffset = 0;
       displayState.markDirty();
@@ -1576,6 +1613,8 @@ void updateDisplay() {
 
       // Safety check: ensure indexA is in valid range
       if (indexA < startIndex || indexA > maxIndex || indexA >= displayState.serviceCount) {
+        Serial.printf("⚠️  BOUNDS FIX: IndexA %d out of range [%d-%d], resetting to %d\n",
+                      indexA, startIndex, maxIndex, startIndex);
         indexA = startIndex;
         displayState.currentAlternatingService = startIndex;
       }
@@ -1584,6 +1623,16 @@ void updateDisplay() {
 
       String labelA = getServiceLabel(indexA);
       String labelB = getServiceLabel(indexB);
+
+      static int lastLoggedA = -1, lastLoggedB = -1;
+      if (indexA != lastLoggedA || indexB != lastLoggedB) {
+        Serial.printf("📺 DISPLAY ALT (CallingAt): A=%d B=%d | Anim:%s Offset:%d\n",
+                      indexA, indexB,
+                      (displayState.isAnimating && displayState.serviceCount >= minServices) ? "YES" : "NO",
+                      displayState.animationOffset);
+        lastLoggedA = indexA;
+        lastLoggedB = indexB;
+      }
 
       displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
                                 labelA.c_str(), labelB.c_str(), config.yPosAlt,
@@ -1616,6 +1665,8 @@ void updateDisplay() {
 
       // Safety check: ensure indexA is in valid range
       if (indexA < startIndex || indexA > maxIndex || indexA >= displayState.serviceCount) {
+        Serial.printf("⚠️  BOUNDS FIX: IndexA %d out of range [%d-%d], resetting to %d\n",
+                      indexA, startIndex, maxIndex, startIndex);
         indexA = startIndex;
         displayState.currentAlternatingService = startIndex;
       }
@@ -1624,6 +1675,16 @@ void updateDisplay() {
 
       String labelA = getServiceLabel(indexA);
       String labelB = getServiceLabel(indexB);
+
+      static int lastLoggedA2 = -1, lastLoggedB2 = -1;
+      if (indexA != lastLoggedA2 || indexB != lastLoggedB2) {
+        Serial.printf("📺 DISPLAY ALT (Standard): A=%d B=%d | Anim:%s Offset:%d\n",
+                      indexA, indexB,
+                      (displayState.isAnimating && displayState.serviceCount >= minServices) ? "YES" : "NO",
+                      displayState.animationOffset);
+        lastLoggedA2 = indexA;
+        lastLoggedB2 = indexB;
+      }
 
       displayAlternatingServices(displayState.services[indexA], displayState.services[indexB],
                                 labelA.c_str(), labelB.c_str(), config.yPosAlt,
