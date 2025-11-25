@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Test - Hero Section</title>
+  <link rel="stylesheet" href="website/styles.css">
+  <style>
+    /* Debug borders */
+    .hero .container {
+      border: 5px solid red !important;
+    }
+    .hero-content {
+      border: 3px solid yellow !important;
+      background: rgba(255,255,0,0.2) !important;
+    }
+    .hero-image {
+      border: 3px solid cyan !important;
+      background: rgba(0,255,255,0.2) !important;
+    }
+
+    /* Debug info */
+    body::before {
+      content: "Width: " attr(data-width);
+      position: fixed;
+      top: 0;
+      left: 0;
+      background: black;
+      color: white;
+      padding: 10px;
+      z-index: 10000;
+      font-family: monospace;
+    }
+  </style>
+  <script>
+    window.addEventListener('resize', updateWidth);
+    window.addEventListener('load', updateWidth);
+
+    function updateWidth() {
+      document.body.setAttribute('data-width', window.innerWidth + 'px');
+      document.body.style.setProperty('--width', `"${window.innerWidth}px"`);
+    }
+  </script>
+</head>
+<body>
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <h1>Your Station, Your Home</h1>
+        <p class="hero-subtitle">Live departure boards</p>
+        <div class="hero-cta">
+          <a href="#" class="btn-primary btn-large">Order Now</a>
+          <a href="#" class="btn-secondary btn-large">Learn More</a>
+        </div>
+      </div>
+      <div class="hero-image">
+        <div class="board-preview">
+          <p>OLED Preview Here</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div style="background: white; padding: 20px; margin: 20px;">
+    <h2>Debug Info</h2>
+    <p>Resize the browser window to test responsive breakpoints:</p>
+    <ul>
+      <li><strong>968px and below:</strong> Should show 1 column (hero-content stacked above hero-image)</li>
+      <li><strong>969px and above:</strong> Should show 2 columns (side by side)</li>
+    </ul>
+    <p>Current grid-template-columns computed value:</p>
+    <div id="grid-info" style="font-family: monospace; background: #f0f0f0; padding: 10px;"></div>
+  </div>
+
+  <script>
+    function updateGridInfo() {
+      const container = document.querySelector('.hero .container');
+      const computed = window.getComputedStyle(container);
+      const gridColumns = computed.getPropertyValue('grid-template-columns');
+      const width = window.innerWidth;
+
+      document.getElementById('grid-info').innerHTML = `
+        Window width: ${width}px<br>
+        Grid columns: ${gridColumns}<br>
+        Expected: ${width <= 968 ? '1 column (1fr)' : '2 columns (1fr 1fr)'}
+      `;
+    }
+
+    window.addEventListener('resize', updateGridInfo);
+    window.addEventListener('load', updateGridInfo);
+    setInterval(updateGridInfo, 500);
+  </script>
+</body>
+</html>

@@ -1,3 +1,28 @@
+// Mobile Menu Toggle
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const icon = document.getElementById('menuIcon');
+  menu.classList.toggle('mobile-open');
+  icon.textContent = menu.classList.contains('mobile-open') ? '✕' : '☰';
+}
+
+function closeMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const icon = document.getElementById('menuIcon');
+  menu.classList.remove('mobile-open');
+  icon.textContent = '☰';
+}
+
+// Close mobile menu when clicking outside
+document.addEventListener('click', function(event) {
+  const menu = document.getElementById('mobileMenu');
+  const toggle = document.querySelector('.mobile-menu-toggle');
+
+  if (menu && toggle && !menu.contains(event.target) && !toggle.contains(event.target)) {
+    closeMobileMenu();
+  }
+});
+
 // Smooth scrolling for anchor links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   anchor.addEventListener('click', function (e) {
@@ -43,6 +68,12 @@ if (orderForm) {
   orderForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    // Disable submit button to prevent double submission
+    const submitBtn = orderForm.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
     // Get form data
     const formData = new FormData(orderForm);
     const data = {
@@ -52,15 +83,13 @@ if (orderForm) {
       address: formData.get('address'),
       city: formData.get('city'),
       postcode: formData.get('postcode'),
-      quantity: formData.get('quantity'),
-      notes: formData.get('notes'),
-      timestamp: new Date().toISOString(),
-      total: totalEl.textContent
+      quantity: parseInt(formData.get('quantity')),
+      notes: formData.get('notes')
     };
 
     try {
-      // Send order to backend (you'll need to implement this endpoint)
-      const response = await fetch('/api/orders', {
+      // Send order to API
+      const response = await fetch('/api/submit-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -68,22 +97,38 @@ if (orderForm) {
         body: JSON.stringify(data)
       });
 
+      const result = await response.json();
+
       if (response.ok) {
         // Show success message
         orderForm.style.display = 'none';
         orderSuccess.style.display = 'block';
 
-        // Send email notification (implement on backend)
-        console.log('Order submitted:', data);
+        // Update success message with order number
+        const successMessage = orderSuccess.querySelector('p');
+        if (result.order && result.order.orderNumber) {
+          successMessage.innerHTML = `Thank you for your order! Your order number is <strong>${result.order.orderNumber}</strong>. We've sent a confirmation email to ${data.email} with payment instructions.`;
+        }
+
+        console.log('Order submitted successfully:', result);
       } else {
-        throw new Error('Order submission failed');
+        throw new Error(result.error || 'Order submission failed');
       }
     } catch (error) {
       console.error('Error submitting order:', error);
 
+      // Show error message
+      alert(`Failed to submit order: ${error.message}\n\nPlease try again or contact us at orders@stationboards.co.uk`);
+
+      // Re-enable submit button
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+
       // Fallback: open email client with order details
-      const subject = encodeURIComponent('StationBoard Order Request');
-      const body = encodeURIComponent(`
+      const shouldUseFallback = confirm('Would you like to send your order via email instead?');
+      if (shouldUseFallback) {
+        const subject = encodeURIComponent('StationBoard Order Request');
+        const body = encodeURIComponent(`
 Name: ${data.name}
 Email: ${data.email}
 Phone: ${data.phone}
@@ -93,17 +138,14 @@ ${data.address}
 ${data.city}, ${data.postcode}
 
 Quantity: ${data.quantity}
-Total: ${data.total}
+Total: ${totalEl.textContent}
 
 Additional Notes:
 ${data.notes || 'None'}
-      `);
+        `);
 
-      window.location.href = `mailto:orders@stationboards.co.uk?subject=${subject}&body=${body}`;
-
-      // Show success message anyway
-      orderForm.style.display = 'none';
-      orderSuccess.style.display = 'block';
+        window.location.href = `mailto:orders@stationboards.co.uk?subject=${subject}&body=${body}`;
+      }
     }
   });
 }
@@ -280,3 +322,266 @@ document.addEventListener('DOMContentLoaded', () => {
 // Log page view (add analytics tracking here)
 console.log('StationBoards website loaded');
 console.log('Ready to take orders! 🚉');
+
+// ============= Live OLED Display =============
+
+// Update clock every second
+function updateClock() {
+  const clockEl = document.getElementById('liveClock');
+  if (!clockEl) return;
+
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+
+  clockEl.textContent = `${hours}:${minutes}:${seconds}`;
+}
+
+// Start clock
+setInterval(updateClock, 1000);
+updateClock(); // Initial call
+
+// Display realistic demo departures from Kings Cross
+function showDemoDepartures() {
+  const servicesEl = document.getElementById('liveServices');
+  if (!servicesEl) return;
+
+  // Calculate realistic departure times based on current time
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // First train: next departure in 5-15 minutes
+  const mins1 = Math.floor((currentMinutes % 30) / 2) + 5;
+  const time1 = new Date(now.getTime() + mins1 * 60000);
+  const std1 = `${String(time1.getHours()).padStart(2, '0')}:${String(time1.getMinutes()).padStart(2, '0')}`;
+
+  // Second train: 15-25 minutes after first
+  const mins2 = mins1 + 15 + Math.floor((currentMinutes % 20) / 2);
+  const time2 = new Date(now.getTime() + mins2 * 60000);
+  const std2 = `${String(time2.getHours()).padStart(2, '0')}:${String(time2.getMinutes()).padStart(2, '0')}`;
+
+  // Rotate through different destinations with realistic journey times (minutes from Kings Cross)
+  const destinations = [
+    {
+      name: 'Edinburgh',
+      calling: ['Peterborough', 'York', 'Darlington', 'Newcastle'],
+      times: [50, 100, 145, 175] // minutes from departure
+    },
+    {
+      name: 'Leeds',
+      calling: ['Stevenage', 'Peterborough', 'Doncaster', 'Wakefield'],
+      times: [25, 50, 95, 115]
+    },
+    {
+      name: 'Cambridge',
+      calling: ['Finsbury Park', 'Stevenage', 'Hitchin', 'Royston'],
+      times: [7, 25, 35, 45]
+    },
+    {
+      name: 'Newcastle',
+      calling: ['Peterborough', 'York', 'Darlington', 'Durham'],
+      times: [50, 100, 145, 165]
+    }
+  ];
+
+  const hour = now.getHours();
+  const dest1 = destinations[hour % destinations.length];
+  const dest2 = destinations[(hour + 1) % destinations.length];
+
+  // ETD varies slightly
+  const etd1 = mins1 <= 1 ? 'On time' : mins1 <= 5 ? `${mins1} min` : 'On time';
+  const etd2 = 'Delayed'; // Always show Delayed for second train
+
+  // Generate calling point times using realistic journey times
+  function generateCallingTimes(departureTime, destination) {
+    return destination.times.map(mins => {
+      const arrivalTime = new Date(departureTime.getTime() + mins * 60000);
+      const hh = String(arrivalTime.getHours()).padStart(2, '0');
+      const mm = String(arrivalTime.getMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    });
+  }
+
+  const callingTimes1 = generateCallingTimes(time1, dest1);
+  const callingText1 = dest1.calling.map((station, i) => `${station} (${callingTimes1[i]})`).join(', ');
+
+  const html = `
+    <div class="oled-service">
+      <div class="oled-service-line">
+        <span>1st  ${std1}  ${dest1.name}</span>
+        <span>${etd1}</span>
+      </div>
+      <div class="oled-calling">
+        <span class="oled-calling-label">Calling at:</span>
+        <div class="oled-calling-scroll-container">
+          <span class="oled-calling-scroll">${callingText1}</span>
+        </div>
+      </div>
+    </div>
+    <div class="oled-service">
+      <div class="oled-service-line">
+        <span>2nd  ${std2}  ${dest2.name}</span>
+        <span>${etd2}</span>
+      </div>
+    </div>
+  `;
+
+  servicesEl.innerHTML = html;
+}
+
+// Show demo departures on load and refresh every 30 seconds to update times
+showDemoDepartures();
+setInterval(showDemoDepartures, 30000);
+
+// ============= Payment Error Handling =============
+
+// Check for payment-related URL parameters (from PayPal/Stripe redirects)
+function checkPaymentStatus() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const error = urlParams.get('error');
+  const message = urlParams.get('message');
+  const orderNumber = urlParams.get('order');
+  const paymentCancelled = urlParams.get('payment_cancelled');
+
+  if (paymentCancelled) {
+    showPaymentMessage(
+      '⚠️ Payment Cancelled',
+      `Your PayPal payment for order ${paymentCancelled} was cancelled. You can try again from the checkout page.`,
+      'warning'
+    );
+    return;
+  }
+
+  if (error === 'payment_failed') {
+    showPaymentMessage(
+      '❌ Payment Failed',
+      message ? `Payment failed: ${message}` : 'Your payment could not be processed. Please try again or use a different payment method.',
+      'error'
+    );
+  } else if (error === 'payment_processing') {
+    showPaymentMessage(
+      '⚠️ Payment Processing Issue',
+      `There was an issue processing your payment${orderNumber ? ` for order ${orderNumber}` : ''}. ${message || 'Please contact support.'}`,
+      'warning'
+    );
+  } else if (error === 'missing_parameters') {
+    showPaymentMessage(
+      '❌ Invalid Payment Link',
+      'This payment link is invalid or incomplete. Please start a new checkout.',
+      'error'
+    );
+  }
+}
+
+// Display payment message banner
+function showPaymentMessage(title, message, type = 'info') {
+  // Create message banner
+  const banner = document.createElement('div');
+  banner.className = `payment-message payment-message-${type}`;
+  banner.innerHTML = `
+    <div class="payment-message-content">
+      <div class="payment-message-title">${title}</div>
+      <div class="payment-message-text">${message}</div>
+      <button onclick="this.parentElement.parentElement.remove()" class="payment-message-close">✕</button>
+    </div>
+  `;
+
+  // Add styles if not already added
+  if (!document.getElementById('payment-message-styles')) {
+    const style = document.createElement('style');
+    style.id = 'payment-message-styles';
+    style.textContent = `
+      .payment-message {
+        position: fixed;
+        top: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 600px;
+        width: 90%;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        z-index: 1000;
+        animation: slideDown 0.4s ease;
+      }
+
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+
+      .payment-message-error {
+        background: #fee;
+        border-left: 4px solid #e53e3e;
+      }
+
+      .payment-message-warning {
+        background: #ffc;
+        border-left: 4px solid #dd6b20;
+      }
+
+      .payment-message-info {
+        background: #e6f7ff;
+        border-left: 4px solid #3182ce;
+      }
+
+      .payment-message-content {
+        position: relative;
+        padding-right: 2rem;
+      }
+
+      .payment-message-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #1a202c;
+      }
+
+      .payment-message-text {
+        color: #4a5568;
+        line-height: 1.6;
+      }
+
+      .payment-message-close {
+        position: absolute;
+        top: 0;
+        right: 0;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #718096;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        line-height: 1;
+      }
+
+      .payment-message-close:hover {
+        color: #1a202c;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Insert banner at top of page
+  document.body.insertBefore(banner, document.body.firstChild);
+
+  // Auto-dismiss after 10 seconds
+  setTimeout(() => {
+    if (banner.parentElement) {
+      banner.style.animation = 'slideDown 0.3s ease reverse';
+      setTimeout(() => banner.remove(), 300);
+    }
+  }, 10000);
+}
+
+// Check for payment status on page load
+checkPaymentStatus();

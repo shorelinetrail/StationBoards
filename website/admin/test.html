@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Test - StationBoards</title>
+  <style>
+    body {
+      font-family: monospace;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #00ff00;
+    }
+    h1 { color: #00ff00; }
+    .test {
+      margin: 20px 0;
+      padding: 15px;
+      background: #2a2a2a;
+      border-left: 4px solid #00ff00;
+    }
+    .error { border-left-color: #ff0000; color: #ff6666; }
+    .success { border-left-color: #00ff00; }
+    button {
+      background: #00ff00;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    pre {
+      background: #000;
+      padding: 10px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚉 StationBoards Database Test</h1>
+
+  <button onclick="runTests()">Run All Tests</button>
+  <button onclick="location.href='/admin'">Go to Admin Dashboard</button>
+
+  <div id="results"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qqwrjrstqnwbwlceccde.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxd3JqcnN0cW53YndsY2VjY2RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5MDMxNjUsImV4cCI6MjA3OTQ3OTE2NX0.ZLkqaJRwpK9aP4AjNCeikrbBfPzUVySaOGdst47GEyE';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const results = document.getElementById('results');
+
+    async function runTests() {
+      results.innerHTML = '<h2>Running tests...</h2>';
+
+      // Test 1: Connection
+      await testConnection();
+
+      // Test 2: Tables exist
+      await testTables();
+
+      // Test 3: Auth user
+      await testAuth();
+    }
+
+    async function testConnection() {
+      try {
+        const { data, error } = await supabase.from('orders').select('count');
+
+        if (error && error.message.includes('relation "public.orders" does not exist')) {
+          addResult('❌ Database tables not created', 'error',
+            'You need to run the schema.sql in Supabase SQL Editor.\n' +
+            'Go to: https://supabase.com/dashboard/project/qqwrjrstqnwbwlceccde/editor\n' +
+            'Copy contents of /supabase/schema.sql and run it.'
+          );
+        } else if (error) {
+          addResult('❌ Database error', 'error', error.message);
+        } else {
+          addResult('✅ Database connected', 'success', 'Tables exist and are accessible');
+        }
+      } catch (error) {
+        addResult('❌ Connection failed', 'error', error.message);
+      }
+    }
+
+    async function testTables() {
+      const tables = ['orders', 'boards', 'shipments', 'order_history', 'email_log'];
+
+      for (const table of tables) {
+        try {
+          const { data, error } = await supabase.from(table).select('count').limit(0);
+
+          if (error) {
+            if (error.message.includes('does not exist')) {
+              addResult(`❌ Table "${table}" missing`, 'error', 'Run schema.sql to create tables');
+            } else {
+              addResult(`⚠️  Table "${table}" error`, 'error', error.message);
+            }
+          } else {
+            addResult(`✅ Table "${table}" exists`, 'success');
+          }
+        } catch (error) {
+          addResult(`❌ Error checking "${table}"`, 'error', error.message);
+        }
+      }
+    }
+
+    async function testAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session) {
+        addResult('✅ User authenticated', 'success', `Logged in as: ${session.user.email}`);
+      } else {
+        addResult('⚠️  Not authenticated', 'error',
+          'You need to create a user in Supabase:\n' +
+          '1. Go to Authentication → Users\n' +
+          '2. Add user\n' +
+          '3. Enter email + password\n' +
+          '4. Then login at /admin'
+        );
+      }
+    }
+
+    function addResult(title, type, details) {
+      const div = document.createElement('div');
+      div.className = `test ${type}`;
+      div.innerHTML = `
+        <strong>${title}</strong>
+        ${details ? `<pre>${details}</pre>` : ''}
+      `;
+      results.appendChild(div);
+    }
+
+    // Run tests on load
+    runTests();
+  </script>
+</body>
+</html>
