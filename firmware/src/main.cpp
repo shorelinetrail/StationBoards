@@ -2223,6 +2223,13 @@ void setup() {
   
   // Initialize WiFi
   displayProgress("Connecting to WiFi...", 3, 5, 40);
+  if (strlen(config.wifiSSID) == 0) {
+    // No SSID configured - must start AP mode for user to configure
+    Serial.println("⚠️ No WiFi SSID configured - starting AP mode");
+    startAccessPoint();
+    displayAPScreen();
+    return;
+  }
   if (!initializeWiFi()) {
     Serial.println("⚠️  WiFi connection failed during setup");
     Serial.println("⏭️  Continuing anyway - will retry in main loop");
