@@ -1846,13 +1846,33 @@ void setupWebServer() {
       return;
     }
 
-    config.save();
+    // Log what we're saving for debugging
+    Serial.println("📝 Saving config with SSID: " + String(config.wifiSSID));
+
+    if (!config.save()) {
+      Serial.println("❌ Config save failed!");
+      server.send(500, "text/plain", "Failed to save configuration");
+      return;
+    }
+
+    // Verify the save by reading back
+    Serial.println("🔍 Verifying saved config...");
+    Config verifyConfig;
+    if (verifyConfig.load()) {
+      Serial.println("✅ Verified SSID: " + String(verifyConfig.wifiSSID));
+    } else {
+      Serial.println("⚠️ Could not verify saved config");
+    }
 
     broadcastStatus("Device restarting - settings saved", "warning");
 
     String html = FPSTR(SAVE_SUCCESS_PAGE);
     server.send(200, "text/html", html);
-    delay(2000);
+
+    // Ensure filesystem is synced before restart
+    delay(500);
+    SPIFFS.end();
+    delay(1500);
     ESP.restart();
   });
 
@@ -2273,7 +2293,10 @@ void setup() {
   
   // Load or create configuration
   displayProgress("Loading configuration...", 2, 5, 20);
-  config.load();
+  bool configLoaded = config.load();
+  Serial.println("📂 Config load result: " + String(configLoaded ? "success" : "failed/defaults"));
+  Serial.println("📶 Loaded SSID: '" + String(config.wifiSSID) + "' (length: " + String(strlen(config.wifiSSID)) + ")");
+  Serial.println("🚉 Loaded Station: " + String(config.stationCode));
 
   // Initialize service provider based on config
   if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
