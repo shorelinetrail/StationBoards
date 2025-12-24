@@ -3093,6 +3093,29 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
     .service-card.selected { border-color: #667eea; background: #f0f4ff; }
     .service-card .icon { font-size: 36px; margin-bottom: 10px; }
     .service-card .name { font-weight: 600; color: #333; }
+    .preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+    .preset-btn {
+      padding: 10px 8px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background: #f8f9fa;
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .preset-btn:hover { border-color: #667eea; background: #f0f4ff; }
+    .preset-btn.selected { border-color: #667eea; background: #e8f0fe; }
+    .config-note {
+      margin-top: 20px;
+      padding: 12px;
+      background: #e8f4f8;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #0066cc;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -3149,10 +3172,30 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
           </div>
         </div>
         <div class="form-group">
-          <label for="stationCode">Station Code</label>
+          <label>Quick Select</label>
+          <div class="preset-grid" id="railPresets">
+            <button type="button" class="preset-btn" onclick="selectStation('PAD')">Paddington</button>
+            <button type="button" class="preset-btn" onclick="selectStation('KGX')">Kings Cross</button>
+            <button type="button" class="preset-btn" onclick="selectStation('VIC')">Victoria</button>
+            <button type="button" class="preset-btn" onclick="selectStation('WAT')">Waterloo</button>
+            <button type="button" class="preset-btn" onclick="selectStation('EUS')">Euston</button>
+            <button type="button" class="preset-btn" onclick="selectStation('LST')">Liverpool St</button>
+          </div>
+          <div class="preset-grid" id="tflPresets" style="display:none;">
+            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUPAC')">Paddington</button>
+            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUKSX')">Kings Cross</button>
+            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUVIC')">Victoria</button>
+            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUWLO')">Waterloo</button>
+            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUBST')">Baker Street</button>
+            <button type="button" class="preset-btn" onclick="selectStation('940GZZLULVT')">Liverpool St</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="stationCode">Or Enter Manually</label>
           <input type="text" id="stationCode" placeholder="e.g., PAD, KGX, VIC" maxlength="16" value="PAD">
           <p class="help-text" id="stationHelp">Enter 3-letter National Rail station code</p>
         </div>
+        <p class="config-note">You can change this anytime via the config page after setup.</p>
       </div>
       <div class="step" data-step="4">
         <div class="success-checkmark">✓</div>
@@ -3242,6 +3285,16 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       document.querySelectorAll('.service-card').forEach(c => c.classList.toggle('selected', parseInt(c.dataset.type) === type));
       document.getElementById('stationHelp').textContent = type === 0 ? 'Enter 3-letter National Rail station code' : 'Enter TFL station NaPTAN ID';
       document.getElementById('stationCode').placeholder = type === 0 ? 'e.g., PAD, KGX, VIC' : 'e.g., 940GZZLUPAC';
+      document.getElementById('railPresets').style.display = type === 0 ? 'grid' : 'none';
+      document.getElementById('tflPresets').style.display = type === 1 ? 'grid' : 'none';
+      document.getElementById('stationCode').value = type === 0 ? 'PAD' : '940GZZLUPAC';
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+    }
+
+    function selectStation(code) {
+      document.getElementById('stationCode').value = code;
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
     }
 
     function finishSetup() {
