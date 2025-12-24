@@ -3146,20 +3146,10 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       </div>
       <div class="step" data-step="3">
         <h2>Choose Your Station</h2>
-        <p class="step-description">Select what to display on your board</p>
-        <div class="service-type-cards">
-          <div class="service-card selected" data-type="0" onclick="selectServiceType(0)">
-            <div class="icon">🚂</div>
-            <div class="name">National Rail</div>
-          </div>
-          <div class="service-card" data-type="1" onclick="selectServiceType(1)">
-            <div class="icon">🚇</div>
-            <div class="name">TFL Underground</div>
-          </div>
-        </div>
+        <p class="step-description">Select a National Rail station to display</p>
         <div class="form-group">
-          <label>Quick Select</label>
-          <div class="preset-grid" id="railPresets">
+          <label>Popular Stations</label>
+          <div class="preset-grid">
             <button type="button" class="preset-btn" onclick="selectStation('PAD')">Paddington</button>
             <button type="button" class="preset-btn" onclick="selectStation('KGX')">Kings Cross</button>
             <button type="button" class="preset-btn" onclick="selectStation('VIC')">Victoria</button>
@@ -3167,21 +3157,13 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
             <button type="button" class="preset-btn" onclick="selectStation('EUS')">Euston</button>
             <button type="button" class="preset-btn" onclick="selectStation('LST')">Liverpool St</button>
           </div>
-          <div class="preset-grid" id="tflPresets" style="display:none;">
-            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUPAC')">Paddington</button>
-            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUKSX')">Kings Cross</button>
-            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUVIC')">Victoria</button>
-            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUWLO')">Waterloo</button>
-            <button type="button" class="preset-btn" onclick="selectStation('940GZZLUBST')">Baker Street</button>
-            <button type="button" class="preset-btn" onclick="selectStation('940GZZLULVT')">Liverpool St</button>
-          </div>
         </div>
         <div class="form-group">
-          <label for="stationCode">Or Enter Manually</label>
-          <input type="text" id="stationCode" placeholder="e.g., PAD, KGX, VIC" maxlength="16" value="PAD">
-          <p class="help-text" id="stationHelp">Enter 3-letter National Rail station code</p>
+          <label for="stationCode">Or Enter Station Code</label>
+          <input type="text" id="stationCode" placeholder="e.g., PAD, KGX, VIC" maxlength="3" value="PAD">
+          <p class="help-text">Enter 3-letter National Rail station code</p>
         </div>
-        <p class="config-note">You can change this anytime via the config page after setup.</p>
+        <p class="config-note">TFL Underground and more options available in the config page after setup.</p>
       </div>
       <div class="step" data-step="4">
         <div class="success-checkmark">✓</div>
@@ -3205,7 +3187,6 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
   </div>
   <script>
     let currentStep = 1;
-    let selectedServiceType = 0;
 
     function updateUI() {
       document.querySelectorAll('.step').forEach(s => {
@@ -3266,17 +3247,6 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       event.currentTarget.classList.add('selected');
     }
 
-    function selectServiceType(type) {
-      selectedServiceType = type;
-      document.querySelectorAll('.service-card').forEach(c => c.classList.toggle('selected', parseInt(c.dataset.type) === type));
-      document.getElementById('stationHelp').textContent = type === 0 ? 'Enter 3-letter National Rail station code' : 'Enter TFL station NaPTAN ID';
-      document.getElementById('stationCode').placeholder = type === 0 ? 'e.g., PAD, KGX, VIC' : 'e.g., 940GZZLUPAC';
-      document.getElementById('railPresets').style.display = type === 0 ? 'grid' : 'none';
-      document.getElementById('tflPresets').style.display = type === 1 ? 'grid' : 'none';
-      document.getElementById('stationCode').value = type === 0 ? 'PAD' : '940GZZLUPAC';
-      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
-    }
-
     function selectStation(code) {
       document.getElementById('stationCode').value = code;
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
@@ -3289,7 +3259,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       const station = document.getElementById('stationCode').value.trim().toUpperCase();
       if (!ssid || !station) { showError('wifiError', 'Please complete all fields'); return; }
       document.getElementById('summaryStation').textContent = station;
-      document.getElementById('summaryService').textContent = selectedServiceType === 0 ? 'National Rail' : 'TFL Underground';
+      document.getElementById('summaryService').textContent = 'National Rail';
       currentStep = 4;
       updateUI();
       document.getElementById('wizardFooter').style.display = 'none';
@@ -3297,7 +3267,7 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       formData.append('ssid', ssid);
       formData.append('password', password);
       formData.append('station', station);
-      formData.append('serviceType', selectedServiceType);
+      formData.append('serviceType', '0');
       formData.append('wizard', 'true');
       fetch('/save', { method: 'POST', body: formData }).then(r => {
         if (r.ok) document.getElementById('statusText').innerHTML = '<span style="color:#16a34a;">Settings saved! Restarting...</span>';
