@@ -2040,7 +2040,14 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       showToast("Resetting device...", "warning");
 
       setTimeout(() => {
-        window.location.href = "/reset";
+        fetch("/reset", { method: "POST" })
+          .then(() => {
+            showToast("Device resetting, please wait...", "warning");
+            setTimeout(() => window.location.reload(), 5000);
+          })
+          .catch(err => {
+            showToast("Reset initiated, reconnect to TrainBoard_AP", "info");
+          });
       }, 1500);
     };
 

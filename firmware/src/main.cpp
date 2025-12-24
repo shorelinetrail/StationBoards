@@ -1130,7 +1130,7 @@ bool initializeWiFi() {
 
 void startAccessPoint() {
   WiFi.disconnect();
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP_STA);  // AP_STA mode allows WiFi scanning while in AP mode
   delay(100);
   WiFi.softAP("TrainBoard_AP", "config123");
   IPAddress ip = WiFi.softAPIP();
@@ -1808,11 +1808,18 @@ void setupWebServer() {
     if (server.hasArg("y1")) config.yPos1st = server.arg("y1").toInt();
     if (server.hasArg("y2")) config.yPos2nd = server.arg("y2").toInt();
     if (server.hasArg("y3")) config.yPosAlt = server.arg("y3").toInt();
-    
+
+    // In AP mode, require WiFi SSID to be configured before saving
+    if (systemFlags.apMode && strlen(config.wifiSSID) == 0) {
+      Serial.println("❌ Cannot save: WiFi SSID required in setup mode");
+      server.send(400, "text/plain", "WiFi network must be selected before saving");
+      return;
+    }
+
     config.save();
-    
+
     broadcastStatus("Device restarting - settings saved", "warning");
-    
+
     String html = FPSTR(SAVE_SUCCESS_PAGE);
     server.send(200, "text/html", html);
     delay(2000);
@@ -2103,7 +2110,7 @@ void setupWebServer() {
     }
   });
 
-  server.on("/reset", HTTP_GET, []() {
+  server.on("/reset", HTTP_POST, []() {  // POST to prevent accidental triggers
     if (SPIFFS.exists("/config.json")) {
       SPIFFS.remove("/config.json");
     }
