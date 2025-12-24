@@ -2185,26 +2185,38 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const validModes = ['tube', 'elizabeth-line', 'dlr'];
         const lines = [];
 
-        // Extract lines from lineModeGroups
+        // Line ID to display name mapping
+        const lineNames = {
+          'bakerloo': 'Bakerloo', 'central': 'Central', 'circle': 'Circle',
+          'district': 'District', 'hammersmith-city': 'Hammersmith & City',
+          'jubilee': 'Jubilee', 'metropolitan': 'Metropolitan', 'northern': 'Northern',
+          'piccadilly': 'Piccadilly', 'victoria': 'Victoria', 'waterloo-city': 'Waterloo & City',
+          'elizabeth': 'Elizabeth', 'dlr': 'DLR'
+        };
+
+        // Extract lines from lineModeGroups (lineIdentifier is array of strings)
         if (data.lineModeGroups) {
           data.lineModeGroups.forEach(group => {
-            if (validModes.includes(group.modeName)) {
-              group.lineIdentifier.forEach(line => {
-                lines.push({ id: line.id, name: line.name, platforms: [] });
+            if (validModes.includes(group.modeName) && group.lineIdentifier) {
+              group.lineIdentifier.forEach(lineId => {
+                const name = lineNames[lineId] || lineId.charAt(0).toUpperCase() + lineId.slice(1).replace(/-/g, ' ');
+                lines.push({ id: lineId, name: name, platforms: [] });
               });
             }
           });
         }
 
-        // Also check lines array directly
+        // Also check lines array directly (has id and name properties)
         if (data.lines && lines.length === 0) {
           data.lines.forEach(line => {
-            if (validModes.some(m => line.id.includes(m) || line.modeName === m)) {
+            if (line.modeName && validModes.includes(line.modeName)) {
               lines.push({ id: line.id, name: line.name, platforms: [] });
             }
           });
         }
 
+        // Sort alphabetically
+        lines.sort((a, b) => a.name.localeCompare(b.name));
         console.log('Fallback found', lines.length, 'lines:', lines.map(l => l.name));
         return lines;
       } catch (error) {
