@@ -282,14 +282,15 @@ inline int getAlternatingStartIndex(bool useCallingAt, bool showStationName) {
 
 /**
  * Calculates the maximum index for alternating services
+ * Uses +1 higher values to match original working wrap check formula
  */
 inline int getAlternatingMaxIndex(bool useCallingAt, int extraServices, bool showStationName) {
   int offset = getServiceOffset(showStationName);
 
   if (useCallingAt) {
-    return extraServices + offset;
-  } else {
     return extraServices + 1 + offset;
+  } else {
+    return extraServices + 2 + offset;
   }
 }
 

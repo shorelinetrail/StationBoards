@@ -1499,7 +1499,9 @@ void handleAlternatingService(unsigned long currentTime) {
 
       // Move to next service
       displayState.currentAlternatingService++;
-      if (displayState.currentAlternatingService > maxServiceIndex) {
+      // Use +1 higher max for wrap check (original working formula)
+      int wrapMaxIndex = (config.useCallingAt ? config.extraServices + 1 : config.extraServices + 2) + serviceOffset;
+      if (displayState.currentAlternatingService > wrapMaxIndex) {
         displayState.currentAlternatingService = startIndex;
       }
 
