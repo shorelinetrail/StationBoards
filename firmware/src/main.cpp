@@ -1465,12 +1465,12 @@ void handleAlternatingService(unsigned long currentTime) {
   if (config.useCallingAt) {
     // Calling At mode: need at least 2 services on bottom line to rotate
     minServicesForAlt = config.extraServices + 2 + serviceOffset;
-    maxServiceIndex = config.extraServices + 1 + serviceOffset;
+    maxServiceIndex = config.extraServices + serviceOffset;
     startIndex = 1 + serviceOffset;
   } else {
     // Standard mode: need at least 2 services on bottom line to rotate
     minServicesForAlt = config.extraServices + 3 + serviceOffset;
-    maxServiceIndex = config.extraServices + 2 + serviceOffset;
+    maxServiceIndex = config.extraServices + 1 + serviceOffset;
     startIndex = 2 + serviceOffset;
   }
 
@@ -1571,8 +1571,15 @@ void updateDisplay() {
     int startIndex = getAlternatingStartIndex(config.useCallingAt, config.showStationName);
     int maxIndex = getAlternatingMaxIndex(config.useCallingAt, config.extraServices, config.showStationName);
 
-    if (displayState.serviceCount >= 2 + serviceOffset) {
+    if (displayState.serviceCount >= minServices) {
       int indexA = displayState.currentAlternatingService;
+
+      // Safety check: ensure indexA is in valid range
+      if (indexA < startIndex || indexA > maxIndex || indexA >= displayState.serviceCount) {
+        indexA = startIndex;
+        displayState.currentAlternatingService = startIndex;
+      }
+
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
       String labelA = getServiceLabel(indexA);
@@ -1604,8 +1611,15 @@ void updateDisplay() {
     int startIndex = getAlternatingStartIndex(config.useCallingAt, config.showStationName);
     int maxIndex = getAlternatingMaxIndex(config.useCallingAt, config.extraServices, config.showStationName);
 
-    if (displayState.serviceCount >= 3 + serviceOffset) {
+    if (displayState.serviceCount >= minServices) {
       int indexA = displayState.currentAlternatingService;
+
+      // Safety check: ensure indexA is in valid range
+      if (indexA < startIndex || indexA > maxIndex || indexA >= displayState.serviceCount) {
+        indexA = startIndex;
+        displayState.currentAlternatingService = startIndex;
+      }
+
       int indexB = (indexA + 1 > maxIndex) ? startIndex : indexA + 1;
 
       String labelA = getServiceLabel(indexA);
