@@ -2210,71 +2210,17 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           });
         }
 
-        // Pattern to match platform names (direction + platform)
-        const platformPattern = /((?:Northbound|Southbound|Eastbound|Westbound|Inner Rail|Outer Rail|Platform\s*\d+).*)/i;
+        // Note: StopPoint endpoint doesn't provide directional platform names
+        // (like "Eastbound - Platform 1"). Those only come from live Arrivals data.
+        // For fallback, we return lines without platform data and mark as fallback.
+        console.log('Using StopPoint fallback - platform names only available with live data');
 
-        // Recursively find all platform entries
-        const findPlatforms = (items, depth = 0) => {
-          if (!items || !Array.isArray(items)) return;
-          items.forEach(item => {
-            const name = item.commonName || '';
-            const stopType = item.stopType || '';
-
-            // Check if this looks like a platform (by stopType or by name pattern)
-            const isPlatformType = stopType.includes('Platform') || stopType === 'NaptanMetroPlatform' || stopType === 'NaptanRailAccessArea';
-            const hasPlatformName = platformPattern.test(name);
-
-            if (isPlatformType || hasPlatformName) {
-              // Extract just the platform part from the name
-              let platformName = name;
-              const match = name.match(platformPattern);
-              if (match) {
-                platformName = match[1];
-              }
-
-              // Associate with lines
-              if (item.lines && Array.isArray(item.lines) && platformName) {
-                item.lines.forEach(line => {
-                  const lineId = line.id;
-                  if (lineMap.has(lineId)) {
-                    lineMap.get(lineId).platforms.add(platformName);
-                    console.log(`Found platform "${platformName}" for line ${lineId}`);
-                  }
-                });
-              }
-            }
-
-            // Always recurse into children
-            if (item.children) {
-              findPlatforms(item.children, depth + 1);
-            }
-          });
-        };
-
-        // Search through all children recursively
-        findPlatforms(data.children);
-
-        // If still no platforms found, try additionalProperties or lineGroup
-        if (Array.from(lineMap.values()).every(l => l.platforms.size === 0)) {
-          console.log('No platforms found in children, checking additionalProperties...');
-          // Some stations have platform info in additionalProperties
-          if (data.additionalProperties) {
-            data.additionalProperties.forEach(prop => {
-              if (prop.key && prop.key.toLowerCase().includes('platform') && prop.value) {
-                // Add to all lines as we can't determine which line
-                lineMap.forEach((lineData, lineId) => {
-                  lineData.platforms.add(prop.value);
-                });
-              }
-            });
-          }
-        }
-
-        // Convert map to array
+        // Convert map to array - platforms will be empty, marked as fallback
         const lines = Array.from(lineMap.entries()).map(([id, data]) => ({
           id: id,
           name: data.name,
-          platforms: Array.from(data.platforms).sort()
+          platforms: [],
+          isStaticFallback: true  // Flag to indicate no live platform data
         }));
 
         // Sort alphabetically
@@ -2469,6 +2415,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
      */
     const showTflPlatformSelector = (lineId) => {
       const platformFilter = document.getElementById('tflPlatformFilter');
+      const platformHelp = document.getElementById('tflplatform-help');
 
       // Clear platform filter first
       platformFilter.innerHTML = '<option value="">-- Select Platform --</option>';
@@ -2482,16 +2429,31 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       // Find the selected line
       const selectedLine = window.tflLinesData.find(line => line.id === lineId);
 
-      if (!selectedLine || !selectedLine.platforms || selectedLine.platforms.length === 0) {
-        console.log('No platforms found for line:', lineId);
+      if (!selectedLine) {
+        console.log('Line not found:', lineId);
         return;
       }
 
-      // Populate platform dropdown
+      // Check if this is fallback data (no live platform info)
+      if (selectedLine.isStaticFallback || !selectedLine.platforms || selectedLine.platforms.length === 0) {
+        // No live platform data - show "All Platforms" as the only option
+        platformFilter.innerHTML = '<option value="">All Platforms</option>';
+        platformFilter.value = '';
+        if (platformHelp) {
+          platformHelp.textContent = 'Platform selection available when trains are running';
+        }
+        console.log('Using fallback - no live platform data for', selectedLine.name);
+        return;
+      }
+
+      // Populate platform dropdown with live data
       platformFilter.innerHTML = '<option value="">-- Select Platform --</option>' +
         selectedLine.platforms.map(platform =>
           `<option value="${escapeHtml(platform)}">${escapeHtml(platform)}</option>`
         ).join('');
+      if (platformHelp) {
+        platformHelp.textContent = 'Select a platform to filter arrivals';
+      }
 
       console.log('Populated', selectedLine.platforms.length, 'platforms for', selectedLine.name);
     };
@@ -2658,7 +2620,12 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
               return;
             }
 
-            if (!platformFilter || !platformFilter.value || platformFilter.value === '') {
+            // Check if we're using fallback data (no live platforms available)
+            const selectedLine = window.tflLinesData?.find(line => line.id === lineFilter.value);
+            const isUsingFallback = selectedLine?.isStaticFallback || !selectedLine?.platforms?.length;
+
+            // Only require platform selection if live data is available
+            if (!isUsingFallback && (!platformFilter || !platformFilter.value || platformFilter.value === '')) {
               showToast("Please select a platform", "error");
               return;
             }
