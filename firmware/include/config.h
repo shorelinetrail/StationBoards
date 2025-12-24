@@ -19,7 +19,6 @@ public:
 
   // Service Settings
   int serviceType = SERVICE_NATIONAL_RAIL;
-  char tflApiKey[128] = "";  // TFL API key (optional but recommended)
   char tflLineFilter[32] = "";  // TFL line filter (e.g., "northern", "elizabeth", "" for all)
   char tflDirectionFilter[16] = "";  // TFL direction filter ("inbound", "outbound", "" for all)
   char tflPlatformFilter[64] = "";  // TFL platform filter (e.g., "Eastbound - Platform 5", "" for all)
@@ -90,14 +89,6 @@ public:
 
     // Load Service Settings
     serviceType = doc["serviceType"] | SERVICE_NATIONAL_RAIL;
-    if (doc.containsKey("tflApiKey")) {
-      String key = doc["tflApiKey"].as<String>();
-      key.trim();
-      strncpy(tflApiKey, key.c_str(), sizeof(tflApiKey) - 1);
-      tflApiKey[sizeof(tflApiKey) - 1] = '\0';
-    } else {
-      tflApiKey[0] = '\0';
-    }
     if (doc.containsKey("tflLineFilter")) {
       String filter = doc["tflLineFilter"].as<String>();
       filter.trim();
@@ -180,7 +171,6 @@ public:
 
     // Save Service Settings
     doc["serviceType"] = serviceType;
-    doc["tflApiKey"] = tflApiKey;
     doc["tflLineFilter"] = tflLineFilter;
     doc["tflDirectionFilter"] = tflDirectionFilter;
     doc["tflPlatformFilter"] = tflPlatformFilter;

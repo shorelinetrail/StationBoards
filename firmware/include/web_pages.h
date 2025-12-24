@@ -1003,15 +1003,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           <span class="help-text" id="servicetype-help">Select which transport service to display</span>
         </div>
 
-        <div class="form-group" id="tflApiKeyGroup" style="display:none;">
-          <label for="tflApiKey">
-            TFL API Key
-            <span class="info-tooltip" title="Optional but recommended. Get from https://api.tfl.gov.uk" aria-label="Information: TFL API key">?</span>
-          </label>
-          <input type="password" id="tflApiKey" name="tflApiKey" value="{TFL_API_KEY}" placeholder="Enter TFL API key" aria-describedby="tflkey-help">
-          <span class="help-text" id="tflkey-help">Free API key from <a href="https://api.tfl.gov.uk" target="_blank">api.tfl.gov.uk</a></span>
-        </div>
-
         <div class="form-group">
           <label for="station">
             <span id="stationLabel">Station Code (CRS)</span>
@@ -1378,8 +1369,7 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       if (query.length < 2) return [];
 
       try {
-        const tflApiKey = document.getElementById('tflApiKey')?.value || '';
-        const apiUrl = `https://api.tfl.gov.uk/StopPoint/Search?query=${encodeURIComponent(query)}&modes=tube,elizabeth-line${tflApiKey ? '&app_key=' + encodeURIComponent(tflApiKey) : ''}`;
+        const apiUrl = `https://api.tfl.gov.uk/StopPoint/Search?query=${encodeURIComponent(query)}&modes=tube,elizabeth-line&app_key=a855ea5ced5443c8902a3f5911589060`;
 
         const response = await fetch(apiUrl);
         if (!response.ok) return [];
@@ -2073,7 +2063,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
       const formData = new URLSearchParams();
       console.log('autoApplySettings: stationCodeOverride=', stationCodeOverride, 'station name=', stationInput.value, 'station code=', stationValue);
       formData.append('serviceType', serviceType);
-      formData.append('tflApiKey', document.getElementById('tflApiKey').value);
       formData.append('tflLineFilter', document.getElementById('tflLineFilter').value);
       formData.append('tflPlatformFilter', document.getElementById('tflPlatformFilter').value);
       formData.append('station', stationValue);
@@ -2121,11 +2110,10 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
     const fetchTflStationLines = async (stationId, stationName = '') => {
       console.log('fetchTflStationLines called with:', stationId, stationName);
 
-      const tflApiKey = document.getElementById('tflApiKey')?.value || '';
       // Use Arrivals endpoint to get lines that actually have services at this station
-      const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}/Arrivals${tflApiKey ? '?app_key=' + encodeURIComponent(tflApiKey) : ''}`;
+      const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}/Arrivals?app_key=a855ea5ced5443c8902a3f5911589060`;
 
-      console.log('Fetching arrivals from TFL API:', apiUrl.replace(tflApiKey, 'XXX'));
+      console.log('Fetching arrivals from TFL API');
 
       try {
         const response = await fetch(apiUrl);
@@ -2431,7 +2419,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
       // Service type selection handler
       const serviceTypeSelect = document.getElementById("serviceType");
-      const tflApiKeyGroup = document.getElementById("tflApiKeyGroup");
       const stationLabel = document.getElementById("stationLabel");
       const stationTooltip = document.getElementById("stationTooltip");
 
@@ -2444,7 +2431,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const modeSelect = document.getElementById("mode");
 
         // Show/hide appropriate elements
-        tflApiKeyGroup.style.display = isUnderground ? "block" : "none";
         tflLineFilterGroup.style.display = isUnderground ? "block" : "none";
         tflPlatformFilterGroup.style.display = isUnderground ? "block" : "none";
         nationalRailPresets.style.display = isUnderground ? "none" : "grid";

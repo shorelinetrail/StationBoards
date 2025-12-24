@@ -486,8 +486,8 @@ bool TflUndergroundProvider::buildRequest(const char* stationCode, String& reque
   }
 
   // Add API key as query parameter
-  if (apiKey.length() > 0) {
-    path += "?app_key=" + apiKey;
+  if (strlen(apiKey) > 0) {
+    path += "?app_key=" + String(apiKey);
   }
 
   request = "GET " + path + " HTTP/1.1\r\n";

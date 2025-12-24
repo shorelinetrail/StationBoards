@@ -74,7 +74,7 @@ public:
 class TflUndergroundProvider : public ServiceProvider {
 private:
   const char* apiHost = "api.tfl.gov.uk";
-  String apiKey;  // Will be loaded from config
+  const char* apiKey = "a855ea5ced5443c8902a3f5911589060";  // Hardcoded TFL API key
   String lineFilter;  // Line filter (e.g., "northern", "elizabeth", "" for all)
   String directionFilter;  // Direction filter ("inbound", "outbound", "" for all)
   String platformFilter;  // Platform filter (e.g., "Eastbound - Platform 5", "" for all)
@@ -96,7 +96,6 @@ private:
 
 public:
   TflUndergroundProvider();
-  void setApiKey(const String& key) { apiKey = key; }
   void setLineFilter(const String& filter) { lineFilter = filter; }
   void setDirectionFilter(const String& direction) { directionFilter = direction; }
   void setPlatformFilter(const String& platform) { platformFilter = platform; }

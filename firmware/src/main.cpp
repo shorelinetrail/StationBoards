@@ -1677,7 +1677,6 @@ void setupWebServer() {
       chunk.replace("{SSID}", String(config.wifiSSID));
       chunk.replace("{SERVICE_SEL_0}", config.serviceType == Config::SERVICE_NATIONAL_RAIL ? " selected" : "");
       chunk.replace("{SERVICE_SEL_1}", config.serviceType == Config::SERVICE_TFL_UNDERGROUND ? " selected" : "");
-      chunk.replace("{TFL_API_KEY}", String(config.tflApiKey));
       chunk.replace("{STATION}", String(config.stationCode));
       chunk.replace("{STATION_NAME}", String(displayState.stationName));
       chunk.replace("{INTERVAL}", String(config.refreshInterval));
@@ -1724,7 +1723,6 @@ void setupWebServer() {
 
       // Reinitialize service provider if type changed
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
-        tflUndergroundProvider.setApiKey(String(config.tflApiKey));
         tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
         tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
         tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
@@ -1733,16 +1731,6 @@ void setupWebServer() {
       } else {
         serviceProvider = &nationalRailProvider;
         Serial.println("  🚂 Switched to National Rail provider");
-      }
-    }
-
-    // Handle TFL API key
-    if (server.hasArg("tflApiKey")) {
-      String apiKey = server.arg("tflApiKey");
-      safeStrCopy(config.tflApiKey, apiKey, sizeof(config.tflApiKey));
-      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
-        tflUndergroundProvider.setApiKey(apiKey);
-        Serial.println("  🔑 TFL API key updated");
       }
     }
 
@@ -1872,7 +1860,6 @@ void setupWebServer() {
 
       // Reinitialize service provider if type changed
       if (serviceType == Config::SERVICE_TFL_UNDERGROUND) {
-        tflUndergroundProvider.setApiKey(String(config.tflApiKey));
         tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
         tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
         tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
@@ -1881,16 +1868,6 @@ void setupWebServer() {
       } else {
         serviceProvider = &nationalRailProvider;
         Serial.println("  🚂 Switched to National Rail provider");
-      }
-    }
-
-    // Handle TFL API key
-    if (server.hasArg("tflApiKey")) {
-      String apiKey = server.arg("tflApiKey");
-      safeStrCopy(config.tflApiKey, apiKey, sizeof(config.tflApiKey));
-      if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
-        tflUndergroundProvider.setApiKey(apiKey);
-        Serial.println("  🔑 TFL API key updated");
       }
     }
 
@@ -2228,7 +2205,6 @@ void setup() {
 
   // Initialize service provider based on config
   if (config.serviceType == Config::SERVICE_TFL_UNDERGROUND) {
-    tflUndergroundProvider.setApiKey(String(config.tflApiKey));
     tflUndergroundProvider.setLineFilter(String(config.tflLineFilter));
     tflUndergroundProvider.setDirectionFilter(String(config.tflDirectionFilter));
     tflUndergroundProvider.setPlatformFilter(String(config.tflPlatformFilter));
