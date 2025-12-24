@@ -2183,7 +2183,6 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
 
         const data = await response.json();
         const validModes = ['tube', 'elizabeth-line', 'dlr'];
-        const lines = [];
 
         // Line ID to display name mapping
         const lineNames = {
@@ -2194,30 +2193,49 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           'elizabeth': 'Elizabeth', 'dlr': 'DLR'
         };
 
-        // Extract lines from lineModeGroups (lineIdentifier is array of strings)
+        // Build map of line -> platforms from children (platform stop points)
+        const lineMap = new Map(); // lineId -> { name, platforms: Set }
+
+        // Extract lines from lineModeGroups first
         if (data.lineModeGroups) {
           data.lineModeGroups.forEach(group => {
             if (validModes.includes(group.modeName) && group.lineIdentifier) {
               group.lineIdentifier.forEach(lineId => {
-                const name = lineNames[lineId] || lineId.charAt(0).toUpperCase() + lineId.slice(1).replace(/-/g, ' ');
-                lines.push({ id: lineId, name: name, platforms: [] });
+                if (!lineMap.has(lineId)) {
+                  const name = lineNames[lineId] || lineId.charAt(0).toUpperCase() + lineId.slice(1).replace(/-/g, ' ');
+                  lineMap.set(lineId, { name: name, platforms: new Set() });
+                }
               });
             }
           });
         }
 
-        // Also check lines array directly (has id and name properties)
-        if (data.lines && lines.length === 0) {
-          data.lines.forEach(line => {
-            if (line.modeName && validModes.includes(line.modeName)) {
-              lines.push({ id: line.id, name: line.name, platforms: [] });
+        // Extract platforms from children array (these are platform stop points)
+        if (data.children && Array.isArray(data.children)) {
+          data.children.forEach(child => {
+            // Each child platform has a commonName and lines array
+            const platformName = child.commonName || '';
+            if (child.lines && Array.isArray(child.lines)) {
+              child.lines.forEach(line => {
+                const lineId = line.id;
+                if (lineMap.has(lineId) && platformName) {
+                  lineMap.get(lineId).platforms.add(platformName);
+                }
+              });
             }
           });
         }
 
+        // Convert map to array
+        const lines = Array.from(lineMap.entries()).map(([id, data]) => ({
+          id: id,
+          name: data.name,
+          platforms: Array.from(data.platforms).sort()
+        }));
+
         // Sort alphabetically
         lines.sort((a, b) => a.name.localeCompare(b.name));
-        console.log('Fallback found', lines.length, 'lines:', lines.map(l => l.name));
+        console.log('Fallback found', lines.length, 'lines:', lines.map(l => `${l.name} (${l.platforms.length} platforms)`));
         return lines;
       } catch (error) {
         console.error('Fallback also failed:', error);
