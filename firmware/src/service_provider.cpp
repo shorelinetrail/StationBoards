@@ -376,8 +376,8 @@ bool TflUndergroundProvider::fetchStationName(const char* stationCode) {
 
   // Build station info request
   String path = "/StopPoint/" + String(stationCode);
-  if (apiKey.length() > 0) {
-    path += "?app_key=" + apiKey;
+  if (strlen(apiKey) > 0) {
+    path += "?app_key=" + String(apiKey);
   }
 
   String req = "GET " + path + " HTTP/1.1\r\n";
