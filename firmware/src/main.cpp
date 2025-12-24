@@ -1676,6 +1676,7 @@ void setupWebServer() {
       chunk.replace("{Y3}", String(config.yPosAlt));
       chunk.replace("{IP}", WiFi.localIP().toString());
       chunk.replace("{DEVICE_ID}", config.deviceId);
+      chunk.replace("{AP_MODE}", systemFlags.apMode ? "true" : "false");
 
       // Send this chunk
       server.sendContent(chunk);
