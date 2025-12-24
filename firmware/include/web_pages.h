@@ -2210,21 +2210,39 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           });
         }
 
-        // Extract platforms from children array (these are platform stop points)
-        if (data.children && Array.isArray(data.children)) {
-          data.children.forEach(child => {
-            // Each child platform has a commonName and lines array
-            const platformName = child.commonName || '';
-            if (child.lines && Array.isArray(child.lines)) {
-              child.lines.forEach(line => {
-                const lineId = line.id;
-                if (lineMap.has(lineId) && platformName) {
-                  lineMap.get(lineId).platforms.add(platformName);
-                }
-              });
+        // Recursively find all platform stop points (NaptanMetroPlatform, NaptanRailAccessArea)
+        const findPlatforms = (children) => {
+          if (!children || !Array.isArray(children)) return;
+          children.forEach(child => {
+            // Check if this is a platform stop point
+            const stopType = child.stopType || '';
+            if (stopType === 'NaptanMetroPlatform' || stopType === 'NaptanRailAccessArea') {
+              // Extract platform name - remove station prefix if present
+              let platformName = child.commonName || '';
+              // Try to extract just the platform part (e.g., "Eastbound - Platform 1")
+              const platformMatch = platformName.match(/((?:Northbound|Southbound|Eastbound|Westbound|Inner Rail|Outer Rail).*)/i);
+              if (platformMatch) {
+                platformName = platformMatch[1];
+              }
+
+              if (child.lines && Array.isArray(child.lines) && platformName) {
+                child.lines.forEach(line => {
+                  const lineId = line.id;
+                  if (lineMap.has(lineId)) {
+                    lineMap.get(lineId).platforms.add(platformName);
+                  }
+                });
+              }
+            }
+            // Recurse into children
+            if (child.children) {
+              findPlatforms(child.children);
             }
           });
-        }
+        };
+
+        // Search through all children recursively
+        findPlatforms(data.children);
 
         // Convert map to array
         const lines = Array.from(lineMap.entries()).map(([id, data]) => ({
