@@ -2130,9 +2130,11 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         const lineMap = new Map();
         const platformsByLine = new Map();
 
+        // Valid TFL underground modes
+        const validModes = ['tube', 'elizabeth-line', 'dlr'];
+
         arrivals.forEach(arrival => {
-          if (arrival.lineId && arrival.lineName && arrival.modeName === 'tube') {
-            // Only include tube mode arrivals (excludes Elizabeth line, which uses separate station IDs)
+          if (arrival.lineId && arrival.lineName && validModes.includes(arrival.modeName)) {
             if (!lineMap.has(arrival.lineId)) {
               lineMap.set(arrival.lineId, arrival.lineName);
               platformsByLine.set(arrival.lineId, new Set());
@@ -2156,11 +2158,57 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
         tubeLines.sort((a, b) => a.name.localeCompare(b.name));
 
         console.log('Station has', tubeLines.length, 'tube lines with active services:', tubeLines.map(l => `${l.name} (${l.platforms.length} platforms)`));
+
+        // If no arrivals found, try fallback to StopPoint endpoint for static line info
+        if (tubeLines.length === 0) {
+          console.log('No arrivals found, trying StopPoint endpoint fallback...');
+          return await fetchTflStationLinesFallback(stationId);
+        }
+
         return tubeLines;
 
       } catch (error) {
         console.error('Error fetching TFL station lines:', error);
-        showToast('Failed to fetch tube lines: ' + error.message, 'error');
+        // Try fallback on error too
+        return await fetchTflStationLinesFallback(stationId);
+      }
+    };
+
+    // Fallback function to get lines from StopPoint endpoint (static data)
+    const fetchTflStationLinesFallback = async (stationId) => {
+      try {
+        const apiUrl = `https://api.tfl.gov.uk/StopPoint/${stationId}?app_key=a855ea5ced5443c8902a3f5911589060`;
+        const response = await fetch(apiUrl);
+        if (!response.ok) return [];
+
+        const data = await response.json();
+        const validModes = ['tube', 'elizabeth-line', 'dlr'];
+        const lines = [];
+
+        // Extract lines from lineModeGroups
+        if (data.lineModeGroups) {
+          data.lineModeGroups.forEach(group => {
+            if (validModes.includes(group.modeName)) {
+              group.lineIdentifier.forEach(line => {
+                lines.push({ id: line.id, name: line.name, platforms: [] });
+              });
+            }
+          });
+        }
+
+        // Also check lines array directly
+        if (data.lines && lines.length === 0) {
+          data.lines.forEach(line => {
+            if (validModes.some(m => line.id.includes(m) || line.modeName === m)) {
+              lines.push({ id: line.id, name: line.name, platforms: [] });
+            }
+          });
+        }
+
+        console.log('Fallback found', lines.length, 'lines:', lines.map(l => l.name));
+        return lines;
+      } catch (error) {
+        console.error('Fallback also failed:', error);
         return [];
       }
     };
