@@ -2210,39 +2210,65 @@ const char CONFIG_PAGE_TEMPLATE[] PROGMEM = R"HTMLCODE(
           });
         }
 
-        // Recursively find all platform stop points (NaptanMetroPlatform, NaptanRailAccessArea)
-        const findPlatforms = (children) => {
-          if (!children || !Array.isArray(children)) return;
-          children.forEach(child => {
-            // Check if this is a platform stop point
-            const stopType = child.stopType || '';
-            if (stopType === 'NaptanMetroPlatform' || stopType === 'NaptanRailAccessArea') {
-              // Extract platform name - remove station prefix if present
-              let platformName = child.commonName || '';
-              // Try to extract just the platform part (e.g., "Eastbound - Platform 1")
-              const platformMatch = platformName.match(/((?:Northbound|Southbound|Eastbound|Westbound|Inner Rail|Outer Rail).*)/i);
-              if (platformMatch) {
-                platformName = platformMatch[1];
+        // Pattern to match platform names (direction + platform)
+        const platformPattern = /((?:Northbound|Southbound|Eastbound|Westbound|Inner Rail|Outer Rail|Platform\s*\d+).*)/i;
+
+        // Recursively find all platform entries
+        const findPlatforms = (items, depth = 0) => {
+          if (!items || !Array.isArray(items)) return;
+          items.forEach(item => {
+            const name = item.commonName || '';
+            const stopType = item.stopType || '';
+
+            // Check if this looks like a platform (by stopType or by name pattern)
+            const isPlatformType = stopType.includes('Platform') || stopType === 'NaptanMetroPlatform' || stopType === 'NaptanRailAccessArea';
+            const hasPlatformName = platformPattern.test(name);
+
+            if (isPlatformType || hasPlatformName) {
+              // Extract just the platform part from the name
+              let platformName = name;
+              const match = name.match(platformPattern);
+              if (match) {
+                platformName = match[1];
               }
 
-              if (child.lines && Array.isArray(child.lines) && platformName) {
-                child.lines.forEach(line => {
+              // Associate with lines
+              if (item.lines && Array.isArray(item.lines) && platformName) {
+                item.lines.forEach(line => {
                   const lineId = line.id;
                   if (lineMap.has(lineId)) {
                     lineMap.get(lineId).platforms.add(platformName);
+                    console.log(`Found platform "${platformName}" for line ${lineId}`);
                   }
                 });
               }
             }
-            // Recurse into children
-            if (child.children) {
-              findPlatforms(child.children);
+
+            // Always recurse into children
+            if (item.children) {
+              findPlatforms(item.children, depth + 1);
             }
           });
         };
 
         // Search through all children recursively
         findPlatforms(data.children);
+
+        // If still no platforms found, try additionalProperties or lineGroup
+        if (Array.from(lineMap.values()).every(l => l.platforms.size === 0)) {
+          console.log('No platforms found in children, checking additionalProperties...');
+          // Some stations have platform info in additionalProperties
+          if (data.additionalProperties) {
+            data.additionalProperties.forEach(prop => {
+              if (prop.key && prop.key.toLowerCase().includes('platform') && prop.value) {
+                // Add to all lines as we can't determine which line
+                lineMap.forEach((lineData, lineId) => {
+                  lineData.platforms.add(prop.value);
+                });
+              }
+            });
+          }
+        }
 
         // Convert map to array
         const lines = Array.from(lineMap.entries()).map(([id, data]) => ({
