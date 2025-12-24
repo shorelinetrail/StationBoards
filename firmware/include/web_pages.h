@@ -2922,4 +2922,356 @@ const char RESET_SUCCESS_PAGE[] PROGMEM = R"HTMLCODE(
 </html>
 )HTMLCODE";
 
+// Setup Wizard Page - shown on first boot
+const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StationBoards - Setup Wizard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .wizard-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 500px;
+      width: 100%;
+      overflow: hidden;
+    }
+    .wizard-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    .wizard-header h1 { font-size: 24px; margin-bottom: 10px; }
+    .progress-bar {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .progress-step {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      transition: all 0.3s;
+    }
+    .progress-step.active { background: white; transform: scale(1.2); }
+    .progress-step.completed { background: #4ade80; }
+    .wizard-content { padding: 40px 30px; min-height: 350px; }
+    .step { display: none; }
+    .step.active { display: block; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .step-icon { font-size: 64px; text-align: center; margin-bottom: 20px; }
+    .step h2 { text-align: center; color: #333; font-size: 22px; margin-bottom: 10px; }
+    .step-description { text-align: center; color: #666; margin-bottom: 30px; line-height: 1.5; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-weight: 600; color: #333; margin-bottom: 8px; }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #667eea; }
+    .network-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+    .network-item {
+      padding: 14px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.2s;
+    }
+    .network-item:hover { background: #f5f5f5; }
+    .network-item:last-child { border-bottom: none; }
+    .network-item.selected { background: #e8f0fe; }
+    .network-name { font-weight: 600; color: #333; }
+    .network-signal { color: #666; font-size: 14px; }
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102,126,234,0.4); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: #f0f0f0; color: #333; margin-top: 10px; }
+    .btn-secondary:hover { background: #e0e0e0; }
+    .btn-scan { background: #f8f9fa; border: 2px dashed #ccc; color: #666; margin-bottom: 15px; }
+    .btn-scan:hover { border-color: #667eea; color: #667eea; }
+    .wizard-footer { padding: 20px 30px; background: #f8f9fa; display: flex; gap: 10px; }
+    .wizard-footer .btn { flex: 1; }
+    .help-text { font-size: 13px; color: #888; margin-top: 8px; }
+    .error-message {
+      background: #fee2e2;
+      color: #dc2626;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 14px;
+      display: none;
+    }
+    .success-checkmark {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+      background: #4ade80;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      color: white;
+      animation: scaleIn 0.5s ease;
+    }
+    @keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
+    .connection-info {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .connection-info p { margin: 8px 0; color: #166534; }
+    .connection-info strong { color: #15803d; }
+    .spinner-small {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #fff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .service-type-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+    .service-card {
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .service-card:hover { border-color: #667eea; }
+    .service-card.selected { border-color: #667eea; background: #f0f4ff; }
+    .service-card .icon { font-size: 36px; margin-bottom: 10px; }
+    .service-card .name { font-weight: 600; color: #333; }
+  </style>
+</head>
+<body>
+  <div class="wizard-container">
+    <div class="wizard-header">
+      <h1>StationBoards Setup</h1>
+      <p>Let's get your train board running</p>
+      <div class="progress-bar">
+        <div class="progress-step active" data-step="1"></div>
+        <div class="progress-step" data-step="2"></div>
+        <div class="progress-step" data-step="3"></div>
+        <div class="progress-step" data-step="4"></div>
+      </div>
+    </div>
+    <div class="wizard-content">
+      <div class="step active" data-step="1">
+        <div class="step-icon">🚂</div>
+        <h2>Welcome!</h2>
+        <p class="step-description">
+          Your StationBoards display is ready to be configured.<br>
+          This wizard will guide you through the setup process.
+        </p>
+        <button class="btn btn-primary" onclick="nextStep()">Get Started</button>
+      </div>
+      <div class="step" data-step="2">
+        <h2>Connect to WiFi</h2>
+        <p class="step-description">Select your home WiFi network</p>
+        <div class="error-message" id="wifiError"></div>
+        <button class="btn btn-scan" id="scanBtn" onclick="scanNetworks()">
+          <span class="btn-text">Scan for Networks</span>
+        </button>
+        <div class="network-list" id="networkList" style="display:none;"></div>
+        <div class="form-group" style="margin-top:20px;">
+          <label for="wifiSSID">Network Name (SSID)</label>
+          <input type="text" id="wifiSSID" placeholder="Select or enter network name" required>
+        </div>
+        <div class="form-group">
+          <label for="wifiPassword">Password</label>
+          <input type="password" id="wifiPassword" placeholder="Enter WiFi password">
+          <p class="help-text">Leave blank for open networks</p>
+        </div>
+      </div>
+      <div class="step" data-step="3">
+        <h2>Choose Your Station</h2>
+        <p class="step-description">Select what to display on your board</p>
+        <div class="service-type-cards">
+          <div class="service-card selected" data-type="0" onclick="selectServiceType(0)">
+            <div class="icon">🚂</div>
+            <div class="name">National Rail</div>
+          </div>
+          <div class="service-card" data-type="1" onclick="selectServiceType(1)">
+            <div class="icon">🚇</div>
+            <div class="name">TFL Underground</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="stationCode">Station Code</label>
+          <input type="text" id="stationCode" placeholder="e.g., PAD, KGX, VIC" maxlength="16" value="PAD">
+          <p class="help-text" id="stationHelp">Enter 3-letter National Rail station code</p>
+        </div>
+      </div>
+      <div class="step" data-step="4">
+        <div class="success-checkmark">✓</div>
+        <h2>Setup Complete!</h2>
+        <p class="step-description">Your StationBoards display is configured and ready.</p>
+        <div class="connection-info">
+          <p><strong>Status:</strong> <span id="statusText">Saving settings...</span></p>
+          <p><strong>Station:</strong> <span id="summaryStation">PAD</span></p>
+          <p><strong>Service:</strong> <span id="summaryService">National Rail</span></p>
+        </div>
+        <p class="help-text" style="margin-top:20px;">
+          The device will restart and connect to your WiFi network.
+        </p>
+      </div>
+    </div>
+    <div class="wizard-footer" id="wizardFooter">
+      <button class="btn btn-secondary" id="backBtn" onclick="prevStep()" style="display:none;">Back</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="nextStep()" style="display:none;">Next</button>
+      <button class="btn btn-primary" id="finishBtn" onclick="finishSetup()" style="display:none;">Finish Setup</button>
+    </div>
+  </div>
+  <script>
+    let currentStep = 1;
+    let selectedServiceType = 0;
+
+    function updateUI() {
+      document.querySelectorAll('.step').forEach(s => {
+        s.classList.toggle('active', parseInt(s.dataset.step) === currentStep);
+      });
+      document.querySelectorAll('.progress-step').forEach(d => {
+        const step = parseInt(d.dataset.step);
+        d.classList.remove('active', 'completed');
+        if (step === currentStep) d.classList.add('active');
+        else if (step < currentStep) d.classList.add('completed');
+      });
+      document.getElementById('backBtn').style.display = currentStep > 1 && currentStep < 4 ? 'block' : 'none';
+      document.getElementById('nextBtn').style.display = currentStep === 2 ? 'block' : 'none';
+      document.getElementById('finishBtn').style.display = currentStep === 3 ? 'block' : 'none';
+    }
+
+    function nextStep() {
+      if (currentStep === 2) {
+        const ssid = document.getElementById('wifiSSID').value.trim();
+        if (!ssid) { showError('wifiError', 'Please select or enter a WiFi network'); return; }
+      }
+      if (currentStep < 4) { currentStep++; updateUI(); }
+    }
+
+    function prevStep() { if (currentStep > 1) { currentStep--; updateUI(); } }
+
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 5000);
+    }
+
+    function scanNetworks() {
+      const btn = document.getElementById('scanBtn');
+      const list = document.getElementById('networkList');
+      btn.innerHTML = '<span class="spinner-small"></span> Scanning...';
+      fetch('/scan').then(r => r.json()).then(data => {
+        list.style.display = 'block';
+        let html = '';
+        if (data.networks && data.networks.length > 0) {
+          data.networks.forEach(n => {
+            const sig = n.rssi > -50 ? 'Excellent' : n.rssi > -60 ? 'Good' : n.rssi > -70 ? 'Fair' : 'Weak';
+            html += '<div class="network-item" onclick="selectNetwork(\'' + n.ssid.replace(/'/g, "\\'") + '\')"><span class="network-name">' + (n.encryption > 0 ? '🔒 ' : '🔓 ') + n.ssid + '</span><span class="network-signal">' + sig + '</span></div>';
+          });
+        } else { html = '<div class="network-item">No networks found</div>'; }
+        list.innerHTML = html;
+        btn.innerHTML = 'Scan Again';
+      }).catch(() => {
+        btn.innerHTML = 'Scan for Networks';
+        showError('wifiError', 'Scan failed. Try again.');
+      });
+    }
+
+    function selectNetwork(ssid) {
+      document.getElementById('wifiSSID').value = ssid;
+      document.querySelectorAll('.network-item').forEach(i => i.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+    }
+
+    function selectServiceType(type) {
+      selectedServiceType = type;
+      document.querySelectorAll('.service-card').forEach(c => c.classList.toggle('selected', parseInt(c.dataset.type) === type));
+      document.getElementById('stationHelp').textContent = type === 0 ? 'Enter 3-letter National Rail station code' : 'Enter TFL station NaPTAN ID';
+      document.getElementById('stationCode').placeholder = type === 0 ? 'e.g., PAD, KGX, VIC' : 'e.g., 940GZZLUPAC';
+    }
+
+    function finishSetup() {
+      const ssid = document.getElementById('wifiSSID').value.trim();
+      const password = document.getElementById('wifiPassword').value;
+      const station = document.getElementById('stationCode').value.trim().toUpperCase();
+      if (!ssid || !station) { showError('wifiError', 'Please complete all fields'); return; }
+      document.getElementById('summaryStation').textContent = station;
+      document.getElementById('summaryService').textContent = selectedServiceType === 0 ? 'National Rail' : 'TFL Underground';
+      currentStep = 4;
+      updateUI();
+      document.getElementById('wizardFooter').style.display = 'none';
+      const formData = new FormData();
+      formData.append('ssid', ssid);
+      formData.append('password', password);
+      formData.append('station', station);
+      formData.append('serviceType', selectedServiceType);
+      formData.append('wizard', 'true');
+      fetch('/save', { method: 'POST', body: formData }).then(r => {
+        if (r.ok) document.getElementById('statusText').innerHTML = '<span style="color:#16a34a;">Settings saved! Restarting...</span>';
+        else throw new Error();
+      }).catch(() => {
+        document.getElementById('statusText').innerHTML = '<span style="color:#dc2626;">Error saving</span>';
+      });
+    }
+
+    updateUI();
+  </script>
+</body>
+</html>
+)HTMLCODE";
+
 #endif

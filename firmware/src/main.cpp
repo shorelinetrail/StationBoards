@@ -1627,6 +1627,31 @@ void updateDisplay() {
 
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
+    // In AP mode (first boot or setup), serve the setup wizard
+    if (systemFlags.apMode) {
+      server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+      server.send(200, "text/html", "");
+
+      // Stream wizard page in chunks
+      const char* wizardPtr = SETUP_WIZARD_PAGE;
+      const size_t chunkSize = 1024;
+      char buffer[chunkSize + 1];
+      size_t wizardLen = strlen_P(wizardPtr);
+      size_t pos = 0;
+
+      while (pos < wizardLen) {
+        size_t remaining = wizardLen - pos;
+        size_t copySize = (remaining < chunkSize) ? remaining : chunkSize;
+        memcpy_P(buffer, wizardPtr + pos, copySize);
+        buffer[copySize] = '\0';
+        server.sendContent(String(buffer));
+        pos += copySize;
+      }
+      server.sendContent("");
+      return;
+    }
+
+    // Normal mode: serve the full config page
     // Use chunked encoding to avoid loading entire template into memory
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
     server.send(200, "text/html", "");
