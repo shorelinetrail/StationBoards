@@ -3347,23 +3347,52 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       const password = document.getElementById('wifiPassword').value;
       const station = document.getElementById('stationCode').value.trim().toUpperCase();
       if (!ssid || !station) { showError('wifiError', 'Please complete all fields'); return; }
+
+      // Show testing step
       document.getElementById('summaryStation').textContent = station;
       document.getElementById('summaryService').textContent = 'National Rail';
       currentStep = 4;
       updateUI();
       document.getElementById('wizardFooter').style.display = 'none';
-      const formData = new FormData();
-      formData.append('ssid', ssid);
-      formData.append('password', password);
-      formData.append('station', station);
-      formData.append('serviceType', '0');
-      formData.append('wizard', 'true');
-      fetch('/save', { method: 'POST', body: formData }).then(r => {
-        if (r.ok) document.getElementById('statusText').innerHTML = '<span style="color:#16a34a;">Settings saved! Restarting...</span>';
-        else throw new Error();
-      }).catch(() => {
-        document.getElementById('statusText').innerHTML = '<span style="color:#dc2626;">Error saving</span>';
-      });
+      document.getElementById('statusText').innerHTML = '<span style="color:#f59e0b;">Testing WiFi connection...</span>';
+
+      // Test WiFi credentials first
+      const testData = new FormData();
+      testData.append('ssid', ssid);
+      testData.append('password', password);
+
+      fetch('/api/test-wifi', { method: 'POST', body: testData })
+        .then(r => r.json())
+        .then(result => {
+          if (result.success) {
+            // WiFi test passed - save settings
+            document.getElementById('statusText').innerHTML = '<span style="color:#16a34a;">WiFi connected! Saving settings...</span>';
+            const formData = new FormData();
+            formData.append('ssid', ssid);
+            formData.append('password', password);
+            formData.append('station', station);
+            formData.append('serviceType', '0');
+            formData.append('wizard', 'true');
+            return fetch('/save', { method: 'POST', body: formData });
+          } else {
+            // WiFi test failed
+            throw new Error(result.error || 'WiFi connection failed. Check password.');
+          }
+        })
+        .then(r => {
+          if (r && r.ok) {
+            document.getElementById('statusText').innerHTML = '<span style="color:#16a34a;">Settings saved! Restarting...</span>';
+          } else if (r) {
+            throw new Error('Failed to save settings');
+          }
+        })
+        .catch(err => {
+          document.getElementById('statusText').innerHTML = '<span style="color:#dc2626;">' + (err.message || 'Error') + '</span>';
+          // Show back button to retry
+          document.getElementById('wizardFooter').style.display = 'flex';
+          currentStep = 1;
+          updateUI();
+        });
     }
 
     updateUI();

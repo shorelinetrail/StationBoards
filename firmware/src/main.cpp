@@ -2149,10 +2149,66 @@ void setupWebServer() {
     ESP.restart();
   });
 
+  // WiFi test endpoint - verifies credentials before saving
+  server.on("/api/test-wifi", HTTP_POST, []() {
+    if (!server.hasArg("ssid")) {
+      server.send(400, "application/json", "{\"success\":false,\"error\":\"SSID required\"}");
+      return;
+    }
+
+    String testSSID = server.arg("ssid");
+    String testPassword = server.hasArg("password") ? server.arg("password") : "";
+
+    Serial.println("🔍 Testing WiFi connection to: " + testSSID);
+
+    // Save current WiFi state
+    String currentSSID = WiFi.SSID();
+    bool wasConnected = (WiFi.status() == WL_CONNECTED);
+
+    // Disconnect and try test connection
+    WiFi.disconnect();
+    delay(100);
+    WiFi.begin(testSSID.c_str(), testPassword.c_str());
+
+    // Wait for connection with timeout (10 seconds)
+    int attempts = 0;
+    int maxAttempts = 40;  // 40 * 250ms = 10 seconds
+    while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
+      delay(250);
+      attempts++;
+    }
+
+    bool success = (WiFi.status() == WL_CONNECTED);
+    String resultIP = success ? WiFi.localIP().toString() : "";
+
+    Serial.println(success ? "✅ Test connection successful!" : "❌ Test connection failed");
+
+    // If we were connected before and test failed, try to reconnect to original
+    if (!success && wasConnected && currentSSID.length() > 0) {
+      Serial.println("🔄 Reconnecting to original network...");
+      WiFi.begin(config.wifiSSID, config.wifiPassword);
+      int reconn = 0;
+      while (WiFi.status() != WL_CONNECTED && reconn < 20) {
+        delay(250);
+        reconn++;
+      }
+    }
+
+    String json = "{\"success\":" + String(success ? "true" : "false");
+    if (success) {
+      json += ",\"ip\":\"" + resultIP + "\"";
+    } else {
+      json += ",\"error\":\"Could not connect. Check password and try again.\"";
+    }
+    json += "}";
+
+    server.send(200, "application/json", json);
+  });
+
   server.on("/scan", HTTP_GET, []() {
     String json = "{\"networks\":[";
     int n = WiFi.scanNetworks();
-    
+
     for (int i = 0; i < n; i++) {
       if (i > 0) json += ",";
       json += "{";
@@ -2257,9 +2313,11 @@ void setup() {
   }
   if (!initializeWiFi()) {
     Serial.println("⚠️  WiFi connection failed during setup");
-    Serial.println("⏭️  Continuing anyway - will retry in main loop");
-    // Don't immediately fall back to AP mode - WiFi might be temporarily down
-    // The main loop will retry connection, and user can configure via serial if needed
+    Serial.println("🔄 Falling back to AP mode for reconfiguration");
+    // Fall back to AP mode so user can fix WiFi credentials
+    startAccessPoint();
+    displayAPScreen();
+    // Continue to setup web server so user can access config page
   }
   
   // Initialize time sync
