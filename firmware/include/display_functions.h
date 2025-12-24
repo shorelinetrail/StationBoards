@@ -287,9 +287,9 @@ inline int getAlternatingMaxIndex(bool useCallingAt, int extraServices, bool sho
   int offset = getServiceOffset(showStationName);
 
   if (useCallingAt) {
-    return extraServices + 1 + offset;
+    return extraServices + offset;
   } else {
-    return extraServices + 2 + offset;
+    return extraServices + 1 + offset;
   }
 }
 
