@@ -2334,40 +2334,49 @@ void setup() {
     displayAPScreen();
     return;
   }
-  if (!initializeWiFi()) {
+
+  bool wifiConnected = initializeWiFi();
+  if (!wifiConnected) {
     Serial.println("⚠️  WiFi connection failed during setup");
     Serial.println("🔄 Falling back to AP mode for reconfiguration");
     // Fall back to AP mode so user can fix WiFi credentials
     startAccessPoint();
-    displayAPScreen();
-    // Continue to setup web server so user can access config page
+    // Don't return - continue to setup web server so user can access config page
   }
-  
-  // Initialize time sync
-  displayProgress("Syncing time...", 4, 5, 60);
-  initializeTimeSync();
-  
+
+  // Initialize time sync (skip if no WiFi - will fail anyway)
+  if (wifiConnected) {
+    displayProgress("Syncing time...", 4, 5, 60);
+    initializeTimeSync();
+  }
+
   // Setup web server and WebSocket
   displayProgress("Starting services...", 5, 5, 80);
   setupWebServer();
-  
+
   // Setup fetch client once for better performance
   fetchClient.setInsecure();
   fetchClient.setTimeout(8000);  // Reduced from 15s to 8s for faster failure detection
   fetchStateData.buffer.reserve(16384);  // Pre-allocate buffer
-  
+
   // Setup OTA
   setupOTA();
 
-  displayProgress("System ready!", 5, 5, 100);
-  delay(500);
-
-  IPAddress localIp = WiFi.localIP();
-  displayReadyScreen(localIp);
-  delay(4000);
+  // Show appropriate screen based on connection status
+  if (wifiConnected) {
+    displayProgress("System ready!", 5, 5, 100);
+    delay(500);
+    IPAddress localIp = WiFi.localIP();
+    displayReadyScreen(localIp);
+    delay(4000);
+  } else {
+    // Show AP screen for reconfiguration
+    displayAPScreen();
+    Serial.println("📡 Device in AP mode - connect to TrainBoard_AP to configure");
+  }
 
   Serial.println("\n✅ Setup complete!");
-  Serial.println("📍 IP: " + WiFi.localIP().toString());
+  Serial.println("📍 IP: " + (wifiConnected ? WiFi.localIP().toString() : WiFi.softAPIP().toString()));
   Serial.println("🌐 WebSocket ready on port 81");
   Serial.println("📊 Free heap: " + String(ESP.getFreeHeap()) + " bytes");
   
