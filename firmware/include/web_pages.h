@@ -3354,16 +3354,27 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
       currentStep = 4;
       updateUI();
       document.getElementById('wizardFooter').style.display = 'none';
-      document.getElementById('statusText').innerHTML = '<span style="color:#f59e0b;">Testing WiFi connection...</span>';
+      document.getElementById('statusText').innerHTML = '<span style="color:#f59e0b;">Testing WiFi connection... (this may take up to 20 seconds)</span>';
 
-      // Test WiFi credentials first
+      console.log('Testing WiFi:', ssid);
+
+      // Test WiFi credentials first with 30 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const testData = new FormData();
       testData.append('ssid', ssid);
       testData.append('password', password);
 
-      fetch('/api/test-wifi', { method: 'POST', body: testData })
-        .then(r => r.json())
+      fetch('/api/test-wifi', { method: 'POST', body: testData, signal: controller.signal })
+        .then(r => {
+          clearTimeout(timeoutId);
+          console.log('Test response status:', r.status);
+          if (!r.ok) throw new Error('Server error: ' + r.status);
+          return r.json();
+        })
         .then(result => {
+          console.log('Test result:', result);
           if (result.success) {
             // WiFi test passed - save settings
             document.getElementById('statusText').innerHTML = '<span style="color:#16a34a;">WiFi connected! Saving settings...</span>';
@@ -3387,7 +3398,11 @@ const char SETUP_WIZARD_PAGE[] PROGMEM = R"HTMLCODE(
           }
         })
         .catch(err => {
-          document.getElementById('statusText').innerHTML = '<span style="color:#dc2626;">' + (err.message || 'Error') + '</span>';
+          clearTimeout(timeoutId);
+          console.error('Setup error:', err);
+          let msg = err.message || 'Error';
+          if (err.name === 'AbortError') msg = 'Connection timed out. Try again.';
+          document.getElementById('statusText').innerHTML = '<span style="color:#dc2626;">' + msg + '</span>';
           // Show back button to retry
           document.getElementById('wizardFooter').style.display = 'flex';
           currentStep = 1;

@@ -2171,7 +2171,16 @@ void setupWebServer() {
 
   // WiFi test endpoint - verifies credentials before saving
   server.on("/api/test-wifi", HTTP_POST, []() {
-    if (!server.hasArg("ssid")) {
+    Serial.println("📡 /api/test-wifi endpoint called");
+
+    // Debug: print all arguments
+    Serial.println("   Args count: " + String(server.args()));
+    for (int i = 0; i < server.args(); i++) {
+      Serial.println("   Arg " + String(i) + ": " + server.argName(i) + " = " + server.arg(i));
+    }
+
+    if (!server.hasArg("ssid") || server.arg("ssid").length() == 0) {
+      Serial.println("❌ No SSID provided");
       server.send(400, "application/json", "{\"success\":false,\"error\":\"SSID required\"}");
       return;
     }
@@ -2180,39 +2189,31 @@ void setupWebServer() {
     String testPassword = server.hasArg("password") ? server.arg("password") : "";
 
     Serial.println("🔍 Testing WiFi connection to: " + testSSID);
+    Serial.println("   Password length: " + String(testPassword.length()));
 
-    // Save current WiFi state
-    String currentSSID = WiFi.SSID();
-    bool wasConnected = (WiFi.status() == WL_CONNECTED);
+    // Disconnect STA but keep AP running
+    WiFi.disconnect(false);  // false = don't turn off WiFi
+    delay(500);
 
-    // Disconnect and try test connection
-    WiFi.disconnect();
-    delay(100);
+    // Try to connect
     WiFi.begin(testSSID.c_str(), testPassword.c_str());
 
-    // Wait for connection with timeout (10 seconds)
+    // Wait for connection with timeout (15 seconds)
     int attempts = 0;
-    int maxAttempts = 40;  // 40 * 250ms = 10 seconds
+    int maxAttempts = 60;  // 60 * 250ms = 15 seconds
     while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
       delay(250);
       attempts++;
+      if (attempts % 10 == 0) {
+        Serial.print(".");
+      }
     }
+    Serial.println();
 
     bool success = (WiFi.status() == WL_CONNECTED);
     String resultIP = success ? WiFi.localIP().toString() : "";
 
-    Serial.println(success ? "✅ Test connection successful!" : "❌ Test connection failed");
-
-    // If we were connected before and test failed, try to reconnect to original
-    if (!success && wasConnected && currentSSID.length() > 0) {
-      Serial.println("🔄 Reconnecting to original network...");
-      WiFi.begin(config.wifiSSID, config.wifiPassword);
-      int reconn = 0;
-      while (WiFi.status() != WL_CONNECTED && reconn < 20) {
-        delay(250);
-        reconn++;
-      }
-    }
+    Serial.println(success ? "✅ Test connection successful! IP: " + resultIP : "❌ Test connection failed");
 
     String json = "{\"success\":" + String(success ? "true" : "false");
     if (success) {
